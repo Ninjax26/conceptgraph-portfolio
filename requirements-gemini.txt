@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Optional alternative to the default Groq provider.
+google-generativeai==0.8.6

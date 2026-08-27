@@ -15,8 +15,7 @@ mkdir -p \
   data/neo4j/import \
   data/neo4j/plugins \
   data/qdrant \
-  data/postgres \
-  data/redis
+  data/postgres
 
 touch \
   app/__init__.py \

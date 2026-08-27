@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     postgres_host: str = Field(default="localhost", alias="POSTGRES_HOST")
     postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
+    database_pool_size: int = Field(default=3, ge=1, le=10, alias="DATABASE_POOL_SIZE")
+    database_max_overflow: int = Field(
+        default=2,
+        ge=0,
+        le=10,
+        alias="DATABASE_MAX_OVERFLOW",
+    )
 
     neo4j_uri: str = Field(default="bolt://localhost:7687", alias="NEO4J_URI")
     neo4j_username: str = Field(default="neo4j", alias="NEO4J_USERNAME")
@@ -25,8 +32,10 @@ class Settings(BaseSettings):
         alias="QDRANT_COLLECTION_NAME",
     )
     qdrant_api_key: SecretStr | None = Field(default=None, alias="QDRANT_API_KEY")
-    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
-    cors_allowed_origins: str = Field(default="", alias="CORS_ALLOWED_ORIGINS")
+    cors_allowed_origins: str = Field(
+        default="",
+        validation_alias=AliasChoices("ALLOWED_ORIGINS", "CORS_ALLOWED_ORIGINS"),
+    )
     demo_access_token: SecretStr | None = Field(default=None, alias="DEMO_ACCESS_TOKEN")
     auth_cookie_name: str = Field(default="conceptgraph_access", alias="AUTH_COOKIE_NAME")
     auth_cookie_secure: bool = Field(default=False, alias="AUTH_COOKIE_SECURE")
@@ -51,6 +60,51 @@ class Settings(BaseSettings):
         default=10,
         ge=1,
         alias="RATE_LIMIT_LOGIN_PER_MINUTE",
+    )
+    processing_concurrency: int = Field(
+        default=1,
+        ge=1,
+        le=4,
+        alias="PROCESSING_CONCURRENCY",
+    )
+    processing_queue_capacity: int = Field(
+        default=8,
+        ge=1,
+        le=100,
+        alias="PROCESSING_QUEUE_CAPACITY",
+    )
+    processing_lease_seconds: int = Field(
+        default=180,
+        ge=60,
+        le=3600,
+        alias="PROCESSING_LEASE_SECONDS",
+    )
+    processing_heartbeat_seconds: int = Field(
+        default=30,
+        ge=5,
+        le=300,
+        alias="PROCESSING_HEARTBEAT_SECONDS",
+    )
+    processing_dispatch_interval_seconds: float = Field(
+        default=2.0,
+        ge=0.25,
+        le=30,
+        alias="PROCESSING_DISPATCH_INTERVAL_SECONDS",
+    )
+    max_pdf_size_mb: int = Field(default=10, ge=1, le=100, alias="MAX_PDF_SIZE_MB")
+    max_pdfs_per_installation: int = Field(
+        default=50,
+        ge=1,
+        le=10_000,
+        alias="MAX_PDFS_PER_INSTALLATION",
+    )
+    require_upload_auth: bool = Field(
+        default=False,
+        alias="REQUIRE_UPLOAD_AUTH",
+    )
+    strict_startup_validation: bool = Field(
+        default=False,
+        alias="STRICT_STARTUP_VALIDATION",
     )
 
     object_storage_backend: str = Field(default="s3", alias="OBJECT_STORAGE_BACKEND")
@@ -79,6 +133,24 @@ class Settings(BaseSettings):
     embedding_model_name: str = Field(
         default="all-MiniLM-L6-v2",
         alias="EMBEDDING_MODEL_NAME",
+    )
+    embedding_provider: str = Field(default="local", alias="EMBEDDING_PROVIDER")
+    embedding_dimension: int = Field(
+        default=384,
+        ge=1,
+        alias="EMBEDDING_DIMENSION",
+    )
+    rerank_provider: str = Field(default="local", alias="RERANK_PROVIDER")
+    rerank_model_name: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L6-v2",
+        alias="RERANK_MODEL_NAME",
+    )
+    cohere_api_key: SecretStr | None = Field(default=None, alias="COHERE_API_KEY")
+    provider_timeout_seconds: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=120.0,
+        alias="PROVIDER_TIMEOUT_SECONDS",
     )
 
     llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
@@ -124,6 +196,84 @@ class Settings(BaseSettings):
         token = self.demo_access_token_value
         if token is not None and len(token) < 24:
             raise ValueError("DEMO_ACCESS_TOKEN must contain at least 24 characters.")
+        if self.require_upload_auth and token is None:
+            raise ValueError(
+                "DEMO_ACCESS_TOKEN is required when REQUIRE_UPLOAD_AUTH=true."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_processing_timing(self) -> "Settings":
+        if self.processing_heartbeat_seconds * 2 >= self.processing_lease_seconds:
+            raise ValueError(
+                "PROCESSING_LEASE_SECONDS must be more than twice "
+                "PROCESSING_HEARTBEAT_SECONDS."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_retrieval_providers(self) -> "Settings":
+        self.embedding_provider = self.embedding_provider.strip().lower()
+        self.rerank_provider = self.rerank_provider.strip().lower()
+        if self.embedding_provider not in {"local", "qdrant_cloud"}:
+            raise ValueError(
+                "EMBEDDING_PROVIDER must be either local or qdrant_cloud."
+            )
+        if self.rerank_provider not in {"local", "cohere"}:
+            raise ValueError("RERANK_PROVIDER must be either local or cohere.")
+        if not self.embedding_model_name.strip():
+            raise ValueError("EMBEDDING_MODEL_NAME cannot be empty.")
+        if not self.rerank_model_name.strip():
+            raise ValueError("RERANK_MODEL_NAME cannot be empty.")
+        if self.rerank_provider == "cohere" and not self.cohere_api_key_value:
+            raise ValueError("COHERE_API_KEY is required when RERANK_PROVIDER=cohere.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_public_deployment(self) -> "Settings":
+        if not self.strict_startup_validation:
+            return self
+        missing: list[str] = []
+        if not self.database_url:
+            missing.append("DATABASE_URL")
+        required_explicit = {
+            "neo4j_uri": "NEO4J_URI",
+            "neo4j_username": "NEO4J_USERNAME",
+            "neo4j_password": "NEO4J_PASSWORD",
+            "qdrant_url": "QDRANT_URL",
+            "s3_bucket": "S3_BUCKET",
+            "s3_access_key_id": "S3_ACCESS_KEY_ID",
+            "s3_secret_access_key": "S3_SECRET_ACCESS_KEY",
+        }
+        for field_name, environment_name in required_explicit.items():
+            if field_name not in self.model_fields_set:
+                missing.append(environment_name)
+        if not self.qdrant_api_key_value:
+            missing.append("QDRANT_API_KEY")
+        if self.embedding_provider != "qdrant_cloud":
+            missing.append("EMBEDDING_PROVIDER=qdrant_cloud")
+        if self.rerank_provider != "cohere":
+            missing.append("RERANK_PROVIDER=cohere")
+        if not self.configured_cors_origins:
+            missing.append("ALLOWED_ORIGINS")
+        if not self.demo_access_token_value:
+            missing.append("DEMO_ACCESS_TOKEN")
+        if not self.require_upload_auth:
+            missing.append("REQUIRE_UPLOAD_AUTH=true")
+        if self.object_storage_backend == "s3" and not self.s3_endpoint_url:
+            missing.append("S3_ENDPOINT_URL")
+        provider = self.llm_provider.strip().lower()
+        if provider == "groq" and not self.groq_api_key:
+            missing.append("GROQ_API_KEY")
+        elif provider == "gemini" and not self.gemini_api_key:
+            missing.append("GEMINI_API_KEY")
+        elif provider not in {"groq", "gemini"}:
+            raise ValueError("LLM_PROVIDER must be either groq or gemini.")
+        if missing:
+            raise ValueError(
+                "Missing required public-deployment environment variables: "
+                + ", ".join(sorted(set(missing)))
+            )
         return self
 
     @property
@@ -169,6 +319,12 @@ class Settings(BaseSettings):
         if self.demo_access_token is None:
             return None
         return self.demo_access_token.get_secret_value().strip() or None
+
+    @property
+    def cohere_api_key_value(self) -> str | None:
+        if self.cohere_api_key is None:
+            return None
+        return self.cohere_api_key.get_secret_value().strip() or None
 
 
 @lru_cache

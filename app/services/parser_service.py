@@ -1,7 +1,7 @@
 from dataclasses import dataclass
+import re
 
-import fitz
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import pymupdf as fitz
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,12 +13,10 @@ class DocumentChunk:
 
 class ParserService:
     def __init__(self, chunk_size: int = 500, chunk_overlap: int = 50) -> None:
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            length_function=self._estimate_token_count,
-            separators=["\n\n", "\n", ". ", " ", ""],
-        )
+        if chunk_size <= 0 or chunk_overlap < 0 or chunk_overlap >= chunk_size:
+            raise ValueError("chunk_size must be positive and larger than chunk_overlap.")
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
 
     def extract_pages_from_bytes(self, content: bytes) -> list[tuple[int, str]]:
         pages: list[tuple[int, str]] = []
@@ -42,39 +40,37 @@ class ParserService:
                 (line.strip() for line in text.splitlines() if 3 <= len(line.strip()) <= 120),
                 None,
             )
-            raw_chunks = self.text_splitter.create_documents(
-                    texts=[text],
-                    metadatas=[
-                        {
+            for index, chunk_text in enumerate(self._split_text(text)):
+                chunk_id = f"{upload_id}:{page_index}:{index}"
+                chunks.append(
+                    DocumentChunk(
+                        id=chunk_id,
+                        text=chunk_text,
+                        metadata={
+                            "chunk_id": chunk_id,
+                            "chunk_index": index,
                             "document_id": document_id,
                             "upload_id": upload_id,
                             "document_name": document_name,
                             "page_number": page_index,
                             "section_heading": section_heading or "",
-                        }
-                    ],
-                )
-
-            for index, chunk in enumerate(raw_chunks):
-                chunk_id = f"{upload_id}:{page_index}:{index}"
-                chunks.append(
-                        DocumentChunk(
-                            id=chunk_id,
-                            text=chunk.page_content,
-                            metadata={
-                                "chunk_id": chunk_id,
-                                "chunk_index": index,
-                                "document_id": document_id,
-                                "upload_id": upload_id,
-                                "document_name": document_name,
-                                "page_number": page_index,
-                                "section_heading": section_heading or "",
-                            },
-                        )
+                        },
+                    )
                 )
 
         return chunks
 
-    @staticmethod
-    def _estimate_token_count(text: str) -> int:
-        return len(text.split())
+    def _split_text(self, text: str) -> list[str]:
+        words = list(re.finditer(r"\S+", text))
+        if not words:
+            return []
+        step = self.chunk_size - self.chunk_overlap
+        chunks: list[str] = []
+        for start in range(0, len(words), step):
+            end = min(start + self.chunk_size, len(words))
+            chunk = text[words[start].start() : words[end - 1].end()].strip()
+            if chunk:
+                chunks.append(chunk)
+            if end == len(words):
+                break
+        return chunks

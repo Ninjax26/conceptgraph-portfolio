@@ -5,14 +5,12 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-import torch
 from groq import Groq
 from neo4j import AsyncDriver
 from pydantic import BaseModel, ConfigDict, Field
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
-from qdrant_client.models import FieldCondition, Filter, MatchAny
-from sentence_transformers import SentenceTransformer
+from qdrant_client.models import Document, FieldCondition, Filter, MatchAny
 
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
@@ -45,7 +43,7 @@ class RetrievalService:
         self.graph_driver = graph_driver
         self.vector_client = vector_client
         self.collection_name = settings.qdrant_collection_name
-        self._embedding_model: SentenceTransformer | None = None
+        self._embedding_model = None
 
     async def retrieve(
         self,
@@ -193,12 +191,18 @@ class RetrievalService:
             return []
 
         expanded_query = self._build_expanded_query(question, prerequisite_names)
-        query_vector = self.embedding_model.encode(
-            expanded_query,
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        ).tolist()
+        if settings.embedding_provider == "qdrant_cloud":
+            query_vector = Document(
+                text=expanded_query,
+                model=settings.embedding_model_name,
+            )
+        else:
+            query_vector = self.embedding_model.encode(
+                expanded_query,
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            ).tolist()
         query_filter = Filter(
             must=[
                 FieldCondition(
@@ -254,8 +258,15 @@ class RetrievalService:
         return chunks
 
     @property
-    def embedding_model(self) -> SentenceTransformer:
+    def embedding_model(self):
         if self._embedding_model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Local embeddings require requirements-local-models.txt."
+                ) from exc
+
             self._embedding_model = SentenceTransformer(
                 settings.embedding_model_name,
                 device=self._resolve_embedding_device(),
@@ -293,7 +304,10 @@ class RetrievalService:
         if not settings.groq_api_key:
             return self._fallback_cypher(question)
 
-        client = Groq(api_key=settings.groq_api_key)
+        client = Groq(
+            api_key=settings.groq_api_key,
+            timeout=settings.provider_timeout_seconds,
+        )
         completion = client.chat.completions.create(
             model=settings.groq_model,
             messages=[
@@ -323,6 +337,7 @@ class RetrievalService:
                 "temperature": 0,
                 "response_mime_type": "application/json",
             },
+            request_options={"timeout": settings.provider_timeout_seconds},
         )
         return CypherGenerationResponse.model_validate_json(response.text or "{}")
 
@@ -449,6 +464,8 @@ class RetrievalService:
 
     @staticmethod
     def _resolve_embedding_device() -> str:
+        import torch
+
         if torch.backends.mps.is_available():
             return "mps"
         return "cpu"

@@ -2,20 +2,17 @@ services:
   - type: web
     name: conceptgraph-api
     runtime: docker
-    plan: standard
+    plan: free
     dockerfilePath: ./Dockerfile.api
     dockerContext: .
-    healthCheckPath: /api/v1/health
+    healthCheckPath: /api/v1/ready
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: conceptgraph-postgres
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: conceptgraph-redis
-          property: connectionString
+        sync: false
+      - key: DATABASE_POOL_SIZE
+        value: "3"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "2"
       - key: LLM_PROVIDER
         value: groq
       - key: GROQ_API_KEY
@@ -34,6 +31,20 @@ services:
         sync: false
       - key: QDRANT_COLLECTION_NAME
         value: conceptgraph_chunks
+      - key: EMBEDDING_PROVIDER
+        value: qdrant_cloud
+      - key: EMBEDDING_MODEL_NAME
+        value: sentence-transformers/all-MiniLM-L6-v2
+      - key: EMBEDDING_DIMENSION
+        value: "384"
+      - key: RERANK_PROVIDER
+        value: cohere
+      - key: RERANK_MODEL_NAME
+        value: rerank-v3.5
+      - key: COHERE_API_KEY
+        sync: false
+      - key: PROVIDER_TIMEOUT_SECONDS
+        value: "30"
       - key: OBJECT_STORAGE_BACKEND
         value: s3
       - key: S3_BUCKET
@@ -50,7 +61,7 @@ services:
         value: "false"
       - key: S3_AUTO_CREATE_BUCKET
         value: "false"
-      - key: CORS_ALLOWED_ORIGINS
+      - key: ALLOWED_ORIGINS
         sync: false
       - key: DEMO_ACCESS_TOKEN
         sync: false
@@ -66,103 +77,22 @@ services:
         value: "30"
       - key: RATE_LIMIT_LOGIN_PER_MINUTE
         value: "10"
-
-  - type: worker
-    name: conceptgraph-worker
-    runtime: docker
-    plan: standard
-    dockerfilePath: ./Dockerfile.api
-    dockerContext: .
-    dockerCommand: celery -A app.tasks.document_tasks.celery_app worker --loglevel=info --pool=solo --concurrency=1
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: conceptgraph-postgres
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: conceptgraph-redis
-          property: connectionString
-      - key: LLM_PROVIDER
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: LLM_PROVIDER
-      - key: GROQ_API_KEY
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: GROQ_API_KEY
-      - key: GROQ_MODEL
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: GROQ_MODEL
-      - key: NEO4J_URI
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: NEO4J_URI
-      - key: NEO4J_USERNAME
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: NEO4J_USERNAME
-      - key: NEO4J_PASSWORD
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: NEO4J_PASSWORD
-      - key: QDRANT_URL
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: QDRANT_URL
-      - key: QDRANT_API_KEY
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: QDRANT_API_KEY
-      - key: QDRANT_COLLECTION_NAME
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: QDRANT_COLLECTION_NAME
-      - key: OBJECT_STORAGE_BACKEND
-        value: s3
-      - key: S3_BUCKET
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: S3_BUCKET
-      - key: S3_REGION
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: S3_REGION
-      - key: S3_ENDPOINT_URL
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: S3_ENDPOINT_URL
-      - key: S3_ACCESS_KEY_ID
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: S3_ACCESS_KEY_ID
-      - key: S3_SECRET_ACCESS_KEY
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: S3_SECRET_ACCESS_KEY
-      - key: S3_FORCE_PATH_STYLE
-        fromService:
-          type: web
-          name: conceptgraph-api
-          envVarKey: S3_FORCE_PATH_STYLE
-      - key: S3_AUTO_CREATE_BUCKET
-        value: "false"
+      - key: PROCESSING_CONCURRENCY
+        value: "1"
+      - key: PROCESSING_QUEUE_CAPACITY
+        value: "8"
+      - key: PROCESSING_LEASE_SECONDS
+        value: "180"
+      - key: PROCESSING_HEARTBEAT_SECONDS
+        value: "30"
+      - key: MAX_PDF_SIZE_MB
+        value: "10"
+      - key: MAX_PDFS_PER_INSTALLATION
+        value: "50"
+      - key: REQUIRE_UPLOAD_AUTH
+        value: "true"
+      - key: STRICT_STARTUP_VALIDATION
+        value: "true"
 
   - type: web
     name: conceptgraph-frontend
@@ -186,17 +116,3 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
-
-  - type: keyvalue
-    name: conceptgraph-redis
-    plan: starter
-    ipAllowList: []
-    maxmemoryPolicy: noeviction
-    persistenceMode: journal-snapshot
-
-databases:
-  - name: conceptgraph-postgres
-    databaseName: conceptgraph
-    user: conceptgraph
-    plan: basic-256mb
-    ipAllowList: []

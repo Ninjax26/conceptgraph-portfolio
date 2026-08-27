@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
-from redis.exceptions import RedisError
 
 from app.core.config import settings
 from app.schemas.auth import AccessCodeRequest, AuthSessionResponse
@@ -20,16 +19,10 @@ async def create_session(
 
     client_host = request.client.host if request.client else "unknown"
     client_key = demo_access_service.fingerprint(client_host)
-    try:
-        rate = await rate_limit_service.check(
-            f"login:{client_key}",
-            settings.rate_limit_login_per_minute,
-        )
-    except RedisError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Access control is temporarily unavailable.",
-        ) from exc
+    rate = await rate_limit_service.check(
+        f"login:{client_key}",
+        settings.rate_limit_login_per_minute,
+    )
 
     if not rate.allowed:
         raise HTTPException(

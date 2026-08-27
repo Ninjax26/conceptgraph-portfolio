@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Optional development-only embedding and reranking models. Production uses
+# Qdrant Cloud Inference and Cohere so the API fits low-memory hosting.
+sentence-transformers==6.0.0
+torch==2.13.0

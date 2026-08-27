@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from functools import lru_cache
 from typing import Any, Literal
@@ -92,8 +91,7 @@ async def query_conceptgraph(
 
     rerank_service = get_rerank_service()
     try:
-        ranked_chunks = await asyncio.to_thread(
-            rerank_service.rerank,
+        ranked_chunks = await rerank_service.rerank(
             request.question,
             retrieval_result["chunks"],
         )

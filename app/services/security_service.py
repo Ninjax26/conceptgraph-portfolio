@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import hashlib
 import hmac
 import time
-
-from redis.asyncio import Redis, from_url
 
 from app.core.config import Settings, settings
 
@@ -68,9 +67,15 @@ class DemoAccessService:
 
 
 class RateLimitService:
-    def __init__(self, redis_url: str = settings.redis_url) -> None:
-        self.redis_url = redis_url
-        self._client: Redis | None = None
+    """Fixed-window limiter for the portfolio edition's single API process.
+
+    Counters intentionally reset when the process restarts. Durable document
+    limits remain PostgreSQL-backed; this limiter protects request bursts.
+    """
+
+    def __init__(self) -> None:
+        self._counts: dict[str, tuple[int, int]] = {}
+        self._lock = asyncio.Lock()
 
     async def check(
         self,
@@ -81,12 +86,10 @@ class RateLimitService:
     ) -> RateLimitResult:
         current_time = now if now is not None else int(time.time())
         window = current_time // 60
-        redis_key = f"conceptgraph:rate:{key}:{window}"
-        pipeline = self.client.pipeline(transaction=True)
-        pipeline.incr(redis_key)
-        pipeline.expire(redis_key, 120)
-        count, _ = await pipeline.execute()
-        count = int(count)
+        async with self._lock:
+            stored_window, stored_count = self._counts.get(key, (window, 0))
+            count = stored_count + 1 if stored_window == window else 1
+            self._counts[key] = (window, count)
         return RateLimitResult(
             allowed=count <= limit,
             limit=limit,
@@ -94,16 +97,9 @@ class RateLimitService:
             retry_after=max(1, 60 - (current_time % 60)),
         )
 
-    @property
-    def client(self) -> Redis:
-        if self._client is None:
-            self._client = from_url(self.redis_url, decode_responses=True)
-        return self._client
-
     async def close(self) -> None:
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
+        async with self._lock:
+            self._counts.clear()
 
 
 demo_access_service = DemoAccessService()

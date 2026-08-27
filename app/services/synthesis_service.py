@@ -45,7 +45,10 @@ class SynthesisService:
         graph_context: list[dict[str, Any]],
         sources: list[dict[str, Any]],
     ) -> str:
-        client = Groq(api_key=settings.groq_api_key)
+        client = Groq(
+            api_key=settings.groq_api_key,
+            timeout=settings.provider_timeout_seconds,
+        )
         completion = client.chat.completions.create(
             model=settings.groq_model,
             messages=[
@@ -72,6 +75,7 @@ class SynthesisService:
                 self._user_prompt(question, graph_context, sources),
             ],
             generation_config={"temperature": 0},
+            request_options={"timeout": settings.provider_timeout_seconds},
         )
         return response.text or ""
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from redis.exceptions import RedisError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -11,7 +10,7 @@ from starlette.types import ASGIApp
 from app.core.config import settings
 from app.services.security_service import demo_access_service, rate_limit_service
 
-PUBLIC_PATHS = {"/api/v1/health"}
+PUBLIC_PATHS = {"/api/v1/health", "/api/v1/ready"}
 PUBLIC_METHOD_PATHS = {("POST", "/api/v1/auth/session")}
 EXPENSIVE_PATHS = {
     "/api/v1/query",
@@ -48,16 +47,10 @@ class DemoProtectionMiddleware(BaseHTTPMiddleware):
         rate_scope = "expensive" if _is_expensive(request) else "standard"
         principal = settings.demo_access_token_value or credential
         fingerprint = demo_access_service.fingerprint(principal)
-        try:
-            result = await rate_limit_service.check(
-                f"{rate_scope}:{fingerprint}",
-                rate_limit,
-            )
-        except RedisError:
-            return JSONResponse(
-                status_code=503,
-                content={"detail": "Access control is temporarily unavailable."},
-            )
+        result = await rate_limit_service.check(
+            f"{rate_scope}:{fingerprint}",
+            rate_limit,
+        )
 
         rate_headers = {
             "X-RateLimit-Limit": str(result.limit),

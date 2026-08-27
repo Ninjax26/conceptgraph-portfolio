@@ -122,6 +122,19 @@ class StorageService:
     def is_legacy_reference(self, reference: str) -> bool:
         return self._legacy_path(reference) is not None
 
+    def check_ready(self) -> None:
+        if self.config.object_storage_backend == "local":
+            root = self.config.legacy_upload_dir.resolve()
+            if not root.exists() or not root.is_dir():
+                raise ObjectStorageError("Local object storage directory is unavailable.")
+            return
+        try:
+            self.client.head_bucket(Bucket=self.config.s3_bucket)
+        except (BotoCoreError, ClientError) as exc:
+            raise ObjectStorageError(
+                "The configured object-storage bucket is unavailable."
+            ) from exc
+
     @property
     def client(self) -> BaseClient:
         if self._client is None:
@@ -131,6 +144,8 @@ class StorageService:
                         "service_name": "s3",
                         "region_name": self.config.s3_region,
                         "config": Config(
+                            connect_timeout=self.config.provider_timeout_seconds,
+                            read_timeout=self.config.provider_timeout_seconds,
                             retries={"max_attempts": 3, "mode": "standard"},
                             s3={
                                 "addressing_style": (

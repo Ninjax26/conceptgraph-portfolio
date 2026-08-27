@@ -2,13 +2,13 @@ import asyncio
 import re
 from collections.abc import Sequence
 
-import torch
 from groq import BadRequestError, Groq
 from neo4j import AsyncDriver
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
     Distance,
+    Document,
     FieldCondition,
     Filter,
     FilterSelector,
@@ -17,7 +17,6 @@ from qdrant_client.models import (
     PointStruct,
     VectorParams,
 )
-from sentence_transformers import SentenceTransformer
 
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
@@ -35,38 +34,52 @@ class IngestionService:
         self.graph_driver = graph_driver
         self.vector_client = vector_client
         self.collection_name = settings.qdrant_collection_name
-        self._embedding_model: SentenceTransformer | None = None
+        self._embedding_model = None
 
     def upsert_chunks_to_qdrant(self, chunks: Sequence[DocumentChunk]) -> int:
         if not chunks:
             return 0
 
-        embeddings = self.embedding_model.encode(
-            [chunk.text for chunk in chunks],
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
-
-        self._ensure_qdrant_collection(vector_size=len(embeddings[0]))
+        if settings.embedding_provider == "qdrant_cloud":
+            self._ensure_qdrant_collection(vector_size=settings.embedding_dimension)
+            vectors = [
+                Document(text=chunk.text, model=settings.embedding_model_name)
+                for chunk in chunks
+            ]
+        else:
+            embeddings = self.embedding_model.encode(
+                [chunk.text for chunk in chunks],
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+            self._ensure_qdrant_collection(vector_size=len(embeddings[0]))
+            vectors = [embedding.tolist() for embedding in embeddings]
 
         points = [
             PointStruct(
                 id=self._qdrant_point_id(chunk.id),
-                vector=embedding.tolist(),
+                vector=vector,
                 payload={
                     **chunk.metadata,
                     "text": chunk.text,
                 },
             )
-            for chunk, embedding in zip(chunks, embeddings, strict=True)
+            for chunk, vector in zip(chunks, vectors, strict=True)
         ]
         self.vector_client.upsert(collection_name=self.collection_name, points=points)
         return len(points)
 
     @property
-    def embedding_model(self) -> SentenceTransformer:
+    def embedding_model(self):
         if self._embedding_model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Local embeddings require requirements-local-models.txt."
+                ) from exc
+
             self._embedding_model = SentenceTransformer(
                 settings.embedding_model_name,
                 device=self._resolve_embedding_device(),
@@ -109,6 +122,7 @@ class IngestionService:
         upload_id: str,
         document_name: str,
         course_name: str = "",
+        execution_token: str = "",
     ) -> None:
         async with self.graph_driver.session() as session:
             await session.run(
@@ -131,6 +145,7 @@ class IngestionService:
                         c.source_id = $source_id,
                         c.course_id = $course_id,
                         c.upload_id = $upload_id,
+                        c.execution_token = $execution_token,
                         c.document_name = $document_name
                     WITH c
                     MATCH (course:Course {id: $course_id})
@@ -143,6 +158,7 @@ class IngestionService:
                     description=node.description,
                     course_id=course_id,
                     upload_id=upload_id,
+                    execution_token=execution_token,
                     document_name=document_name,
                 )
 
@@ -159,6 +175,7 @@ class IngestionService:
                     SET r.relation_type = $relation_type,
                         r.course_id = $course_id,
                         r.upload_id = $upload_id,
+                        r.execution_token = $execution_token,
                         r.document_name = $document_name
                     """,
                     course_id=course_id,
@@ -174,6 +191,7 @@ class IngestionService:
                     ),
                     relation_type=relationship.relation_type,
                     upload_id=upload_id,
+                    execution_token=execution_token,
                     document_name=document_name,
                 )
 
@@ -186,6 +204,7 @@ class IngestionService:
             course_id=course_id,
             upload_id=str(chunks[0].metadata.get("upload_id", "")),
             document_name=str(chunks[0].metadata.get("document_name", "")),
+            execution_token=str(chunks[0].metadata.get("execution_token", "")),
         )
         vector_count = self.upsert_chunks_to_qdrant(chunks)
         return {
@@ -218,10 +237,25 @@ class IngestionService:
     def _collection_exists_for_cleanup(self) -> bool:
         try:
             return bool(self.vector_client.collection_exists(self.collection_name))
-        except Exception:
-            return False
+        except UnexpectedResponse as exc:
+            if exc.status_code == 404:
+                return False
+            raise
+        except AttributeError:
+            try:
+                self.vector_client.get_collection(self.collection_name)
+            except UnexpectedResponse as exc:
+                if exc.status_code == 404:
+                    return False
+                raise
+            return True
 
     def _ensure_qdrant_collection(self, vector_size: int) -> None:
+        if vector_size != settings.embedding_dimension:
+            raise RuntimeError(
+                f"Embedding model returned {vector_size} dimensions; "
+                f"EMBEDDING_DIMENSION is {settings.embedding_dimension}."
+            )
         existing_collections = self.vector_client.get_collections().collections
         collection_exists = any(
             collection.name == self.collection_name
@@ -236,8 +270,30 @@ class IngestionService:
             except UnexpectedResponse as exc:
                 if exc.status_code != 409 and b"already exists" not in exc.content.lower():
                     raise
+        else:
+            self.validate_qdrant_collection()
 
         self._ensure_qdrant_payload_indexes()
+
+    def validate_qdrant_collection(self) -> None:
+        """Reject an existing collection created for incompatible embeddings."""
+
+        if not self.vector_client.collection_exists(self.collection_name):
+            return
+        collection = self.vector_client.get_collection(self.collection_name)
+        vectors = collection.config.params.vectors
+        size = getattr(vectors, "size", None)
+        if size is None:
+            raise RuntimeError(
+                "Qdrant collection uses named or unsupported vectors; configure a new "
+                "QDRANT_COLLECTION_NAME for this embedding model."
+            )
+        if int(size) != settings.embedding_dimension:
+            raise RuntimeError(
+                f"Qdrant collection dimension is {size}, but the configured embedding "
+                f"dimension is {settings.embedding_dimension}. Use a new collection name; "
+                "old vectors are incompatible."
+            )
 
     def _ensure_qdrant_payload_indexes(self) -> None:
         collection = self.vector_client.get_collection(self.collection_name)
@@ -259,7 +315,10 @@ class IngestionService:
         if not settings.groq_api_key:
             raise LLMConfigurationError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
 
-        client = Groq(api_key=settings.groq_api_key)
+        client = Groq(
+            api_key=settings.groq_api_key,
+            timeout=settings.provider_timeout_seconds,
+        )
         contexts = self._graph_extraction_contexts(text)
         for attempt, context in enumerate(contexts):
             try:
@@ -333,6 +392,7 @@ class IngestionService:
                 "temperature": 0,
                 "response_mime_type": "application/json",
             },
+            request_options={"timeout": settings.provider_timeout_seconds},
         )
         return GraphExtractionResponse.model_validate_json(response.text or "{}")
 
@@ -383,6 +443,8 @@ class IngestionService:
 
     @staticmethod
     def _resolve_embedding_device() -> str:
+        import torch
+
         if torch.backends.mps.is_available():
             return "mps"
         return "cpu"

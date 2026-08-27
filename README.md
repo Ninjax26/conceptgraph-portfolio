@@ -1,393 +1,231 @@
-# ConceptGraph
+# ConceptGraph Portfolio Edition
 
-ConceptGraph is an AI-powered academic knowledge graph and GraphRAG pipeline for dense course materials. It ingests syllabi, essays, and textbooks, isolates them by course boundary, and turns them into a searchable concept graph plus a syllabus-bounded retrieval and exam workflow.
-
-## Preview
+ConceptGraph turns course PDFs into a searchable concept graph, grounded answers, and citation-backed mock exams. This portfolio edition keeps the React experience and GraphRAG behavior while running the API and background processor in one bounded, restart-safe FastAPI service. Redis and Celery are not required.
 
 ![ConceptGraph dashboard preview](public/dashboard-preview.jpeg)
-
-## What It Does
-
-- Parses PDFs asynchronously through Celery so large files do not block the API.
-- Stores semantic chunks in Qdrant for vector search.
-- Extracts concepts and prerequisite relationships into Neo4j.
-- Uses hybrid retrieval to combine graph traversal, vector search, reranking, and LLM synthesis.
-- Generates course-wide mock exams directly from uploaded material.
-- Tracks PDF ingestion status in real time through Celery-backed upload records.
-- Opens source citations with page-aware PDF previews in the dashboard.
-- Renders an interactive concept map in the React dashboard.
-- Shows canonical course choices plus logical document, chunk, and extracted graph metrics.
 
 ## Architecture
 
 ```mermaid
-flowchart TD
-  A["React Frontend"] --> B["FastAPI Backend"]
-  B --> C["Celery + Redis"]
-  C --> D["PDF Parser + Chunker"]
-  D --> E["Embeddings"]
-  D --> F["LLM Graph Extraction"]
-  E --> G["Qdrant Vector DB"]
-  F --> H["Neo4j Concept Graph"]
-
-  A --> I["Ask Question"]
-  I --> B
-  B --> J["Neo4j Graph Retrieval"]
-  J --> K["Expanded Vector Search"]
-  K --> G
-  G --> L["Cross-Encoder Rerank"]
-  L --> M["LLM Synthesis"]
-  M --> A
-
-  A --> N["Generate Exam"]
-  N --> B
-  B --> G
-  G --> O["Syllabus-Bounded Exam LLM"]
-  O --> A
+flowchart LR
+  UI[React + Vite] --> API[FastAPI API]
+  API --> PG[(PostgreSQL\ndurable jobs + leases)]
+  API --> Q[(Qdrant Cloud\nvectors + inference)]
+  API --> N[(Neo4j Aura\nconcept graph)]
+  API --> R2[(Private R2 bucket\nsource PDFs)]
+  API --> LLM[Groq\ngraph extraction + answers]
+  API --> RR[Cohere\nreranking]
+  API --> C[Bounded in-process coordinator]
+  C --> PG
+  C --> R2
+  C --> Q
+  C --> N
+  C --> LLM
 ```
 
-## Core Features
+PostgreSQL is authoritative. The in-memory queue is only an execution accelerator: if it is full, a request is saved as `UPLOADED` and the dispatcher picks it up later. If the process stops, its lease expires and startup recovery creates a new, auditable processing attempt. Qdrant, Neo4j, and object storage are derived or external stores; no job state depends on process memory.
 
-- Course scoping to prevent syllabus bleed across uploads. Authentication and true tenant ownership are not implemented.
-- Hybrid GraphRAG retrieval that expands user queries with prerequisite concepts.
-- Defensive error handling with explicit HTTP responses for missing config or empty data.
-- Simple course-level isolation across ingestion, retrieval, and exam generation.
-- Apple Silicon-friendly local execution with `arm64` container images and MPS-accelerated embeddings where available.
-- Graph-integrity validation for unique entities, valid relationship endpoints, and duplicate-edge removal.
+## What changed from the distributed edition
 
-## Tech Stack
+- Removed Redis, the Celery app, worker service, broker URLs, and Celery task dispatch.
+- Added a lifecycle-managed `asyncio` coordinator with a bounded queue and configurable concurrency (default `1`).
+- Added PostgreSQL leases, heartbeats, task-token fencing, durable attempts, startup recovery, and a three-attempt retry cap.
+- Preserved the durable stage contract and existing frontend polling/status response.
+- Added content-addressed private object storage, duplicate admission control, PDF signature/parse checks, size/count limits, and partial-artifact cleanup.
+- Added hosted embedding and reranking modes so the production API does not load Torch.
+- Added liveness (`/api/v1/health`) and dependency-aware readiness (`/api/v1/ready`).
+- Added strict public-deployment configuration validation and demo access-code protection.
 
-- Frontend: React, TypeScript, Tailwind CSS, Cytoscape.js
-- Backend: FastAPI, Uvicorn, Celery, Redis
-- Databases: Neo4j, Qdrant, PostgreSQL
-- AI/ML: PyMuPDF, LangChain, SentenceTransformers, Groq, Gemini
-
-## Repository Layout
-
-```text
-app/
-  api/
-  core/
-  schemas/
-  services/
-  tasks/
-src/
-  components/
-  pages/
-  services/
-data/
-docker-compose.yml
-requirements.txt
-package.json
-```
-
-## Getting Started
-
-### 1. Start the infrastructure
-
-```bash
-docker compose up -d
-```
-
-This starts:
-
-- Neo4j on `7474` and `7687`
-- Qdrant on `6333`
-- PostgreSQL on `5432`
-- Redis on `6379`
-- MinIO S3 API on `9000` and console on `9001`
-
-### 2. Configure environment variables
-
-Create a backend `.env` file with the following values:
-
-```bash
-LLM_PROVIDER=groq
-GROQ_API_KEY=your_groq_api_key
-GROQ_MODEL=openai/gpt-oss-20b
-
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-1.5-flash
-
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=conceptgraph_password
-
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=
-QDRANT_COLLECTION_NAME=conceptgraph_chunks
-
-POSTGRES_USER=conceptgraph
-POSTGRES_PASSWORD=conceptgraph_password
-POSTGRES_DB=conceptgraph
-
-REDIS_URL=redis://localhost:6379/0
-
-# Optional locally; required before exposing a public deployment.
-DEMO_ACCESS_TOKEN=
-AUTH_COOKIE_SECURE=false
-AUTH_COOKIE_SAMESITE=lax
-AUTH_SESSION_TTL_SECONDS=43200
-
-OBJECT_STORAGE_BACKEND=s3
-S3_BUCKET=conceptgraph-pdfs
-S3_REGION=us-east-1
-S3_ENDPOINT_URL=http://localhost:9000
-S3_ACCESS_KEY_ID=conceptgraph
-S3_SECRET_ACCESS_KEY=conceptgraph_local_only
-S3_FORCE_PATH_STYLE=true
-S3_AUTO_CREATE_BUCKET=true
-```
-
-These object-storage credentials are development-only defaults for the local MinIO container. Use a private bucket and platform-managed secrets in deployment.
-
-The local Docker Qdrant instance does not require an API key. For Qdrant Cloud, replace `QDRANT_URL` with the HTTPS cluster endpoint and set `QDRANT_API_KEY` to the cluster API key. Never commit either provider secret.
-
-When `DEMO_ACCESS_TOKEN` is empty, local API protection is disabled. Public deployments must use a random value of at least 24 characters, for example `openssl rand -base64 32`. The dashboard exchanges this value for a signed, short-lived HttpOnly cookie; frontend JavaScript does not persist the secret.
-
-If you are on Apple Silicon and run into fork safety issues, set:
-
-```bash
-export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-```
-
-### 3. Run the backend
-
-```bash
-source venv/bin/activate
-pip install -r requirements.txt
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-### 4. Start the Celery worker
-
-```bash
-celery -A app.tasks.document_tasks.celery_app worker --loglevel=info --pool=solo --concurrency=1
-```
-
-### 5. Run the frontend
-
-```bash
-npm install
-npm run dev -- --host 127.0.0.1
-```
-
-Open the app at `http://127.0.0.1:5173`.
-
-## Workflow
-
-### Ingestion
-
-1. Upload a PDF through the frontend.
-2. FastAPI validates and hashes the PDF, then writes it to a content-addressed S3 object key.
-3. The worker reads the same immutable object and extracts text with PyMuPDF.
-4. LangChain chunks the document.
-5. Chunk embeddings are generated and stored in Qdrant.
-6. The LLM extracts concepts and prerequisite relationships.
-7. Neo4j stores the scoped concept graph for the course.
-
-### Data Consistency
-
-- Courses have an immutable UUID plus a normalized, case-insensitive display name. `CYBER`, `Cyber`, and `cyber ` resolve to the same course.
-- PDFs are SHA-256 hashed before a document row is created. Uploading the same file to the same course returns the existing document instead of duplicating vectors or graph nodes.
-- Historical same-hash rows from installations predating duplicate detection are collapsed into one logical document for course metrics and READY retrieval; the history is retained rather than deleted.
-- Query and exam generation call the same READY-course resolver and filter Qdrant by READY document IDs.
-- Graph nodes and relationships carry document provenance (`upload_id` and document name). Legacy graph data without provenance is excluded from query graph counts.
-- Failed attempts are retained in `processing_attempts`; retries update the original document and are capped at three attempts.
-- Workers persist 30-second heartbeats and every worker-driven transition is fenced by the current Celery task ID. Superseded attempts stop without changing status or deleting current-attempt data.
-- Course selection comes from `GET /api/v1/ingest/courses`, not the truncated processing queue. Courses without READY content remain visible but cannot be selected for query or exam generation.
-- The dashboard remembers the course associated with a new upload, refreshes course summaries when polling observes READY, and automatically selects that course. On a fresh page load it selects the most recently updated READY course. Changing courses clears the previous answer and concept map.
-
-| Stage | Input | Output / storage | Success condition | Failure condition |
-| --- | --- | --- | --- | --- |
-| Upload | PDF + course name | `courses`, `document_uploads`, S3 object | Valid PDF, canonical course, unique course/hash document | Invalid, encrypted, oversized, malformed, or unavailable object storage |
-| Extract | Stored PDF | Page text in worker memory | At least one readable page | Empty/scanned PDF or missing source |
-| Chunk | Page text | Typed chunks with document/page/section metadata | At least one non-empty chunk | No valid chunks |
-| Embed | Chunks | Qdrant points filtered by READY document ID | Every chunk upsert completes | Vector service/model failure |
-| Build graph | Representative text | Neo4j concepts/relationships with document provenance | Graph transaction completes | Provider or graph database failure |
-| Commit READY | Stored counts | `document_uploads` + `processing_attempts` | All mandatory writes committed | Compensating cleanup and `FAILED` |
-| Query | Course name/UUID + question | Ranked sources, answer, query subgraph | Shared READY context and usable vectors | `404` unknown course, `409` no usable READY data |
-| Exam | Course name/UUID + question count | Topic-balanced questions with document/page/passage citations | Same READY context, usable vectors, and valid source IDs | Same `404`/`409` readiness rules as query |
-| Dashboard | Upload/status/query responses | Grouped queue, citations, graph metadata | Stable typed API contract | Safe actionable error state |
-
-### Processing States
-
-Documents progress through durable stages:
+## Durable processing contract
 
 ```text
 UPLOADED -> EXTRACTING -> EXTRACTED -> CHUNKING -> CHUNKED
 -> EMBEDDING -> EMBEDDED -> BUILDING_GRAPH -> GRAPH_BUILT -> READY
 ```
 
-Terminal states are `READY`, `FAILED`, and `CANCELLED`. A document becomes `READY` only after text extraction, chunk creation, graph construction, vector storage, and database count updates succeed. A failed attempt compensates by deleting partial vectors and provenance-scoped graph nodes.
+`READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, and the document has a positive chunk count. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
 
-Failure categories are `DOCUMENT_ERROR`, `CONFIGURATION_ERROR`, `PROVIDER_ERROR`, `WORKER_ERROR`, `TIMEOUT_ERROR`, `DATABASE_ERROR`, and `UNKNOWN_ERROR`. Permanent document/configuration failures cannot be retried in the dashboard. Temporary provider, worker, timeout, and database failures may be retried until the attempt limit is reached.
+Every worker-owned transition is fenced by both the current task token and lease owner. A stale task cannot advance or complete a newer attempt. The coordinator:
 
-### Retrieval
+1. claims a dispatchable row with a PostgreSQL row lock;
+2. records a lease owner and expiration;
+3. extends the lease on the heartbeat interval;
+4. runs the shared idempotent processor;
+5. releases or clears the lease on completion, failure, or cancellation.
 
-1. The user asks a question.
-2. FastAPI runs a deterministic, parameterized, read-only Cypher query scoped to READY documents.
-3. Neo4j returns matching concepts plus typed incoming and outgoing relationships with native direction.
-4. Those prerequisite names expand the vector query sent to Qdrant.
-5. A local cross-encoder reranks the chunks.
-6. A configurable evidence gate removes weak passages and calculates answer confidence.
-7. The synthesis model answers strictly from the provided context, or returns the weak-evidence fallback without calling the LLM.
+On startup and periodically, expired active rows are recovered. The interrupted attempt is retained as failed, a real new attempt/task token is created, and the document returns to `UPLOADED`. When the retry budget is exhausted it becomes terminally failed with an actionable message.
 
-Answers use readable citations such as `[Source 1]` and `[Source 2, p. 6]`. Internal chunk IDs, vector IDs, file paths, and scores are never included in model prompts or displayed answers. Source cards include the PDF name, page, detected section heading, and supporting passage.
+## Stack
 
-Only `PREREQUISITE_OF` relationships expand the vector query and participate in the highlighted prerequisite path. Other relationship types remain visible with their real labels. Graph extraction rejects duplicate entity IDs and missing relationship endpoints, and collapses identical edges before persistence.
+- React 18, TypeScript, Vite, Tailwind CSS, Cytoscape.js
+- FastAPI, Uvicorn, SQLAlchemy async, PyMuPDF
+- PostgreSQL for durable state, attempts, leases, and canonical course identity
+- Qdrant for vectors; Qdrant Cloud Inference in the low-memory profile
+- Neo4j for document-provenance-scoped concepts and relationships
+- S3-compatible private storage (Cloudflare R2 in production, MinIO locally)
+- Groq for graph extraction, GraphRAG synthesis, and exam generation
+- Cohere Rerank for the low-memory hosted profile
 
-Neo4j retrieval preserves native records instead of using the driver's lossy `Result.data()` conversion, then serializes nodes and relationships through their mapping interfaces. This retains relationship endpoints, types, and provenance for the frontend.
+## Local development
 
-### Exam Generation
+Requirements: Python 3.12, Node.js, Docker, and a Groq API key.
 
-1. The user selects a course.
-2. Qdrant is filtered by READY document IDs.
-3. Up to twelve excerpts are selected round-robin across document/topic groups.
-4. The LLM must assign a topic and cite one or more provided source IDs for every question.
-5. The backend rejects invented source IDs and enriches valid citations with document, page, heading, and supporting passage metadata.
+```bash
+cp .env.example .env
+docker compose up -d
 
-Evidence thresholds are configurable with `EVIDENCE_MIN_SCORE`, `EVIDENCE_MEDIUM_SCORE`, and `EVIDENCE_HIGH_SCORE`. They must be ordered from lowest to highest and remain between zero and one.
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-local-models.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
-## API Endpoints
+In a second terminal:
 
-- `POST /api/v1/auth/session` (public access-code exchange)
-- `GET /api/v1/auth/session`
-- `DELETE /api/v1/auth/session`
+```bash
+npm ci
+npm run dev -- --host 127.0.0.1
+```
+
+Open `http://127.0.0.1:5173`. Local infrastructure includes PostgreSQL, Qdrant, Neo4j, and MinIO. There is no Redis container and no separate worker command.
+
+For the smaller hosted-provider environment, install `requirements.txt` instead and set:
+
+```dotenv
+EMBEDDING_PROVIDER=qdrant_cloud
+EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+RERANK_PROVIDER=cohere
+RERANK_MODEL_NAME=rerank-v3.5
+COHERE_API_KEY=...
+```
+
+Gemini remains an optional alternative LLM provider and is installed with `requirements-gemini.txt`.
+
+## Configuration
+
+Copy `.env.example`; it contains every supported setting. Important production settings are:
+
+| Setting | Production value / purpose |
+| --- | --- |
+| `DATABASE_URL` | External managed PostgreSQL URL; TLS as required by the provider |
+| `QDRANT_URL`, `QDRANT_API_KEY` | Qdrant Cloud cluster |
+| `EMBEDDING_PROVIDER` | `qdrant_cloud` for a low-memory API |
+| `EMBEDDING_MODEL_NAME` | `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions) |
+| `RERANK_PROVIDER`, `COHERE_API_KEY` | `cohere` and a secret API key |
+| `NEO4J_*` | Neo4j Aura credentials |
+| `S3_*` | Private R2 bucket endpoint and scoped credentials |
+| `GROQ_API_KEY` | Secret graph/synthesis provider key |
+| `ALLOWED_ORIGINS` | Exact deployed frontend origin; comma-separated if necessary |
+| `DEMO_ACCESS_TOKEN` | Random value of at least 24 characters |
+| `REQUIRE_UPLOAD_AUTH` | `true` for public deployments |
+| `STRICT_STARTUP_VALIDATION` | `true` for public deployments |
+| `PROCESSING_CONCURRENCY` | `1` by default; bounded to `1..4` |
+| `PROCESSING_QUEUE_CAPACITY` | In-memory admission buffer; durable overflow remains in PostgreSQL |
+| `MAX_PDF_SIZE_MB` | Default `10` |
+| `MAX_PDFS_PER_INSTALLATION` | Default `50` |
+
+Generate the demo secret with `openssl rand -base64 32`. The dashboard exchanges it for a signed, short-lived HttpOnly cookie; it is not stored in frontend JavaScript. Rate limiting is intentionally process-local because this deployment runs one API instance. Counters reset on restart and must be replaced by shared infrastructure before scaling horizontally.
+
+Never commit `.env`, database URLs, provider keys, bucket credentials, or access tokens. The included example contains placeholders and local-only MinIO credentials.
+
+## Deployment blueprint (not automatically deployed)
+
+`render.yaml` defines one free API service and one static frontend. It deliberately expects an external `DATABASE_URL` instead of creating Render's time-limited free PostgreSQL database. Add the remaining `sync: false` secrets in the Render dashboard before the first start.
+
+Suggested low-cost services:
+
+- Static frontend: Render Static Site or Cloudflare Pages.
+- API: Render Free while the measured hosted-provider profile fits; move to paid compute if real traffic or longer processing requires predictable uptime.
+- PostgreSQL: an external free managed tier with persistence suitable for your portfolio window.
+- Vectors/inference: Qdrant Cloud free cluster.
+- Graph: one Neo4j Aura Free instance.
+- PDFs: a private Cloudflare R2 bucket with public access disabled.
+- LLM/reranking: Groq and Cohere API keys with account-side usage limits.
+
+Current free tiers are not service-level guarantees. Render free web services spin down after inactivity and may restart; that is why processing uses durable leases and recovery. Provider quotas, retention, and prices can change, so verify them before deployment. Useful primary references: [Render free services](https://render.com/docs/free), [Render compute plans](https://render.com/docs/compute-plans), [Qdrant free cluster](https://qdrant.tech/documentation/cloud/create-cluster/), [Qdrant Cloud Inference](https://qdrant.tech/documentation/cloud/inference/), [Neo4j Aura instance creation](https://neo4j.com/docs/aura/getting-started/create-instance/), [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/), and [Cohere Rerank v2](https://docs.cohere.com/v2/reference/rerank).
+
+### Before deployment
+
+1. Create PostgreSQL, Qdrant, Neo4j, R2, Groq, and Cohere credentials.
+2. Create a private R2 bucket; disable public development URLs and use least-privilege object credentials.
+3. Set all `sync: false` values in `render.yaml`, including the exact frontend `ALLOWED_ORIGINS` and API `VITE_API_BASE_URL`.
+4. Use a new Qdrant collection when changing embedding model or dimension. Startup rejects incompatible existing vectors.
+5. Run the verification commands below.
+6. Deploy only after explicit approval.
+
+The API image binds on port `8000`, runs as a non-root user, contains no local ML model artifacts, and stores no durable data on the container filesystem.
+
+## Schema changes and rollback
+
+Startup runs additive, idempotent PostgreSQL DDL (`ADD COLUMN IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`) before accepting traffic. Back up the database before the first production rollout.
+
+Safe rollout:
+
+1. snapshot/export PostgreSQL;
+2. deploy the new API with processing concurrency `1`;
+3. wait for `/api/v1/ready`;
+4. upload one small PDF and observe it reach `READY`;
+5. verify query, citations, concept graph, and exam generation.
+
+Application rollback is safe because the migration is additive. Roll back the service image first; leave the added lease columns/indexes in place. Drop them only during a maintenance window after proving the older image does not depend on them. Do not delete Qdrant collections, graph data, PostgreSQL rows, or R2 objects as part of an application rollback.
+
+Legacy local PDFs can be copied to object storage with a dry-run-first utility:
+
+```bash
+python scripts/migrate_pdfs_to_object_storage.py --dry-run
+python scripts/migrate_pdfs_to_object_storage.py
+```
+
+If PostgreSQL claims a document is ready after a vector migration but its points are missing:
+
+```bash
+python scripts/reconcile_ready_vectors.py
+python scripts/reconcile_ready_vectors.py --apply
+```
+
+## Capacity evidence
+
+Measurements were taken on macOS with Python 3.12 using `resource.getrusage(...).ru_maxrss` after cached model loads:
+
+| Probe | Measured peak resident memory |
+| --- | ---: |
+| Import API after removing eager model imports | ~193 MiB |
+| Production container API import (Linux) | ~187 MiB |
+| Local MiniLM embedding load + encode 8 strings | ~553 MiB |
+| Local embedding + cross-encoder rerank | ~599 MiB |
+
+The verified production image is about 140 MiB (147,140,460 bytes). The local model profile is not safe for a 512 MiB process. The Render blueprint uses hosted embedding/reranking and excludes Torch/SentenceTransformers from the production requirements. These are engineering measurements, not hosting guarantees; repeat them in the target container and use paid memory if real PDF processing approaches the limit.
+
+The queue is intentionally conservative: one processor, eight buffered jobs, 10 MiB PDFs, and 50 PDFs per installation. Increasing concurrency multiplies parse buffers and provider traffic and should be backed by a new load/memory test.
+
+## Verification
+
+```bash
+source .venv/bin/activate
+python -m compileall -q app tests
+python -m unittest discover -s tests -v
+npm ci
+npm run build
+docker compose config -q
+```
+
+Tests cover durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY gating, hosted inference payloads, hosted reranking, object storage, PDF byte ranges, auth cookies, rate limits, citations, graph integrity, and readiness-sensitive course behavior.
+
+## API surface
+
+- `GET /api/v1/health` — PostgreSQL liveness
+- `GET /api/v1/ready` — PostgreSQL, Qdrant, Neo4j, object storage, and coordinator readiness
+- `POST|GET|DELETE /api/v1/auth/session`
 - `POST /api/v1/ingest/upload`
 - `GET /api/v1/ingest/status/{task_id}`
 - `GET /api/v1/ingest/uploads`
 - `GET /api/v1/ingest/courses`
-- `GET /api/v1/ingest/uploads/{upload_id}/preview`
 - `POST /api/v1/ingest/uploads/{upload_id}/retry`
-- `DELETE /api/v1/ingest/uploads/{upload_id}` (failed records only)
+- `GET /api/v1/ingest/uploads/{upload_id}/preview`
+- `DELETE /api/v1/ingest/uploads/{upload_id}` (failed documents only)
 - `POST /api/v1/query`
 - `POST /api/v1/exam/generate`
-- `GET /api/v1/health`
 
-When `DEMO_ACCESS_TOKEN` is configured, health and the session exchange are public and every other `/api/v1` route is protected. Browser calls use the HttpOnly session cookie. Scripts may send the deployment token as `Authorization: Bearer <token>`. Redis applies separate per-minute limits to login attempts, ordinary routes, and expensive upload/query/exam/retry actions.
+## Repository safety
 
-## Application Containers
-
-The repository includes separate production-oriented images for the application runtime and static frontend. The API and Celery worker intentionally share one Python image so they use identical code and dependencies.
-
-```bash
-# FastAPI image
-docker build -f Dockerfile.api -t conceptgraph-api .
-
-# Run the same image as a Celery worker
-docker run --rm conceptgraph-api \
-  celery -A app.tasks.document_tasks.celery_app worker \
-  --loglevel=info --concurrency=1
-
-# Frontend image; the API URL is compiled into the Vite bundle
-docker build -f Dockerfile.frontend \
-  --build-arg VITE_API_BASE_URL=https://api.example.com/api/v1 \
-  -t conceptgraph-frontend .
-```
-
-`Dockerfile.api` runs as the non-root `conceptgraph` user and exposes port `8000`. `Dockerfile.frontend` uses a multi-stage Node build and serves the compiled SPA from unprivileged Nginx on port `8080`; its Nginx configuration includes `/dashboard` fallback routing and `/healthz`.
-
-The API and worker exchange an opaque S3 object key through PostgreSQL/Celery, so they do not require a shared filesystem. The default local S3-compatible service is MinIO; production can use AWS S3, Cloudflare R2, or another compatible private bucket.
-
-## Render Deployment
-
-[`render.yaml`](render.yaml) defines a Render Blueprint with:
-
-- Docker-based FastAPI and Celery services.
-- A static Vite frontend with SPA rewrites and security headers.
-- Render PostgreSQL and Render Key Value.
-- External Neo4j, Qdrant, and S3-compatible service settings supplied as secrets.
-
-The API and worker use `standard` compute because the local PyTorch/SentenceTransformers models require materially more memory than a typical lightweight web process. PostgreSQL uses `basic-256mb`, and Key Value uses `starter`; review current Render pricing before creating the Blueprint.
-
-Before the first Blueprint sync, prepare private Neo4j, Qdrant, and S3-compatible services. Render prompts for every `sync: false` value. Set:
-
-- `VITE_API_BASE_URL` to `https://<api-service>.onrender.com/api/v1`.
-- `CORS_ALLOWED_ORIGINS` to the frontend URL, without a trailing slash.
-- `QDRANT_URL` to the Qdrant Cloud HTTPS cluster endpoint and `QDRANT_API_KEY` to its API key. The worker inherits both from the API service.
-- `DEMO_ACCESS_TOKEN` to a new random value of at least 24 characters. Do not reuse the Groq, Qdrant, database, or storage key.
-- `S3_ENDPOINT_URL` to the provider endpoint; use an empty value for AWS S3.
-- `S3_FORCE_PATH_STYLE=true` only when required by the selected provider.
-
-Existing installations that have local `data/uploads` records must migrate before moving the database to cloud infrastructure:
-
-```bash
-python -m scripts.migrate_pdfs_to_object_storage --dry-run
-python -m scripts.migrate_pdfs_to_object_storage
-```
-
-The command copies each legacy file, verifies the object write returned successfully, and then commits its object key. It does not delete the local source files. Back up PostgreSQL and `data/uploads` before migration.
-
-Query and exam responses use the same course readiness rules:
-
-- `404`: the course does not exist.
-- `409`: the course exists but has no READY documents, or READY metadata points to missing vectors.
-- `200`: at least one READY document has usable indexed content.
-
-The query response also includes graph count metadata:
-
-```json
-{
-  "total_nodes": 18,
-  "total_edges": 14,
-  "displayed_nodes": 4,
-  "displayed_edges": 2,
-  "filter_reason": "query_subgraph"
-}
-```
-
-These values are illustrative response fields, not hardcoded dashboard statistics; the API calculates them from the selected READY documents.
-
-Dashboard course metrics distinguish the concepts and relationships recorded during extraction from the query-specific graph currently displayed. Historical duplicate records are shown as excluded history instead of inflating READY documents and chunk totals.
-
-## Database Migration
-
-Startup performs an idempotent migration for existing local installations:
-
-- Creates `courses` and `processing_attempts`.
-- Adds canonical course UUID, SHA-256 hash, stage, failure, retry, attempt, and output-count columns to `document_uploads`.
-- Maps legacy `completed` rows with stored chunks to `READY`.
-- Converts interrupted legacy `queued`/`running` rows to retryable `WORKER_ERROR` failures.
-- Computes hashes for legacy PDFs that are still present on disk.
-
-The migration is additive and does not delete existing PDFs. Old Neo4j nodes without document provenance are intentionally excluded from new graph totals. They must be rebuilt from a canonical PDF rather than silently attributed to a document, because doing so would invent provenance.
-
-## Graph Display Semantics
-
-- **READY PDFs**: unique SHA-256 document contents that completed every mandatory processing stage.
-- **Chunks**: page-aware searchable passages stored as Qdrant points. They overlap slightly to preserve context.
-- **Extracted nodes / edges**: concepts and relationships returned by graph extraction when the canonical document completed. These are processing-time counts, not a live Neo4j recount.
-- **Showing X of Y**: the query-specific Cytoscape subgraph compared with the provenance-scoped READY graph stored in Neo4j.
-
-Cytoscape deduplicates edges by source, target, and relationship type. It drops an edge when either endpoint is absent and highlights only incoming `PREREQUISITE_OF` chains. Isolated concepts can still be shown when independently relevant to the query.
-
-### Legacy graph note
-
-The current local CYBER dataset contains five historical PostgreSQL rows with one identical SHA-256 hash, so the dashboard correctly reports one logical READY PDF and excludes four duplicate records. Its older Neo4j concepts lack `upload_id` provenance and are therefore excluded from safe READY-document graph retrieval until the canonical PDF is reprocessed.
-
-## Tests
-
-Run backend rules and frontend production checks with:
-
-```bash
-.venv/bin/python -m unittest discover -s tests -v
-npm run build
-```
-
-The 38 backend tests cover course normalization and readiness-aware metrics, logical duplicate summaries, failure retryability including Qdrant DNS failures, terminal retry messaging, bounded graph-provider recovery, strict graph extraction, READY gating, citation deduplication, missing graph endpoints, duplicate relationships, object-storage round trips, legacy reads, cloud database URLs, PDF range responses, Qdrant secret handling, signed-session integrity/expiry, access middleware/cookie exchange, and Redis rate-limit counters.
-
-After changing Qdrant clusters, audit legacy READY records before accepting traffic:
-
-```bash
-.venv/bin/python -m scripts.reconcile_ready_vectors
-.venv/bin/python -m scripts.reconcile_ready_vectors --apply
-```
-
-The first command is a dry run. The second marks READY records with zero Qdrant vectors as FAILED and enables Retry only when the source PDF and retry budget are available.
-
-## Notes
-
-- The Neo4j graph is course-scoped to avoid mixing unrelated syllabi.
-- A course can contain multiple PDFs; retrieval and exams use all processed PDFs in that course.
-- The project is optimized for local development on Apple Silicon.
+This clone is configured with the new portfolio repository as `origin`. The source repository is `upstream` for fetches only and has its push URL disabled. Do not change that protection or push portfolio changes to the original repository.

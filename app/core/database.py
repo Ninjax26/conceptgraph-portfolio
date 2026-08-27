@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
 from sqlalchemy import text
 
 from app.core.config import settings
@@ -28,10 +27,9 @@ class DatabaseClients:
 
 postgres_engine: AsyncEngine = create_async_engine(
     settings.postgres_dsn,
-    # Celery's solo worker creates a fresh asyncio loop per task. Reusing an
-    # asyncpg connection across those loops causes "Future attached to a
-    # different loop" failures on the second upload.
-    poolclass=NullPool,
+    pool_pre_ping=True,
+    pool_size=settings.database_pool_size,
+    max_overflow=settings.database_max_overflow,
 )
 
 AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
@@ -43,11 +41,15 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
 neo4j_driver: AsyncDriver = AsyncGraphDatabase.driver(
     settings.neo4j_uri,
     auth=(settings.neo4j_username, settings.neo4j_password),
+    connection_timeout=settings.provider_timeout_seconds,
 )
 
 qdrant_client: QdrantClient = QdrantClient(
     url=settings.qdrant_url,
     api_key=settings.qdrant_api_key_value,
+    cloud_inference=settings.embedding_provider == "qdrant_cloud",
+    check_compatibility=False,
+    timeout=settings.provider_timeout_seconds,
 )
 
 
@@ -77,12 +79,15 @@ async def initialize_database_schema() -> None:
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS last_attempted_at TIMESTAMPTZ",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ",
+            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS lease_owner VARCHAR(128)",
+            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS processed_chunk_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_node_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_edge_count INTEGER NOT NULL DEFAULT 0",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_course_uuid ON document_uploads (course_uuid)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_content_hash ON document_uploads (content_hash)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_stage ON document_uploads (stage)",
+            "CREATE INDEX IF NOT EXISTS ix_document_uploads_lease_expires_at ON document_uploads (lease_expires_at)",
             "ALTER TABLE processing_attempts ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ",
         ]
         for statement in migrations:

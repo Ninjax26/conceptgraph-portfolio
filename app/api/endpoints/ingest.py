@@ -5,13 +5,14 @@ import hashlib
 from urllib.parse import quote
 from uuid import uuid4
 
-import fitz
+import pymupdf as fitz
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from app.core.database import get_postgres_session
+from app.core.config import settings
 from app.schemas.ingest import CourseSummaryResponse, IngestResponse, UploadStatusResponse
 from app.services.upload_service import UploadService
 from app.services.course_service import CourseService
@@ -21,15 +22,16 @@ from app.services.storage_service import (
     StorageService,
     storage_service,
 )
-from app.core.processing import normalize_course_name
 from app.core.processing import FailureCategory
-from app.tasks.document_tasks import process_pdf_task
+from app.core.processing_coordinator import EnqueueDisposition, processing_coordinator
+from app.services.document_processing_service import document_processing_service
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
 
 upload_service = UploadService()
 course_service = CourseService()
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = settings.max_pdf_size_mb * 1024 * 1024
+MAX_UPLOAD_DETAIL = f"PDF files must be {settings.max_pdf_size_mb} MB or smaller."
 
 @router.post(
     "/upload",
@@ -47,16 +49,18 @@ async def upload_document(
     if file.content_type not in {"application/pdf", "application/x-pdf"}:
         raise HTTPException(status_code=400, detail="The selected file is not a valid PDF.")
     if file.size is not None and file.size > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="PDF files must be 10 MB or smaller.")
+        raise HTTPException(status_code=413, detail=MAX_UPLOAD_DETAIL)
     course_id = course_id.strip()
     if not course_id:
         raise HTTPException(status_code=400, detail="course_id cannot be empty.")
 
     content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="PDF files must be 10 MB or smaller.")
+        raise HTTPException(status_code=413, detail=MAX_UPLOAD_DETAIL)
     if not content:
         raise HTTPException(status_code=400, detail="The selected PDF is empty.")
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="The selected file has an invalid PDF signature.")
     try:
         with fitz.open(stream=content, filetype="pdf") as document:
             if document.needs_pass:
@@ -74,7 +78,7 @@ async def upload_document(
     content_hash = hashlib.sha256(content).hexdigest()
     await db.execute(
         text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
-        {"key": f"course:{normalize_course_name(course_id)}"},
+        {"key": "conceptgraph:pdf-admission"},
     )
     course = await course_service.get_or_create(db, course_id)
     duplicate = await upload_service.find_duplicate(db, course.id, content_hash)
@@ -83,6 +87,14 @@ async def upload_document(
             duplicate,
             message="This PDF already exists in the course. The existing document was returned.",
             duplicate=True,
+        )
+    if await upload_service.count_uploads(db) >= settings.max_pdfs_per_installation:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "This installation has reached its configured PDF limit. "
+                "Remove an eligible document before uploading another."
+            ),
         )
 
     upload_id = str(uuid4())
@@ -114,28 +126,16 @@ async def upload_document(
         # its source; a later reconciliation job can remove true orphans.
         raise HTTPException(status_code=503, detail="Document tracking is temporarily unavailable.") from exc
 
-    try:
-        task = process_pdf_task.apply_async(
-            args=[upload_id, storage_key, course.id, course.display_name, file.filename],
-            task_id=task_id,
-        )
-    except Exception as exc:
-        await upload_service.mark_failed(
-            db,
-            upload_id,
-            task_id,
-            "The processing worker is unavailable. Please retry when the service is restored.",
-            FailureCategory.WORKER_ERROR,
-            True,
-        )
-        raise HTTPException(
-            status_code=503,
-            detail="The processing worker is unavailable. The upload was saved and can be retried.",
-        ) from exc
+    disposition = await processing_coordinator.submit(upload_id, task_id)
+    message = (
+        "Background processing has started."
+        if disposition != EnqueueDisposition.DEFERRED
+        else "The upload was saved and will start when processing capacity is available."
+    )
 
     return IngestResponse(
-        message="Background processing has started.",
-        task_id=task.id,
+        message=message,
+        task_id=task_id,
         upload_id=upload_id,
         course_id=course.id,
         course_name=course.display_name,
@@ -184,7 +184,6 @@ async def list_uploads(
     limit: int = 25,
     db: AsyncSession = Depends(get_postgres_session),
 ) -> list[UploadStatusResponse]:
-    await upload_service.expire_stale_uploads(db)
     records = await upload_service.list_uploads(db, limit=100)
     grouped: dict[tuple[str, str], object] = {}
     rank = {"active": 0, "ready": 1, "failed": 2, "cancelled": 3}
@@ -286,33 +285,15 @@ async def retry_upload(
         )
         raise HTTPException(status_code=404, detail="The stored PDF is no longer available.")
 
-    try:
-        task = process_pdf_task.apply_async(
-            args=[
-                record.upload_id,
-                record.storage_key,
-                record.course_uuid,
-                record.course_id,
-                record.original_filename,
-            ],
-            task_id=task_id,
-        )
-    except Exception as exc:
-        await upload_service.mark_failed(
-            db,
-            upload_id,
-            task_id,
-            "The processing worker is unavailable. Please retry when the service is restored.",
-            FailureCategory.WORKER_ERROR,
-            True,
-        )
-        raise HTTPException(
-            status_code=503,
-            detail="The processing worker is unavailable. The retry was saved and can be attempted again.",
-        ) from exc
+    disposition = await processing_coordinator.submit(upload_id, record.task_id)
+    message = (
+        "Document processing has been queued again."
+        if disposition != EnqueueDisposition.DEFERRED
+        else "The retry was saved and will start when processing capacity is available."
+    )
     return IngestResponse(
-        message="Document processing has been queued again.",
-        task_id=task.id,
+        message=message,
+        task_id=record.task_id,
         upload_id=record.upload_id,
         course_id=record.course_uuid or record.course_id,
         course_name=record.course_id,
@@ -349,6 +330,19 @@ async def remove_failed_upload(
     record = await upload_service.lock_failed_for_deletion(db, upload_id)
     if record is None:
         raise HTTPException(status_code=409, detail="Only failed document records can be removed.")
+    course_uuid = getattr(record, "course_uuid", None)
+    if course_uuid:
+        try:
+            await document_processing_service.ingestion_service.cleanup_upload(
+                record.upload_id,
+                course_uuid,
+            )
+        except Exception as exc:
+            await db.rollback()
+            raise HTTPException(
+                status_code=503,
+                detail="Indexed document artifacts are temporarily unavailable.",
+            ) from exc
     shared_object = await upload_service.storage_key_is_shared(
         db,
         record.storage_key,

@@ -1,13 +1,13 @@
 import asyncio
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
-import fitz
+import pymupdf as fitz
 import httpx
 from botocore.exceptions import EndpointConnectionError
 from fastapi import HTTPException, Request, UploadFile
@@ -18,19 +18,23 @@ from starlette.datastructures import Headers
 from app.api.endpoints import auth, ingest
 from app.core.config import Settings
 from app.core.processing import FailureCategory, ProcessingStage, classify_failure, normalize_course_name
+from app.core.processing_coordinator import EnqueueDisposition, ProcessingCoordinator
 from app.core.security import DemoProtectionMiddleware
 from app.schemas.auth import AccessCodeRequest
 from app.services.citation_service import assess_evidence, build_sources
 from app.services.course_service import CourseNotReadyError, CourseService
+from app.services.document_processing_service import DocumentProcessingService
 from app.services.exam_service import ExamService
 from app.services.ingestion_service import IngestionService
+from app.services.parser_service import DocumentChunk
 from app.services.rag_service import RetrievalService
+from app.services.rerank_service import RerankService
 from app.services.security_service import DemoAccessService, RateLimitResult, RateLimitService
 from app.services.storage_service import ObjectStorageError, StorageService
 from app.services.upload_service import UploadService
 from app.schemas.exam import ExamSource
 from app.schemas.extraction import ConceptNode, ConceptRelationship, GraphExtractionResponse
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 
 class ProcessingRulesTests(unittest.TestCase):
@@ -66,36 +70,42 @@ class ProcessingRulesTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Settings(_env_file=None, DEMO_ACCESS_TOKEN="short-token")
 
-    def test_rate_limit_is_shared_through_redis_counter(self):
-        class FakePipeline:
-            def __init__(self, redis):
-                self.redis = redis
-                self.key = ""
+    def test_strict_public_startup_rejects_missing_secrets(self):
+        with self.assertRaises(ValidationError) as raised:
+            Settings(_env_file=None, STRICT_STARTUP_VALIDATION=True)
 
-            def incr(self, key):
-                self.key = key
-                return self
+        self.assertIn("Missing required public-deployment", str(raised.exception))
 
-            def expire(self, key, seconds):
-                self.redis.expiry = (key, seconds)
-                return self
+    def test_strict_hosted_configuration_accepts_complete_secrets(self):
+        config = Settings(
+            _env_file=None,
+            STRICT_STARTUP_VALIDATION=True,
+            DATABASE_URL="postgresql://user:pass@db.example.test/conceptgraph",
+            NEO4J_URI="neo4j+s://graph.example.test",
+            NEO4J_USERNAME="neo4j",
+            NEO4J_PASSWORD="graph-secret",
+            QDRANT_URL="https://vectors.example.test",
+            QDRANT_API_KEY="vector-secret",
+            EMBEDDING_PROVIDER="qdrant_cloud",
+            RERANK_PROVIDER="cohere",
+            COHERE_API_KEY="cohere-secret",
+            OBJECT_STORAGE_BACKEND="s3",
+            S3_BUCKET="private-pdfs",
+            S3_ENDPOINT_URL="https://account.r2.cloudflarestorage.com",
+            S3_ACCESS_KEY_ID="r2-access",
+            S3_SECRET_ACCESS_KEY="r2-secret",
+            ALLOWED_ORIGINS="https://portfolio.example.test",
+            DEMO_ACCESS_TOKEN="a-strong-demo-secret-value-123456",
+            REQUIRE_UPLOAD_AUTH=True,
+            LLM_PROVIDER="groq",
+            GROQ_API_KEY="groq-secret",
+        )
 
-            async def execute(self):
-                self.redis.counts[self.key] = self.redis.counts.get(self.key, 0) + 1
-                return [self.redis.counts[self.key], True]
+        self.assertTrue(config.strict_startup_validation)
+        self.assertEqual(config.embedding_provider, "qdrant_cloud")
 
-        class FakeRedis:
-            def __init__(self):
-                self.counts = {}
-                self.expiry = None
-
-            def pipeline(self, transaction=True):
-                self.transaction = transaction
-                return FakePipeline(self)
-
-        service = RateLimitService("redis://unused")
-        fake_redis = FakeRedis()
-        service._client = fake_redis
+    def test_rate_limit_is_enforced_by_the_single_process_counter(self):
+        service = RateLimitService()
 
         first = asyncio.run(service.check("query:user", 2, now=120))
         second = asyncio.run(service.check("query:user", 2, now=121))
@@ -105,7 +115,6 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(second.remaining, 0)
         self.assertFalse(third.allowed)
         self.assertEqual(third.retry_after, 58)
-        self.assertEqual(fake_redis.expiry[1], 120)
 
     def test_protected_route_rejects_a_missing_credential(self):
         config = Settings(
@@ -241,7 +250,13 @@ class ProcessingRulesTests(unittest.TestCase):
             get_collections=lambda: SimpleNamespace(
                 collections=[SimpleNamespace(name="conceptgraph_chunks")]
             ),
-            get_collection=lambda name: SimpleNamespace(payload_schema={}),
+            get_collection=lambda name: SimpleNamespace(
+                payload_schema={},
+                config=SimpleNamespace(
+                    params=SimpleNamespace(vectors=SimpleNamespace(size=384))
+                ),
+            ),
+            collection_exists=lambda name: True,
             create_payload_index=Mock(),
         )
         service = IngestionService(
@@ -258,6 +273,94 @@ class ProcessingRulesTests(unittest.TestCase):
             wait=True,
         )
 
+    def test_incompatible_qdrant_dimension_is_rejected(self):
+        vector_client = SimpleNamespace(
+            collection_exists=lambda name: True,
+            get_collection=lambda name: SimpleNamespace(
+                config=SimpleNamespace(
+                    params=SimpleNamespace(vectors=SimpleNamespace(size=768))
+                )
+            ),
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=vector_client,
+        )
+
+        with self.assertRaises(RuntimeError) as raised:
+            service.validate_qdrant_collection()
+
+        self.assertIn("new collection name", str(raised.exception))
+
+    def test_qdrant_cloud_inference_sends_documents_instead_of_local_vectors(self):
+        vector_client = SimpleNamespace(
+            get_collections=lambda: SimpleNamespace(collections=[]),
+            create_collection=Mock(),
+            get_collection=lambda name: SimpleNamespace(payload_schema={}),
+            create_payload_index=Mock(),
+            upsert=Mock(),
+        )
+        chunk = DocumentChunk(
+            id="chunk-1",
+            text="Hosted embedding text",
+            metadata={"upload_id": "upload-1"},
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=vector_client,
+        )
+
+        with (
+            patch("app.services.ingestion_service.settings.embedding_provider", "qdrant_cloud"),
+            patch(
+                "app.services.ingestion_service.settings.embedding_model_name",
+                "sentence-transformers/all-MiniLM-L6-v2",
+            ),
+        ):
+            indexed = service.upsert_chunks_to_qdrant([chunk])
+
+        self.assertEqual(indexed, 1)
+        point = vector_client.upsert.call_args.kwargs["points"][0]
+        self.assertEqual(point.vector.text, chunk.text)
+        self.assertEqual(
+            point.vector.model,
+            "sentence-transformers/all-MiniLM-L6-v2",
+        )
+
+    def test_cohere_reranking_preserves_probability_scoring_contract(self):
+        async def handler(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.url.path, "/v2/rerank")
+            self.assertEqual(request.headers["authorization"], "Bearer cohere-secret")
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {"index": 1, "relevance_score": 0.9},
+                        {"index": 0, "relevance_score": 0.2},
+                    ]
+                },
+            )
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        chunks = [
+            {"id": "a", "text": "weak"},
+            {"id": "b", "text": "strong"},
+        ]
+        with (
+            patch("app.services.rerank_service.settings.rerank_provider", "cohere"),
+            patch("app.services.rerank_service.settings.rerank_model_name", "rerank-v3.5"),
+            patch(
+                "app.services.rerank_service.settings.cohere_api_key",
+                SecretStr("cohere-secret"),
+            ),
+        ):
+            ranked = asyncio.run(RerankService(client).rerank("query", chunks))
+        asyncio.run(client.aclose())
+
+        self.assertEqual([chunk["id"] for chunk in ranked], ["b", "a"])
+        probability = 1 / (1 + __import__("math").exp(-ranked[0]["rerank_score"]))
+        self.assertAlmostEqual(probability, 0.9)
+
     def test_groq_graph_extraction_uses_strict_json_schema(self):
         completion = SimpleNamespace(
             choices=[
@@ -273,7 +376,10 @@ class ProcessingRulesTests(unittest.TestCase):
             vector_client=SimpleNamespace(),
         )
 
-        with patch("app.services.ingestion_service.Groq", return_value=client):
+        with (
+            patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),
+            patch("app.services.ingestion_service.Groq", return_value=client),
+        ):
             result = service._extract_with_groq("Course text")
 
         response_format = client.chat.completions.create.call_args.kwargs[
@@ -319,7 +425,10 @@ class ProcessingRulesTests(unittest.TestCase):
             vector_client=SimpleNamespace(),
         )
 
-        with patch("app.services.ingestion_service.Groq", return_value=client):
+        with (
+            patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),
+            patch("app.services.ingestion_service.Groq", return_value=client),
+        ):
             result = service._extract_with_groq("Course text\n" * 500)
 
         self.assertEqual(client.chat.completions.create.call_count, 2)
@@ -345,6 +454,7 @@ class ProcessingRulesTests(unittest.TestCase):
         )
 
         with (
+            patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),
             patch("app.services.ingestion_service.Groq", return_value=client),
             self.assertRaises(BadRequestError),
         ):
@@ -644,12 +754,17 @@ class UploadEndpointTests(unittest.TestCase):
                 "find_duplicate",
                 AsyncMock(return_value=None),
             ),
+            patch.object(
+                ingest.upload_service,
+                "count_uploads",
+                AsyncMock(return_value=0),
+            ),
             patch.object(ingest.upload_service, "create_upload", AsyncMock()),
             patch.object(ingest.storage_service, "put_pdf") as put_pdf,
             patch.object(
-                ingest.process_pdf_task,
-                "apply_async",
-                return_value=SimpleNamespace(id="task-1"),
+                ingest.processing_coordinator,
+                "submit",
+                AsyncMock(return_value=EnqueueDisposition.ACCEPTED),
             ) as enqueue,
         ):
             response = asyncio.run(ingest.upload_document(" CYBER ", upload, db))
@@ -658,8 +773,8 @@ class UploadEndpointTests(unittest.TestCase):
         self.assertTrue(key.startswith("courses/course-uuid/documents/"))
         self.assertTrue(key.endswith(".pdf"))
         self.assertEqual(put_pdf.call_args.args[1], content)
-        self.assertEqual(response.task_id, "task-1")
-        self.assertEqual(enqueue.call_args.kwargs["args"][1], key)
+        self.assertEqual(response.task_id, enqueue.await_args.args[1])
+        self.assertEqual(enqueue.await_args.args[0], response.upload_id)
 
     def test_failed_duplicate_deletion_keeps_shared_object(self):
         record = SimpleNamespace(
@@ -689,6 +804,40 @@ class UploadEndpointTests(unittest.TestCase):
             asyncio.run(ingest.remove_failed_upload(record.upload_id, db))
 
         delete_object.assert_not_called()
+
+    def test_failed_deletion_cleans_partial_derived_artifacts(self):
+        record = SimpleNamespace(
+            upload_id="failed-upload",
+            course_uuid="course-1",
+            storage_key="courses/course-1/documents/hash.pdf",
+        )
+        db = SimpleNamespace(rollback=AsyncMock())
+
+        with (
+            patch.object(
+                ingest.upload_service,
+                "lock_failed_for_deletion",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.document_processing_service.ingestion_service,
+                "cleanup_upload",
+                AsyncMock(),
+            ) as cleanup,
+            patch.object(
+                ingest.upload_service,
+                "storage_key_is_shared",
+                AsyncMock(return_value=True),
+            ),
+            patch.object(
+                ingest.upload_service,
+                "delete_failed",
+                AsyncMock(return_value=record),
+            ),
+        ):
+            asyncio.run(ingest.remove_failed_upload(record.upload_id, db))
+
+        cleanup.assert_awaited_once_with("failed-upload", "course-1")
 
 
 class ProcessingFencingTests(unittest.TestCase):
@@ -737,6 +886,33 @@ class ProcessingFencingTests(unittest.TestCase):
         self.assertFalse(record.retryable)
         self.assertIn("Remove this failed record", record.error_message)
         self.assertEqual(attempt.error_message, record.error_message)
+
+    def test_ready_transition_requires_graph_built_and_committed_chunks(self):
+        service = UploadService()
+        record = SimpleNamespace(
+            status="active",
+            stage=ProcessingStage.EMBEDDED.value,
+            course_uuid="course-1",
+            storage_key="courses/course-1/documents/hash.pdf",
+        )
+        service._get_current_upload = AsyncMock(return_value=record)
+        session = SimpleNamespace(commit=AsyncMock())
+
+        with self.assertRaises(ValueError):
+            asyncio.run(
+                service.mark_completed(
+                    session,
+                    "upload-1",
+                    "task-1",
+                    {
+                        "chunks_indexed": 1,
+                        "nodes_upserted": 0,
+                        "relationships_upserted": 0,
+                    },
+                )
+            )
+
+        session.commit.assert_not_awaited()
 
 
 class ReadyContextTests(unittest.TestCase):
@@ -822,7 +998,7 @@ class ReadyContextTests(unittest.TestCase):
 
 
 class RetryEndpointTests(unittest.TestCase):
-    def test_worker_enqueue_failure_returns_document_to_failed_state(self):
+    def test_full_queue_defers_retry_without_marking_it_failed(self):
         with tempfile.NamedTemporaryFile(suffix=".pdf") as source:
             record = SimpleNamespace(
                 upload_id="upload-1",
@@ -848,24 +1024,307 @@ class RetryEndpointTests(unittest.TestCase):
                 ),
                 patch.object(ingest.upload_service, "mark_failed", AsyncMock()) as mark_failed,
                 patch.object(
-                    ingest.process_pdf_task,
-                    "apply_async",
-                    side_effect=ConnectionError("broker unavailable"),
+                    ingest.processing_coordinator,
+                    "submit",
+                    AsyncMock(return_value=EnqueueDisposition.DEFERRED),
                 ),
                 patch.object(ingest.storage_service, "exists", return_value=True),
             ):
-                with self.assertRaises(HTTPException) as raised:
-                    asyncio.run(ingest.retry_upload(record.upload_id, SimpleNamespace()))
+                response = asyncio.run(
+                    ingest.retry_upload(record.upload_id, SimpleNamespace())
+                )
 
-            self.assertEqual(raised.exception.status_code, 503)
-            mark_failed.assert_awaited_once_with(
-                ANY,
-                record.upload_id,
-                ANY,
-                "The processing worker is unavailable. Please retry when the service is restored.",
-                FailureCategory.WORKER_ERROR,
-                True,
+            self.assertEqual(response.task_id, "new-task")
+            self.assertIn("capacity", response.message)
+            mark_failed.assert_not_awaited()
+
+
+class ProcessingCoordinatorTests(unittest.TestCase):
+    def test_bounded_queue_defers_when_capacity_is_full(self):
+        config = Settings(
+            _env_file=None,
+            PROCESSING_CONCURRENCY=1,
+            PROCESSING_QUEUE_CAPACITY=1,
+        )
+        coordinator = ProcessingCoordinator(
+            config=config,
+            upload_service=SimpleNamespace(),
+            processing_service=SimpleNamespace(),
+        )
+        coordinator._started = True
+
+        async def submit_jobs():
+            first = await coordinator.submit("upload-1", "task-1")
+            duplicate = await coordinator.submit("upload-1", "task-1")
+            second = await coordinator.submit("upload-2", "task-2")
+            return first, duplicate, second
+
+        first, duplicate, second = asyncio.run(submit_jobs())
+
+        self.assertEqual(first, EnqueueDisposition.ACCEPTED)
+        self.assertEqual(duplicate, EnqueueDisposition.ALREADY_QUEUED)
+        self.assertEqual(second, EnqueueDisposition.DEFERRED)
+        self.assertEqual(coordinator.queue_depth, 1)
+
+    def test_default_configuration_starts_one_processor(self):
+        config = Settings(
+            _env_file=None,
+            PROCESSING_CONCURRENCY=1,
+            PROCESSING_QUEUE_CAPACITY=2,
+        )
+        coordinator = ProcessingCoordinator(
+            config=config,
+            upload_service=SimpleNamespace(),
+            processing_service=SimpleNamespace(),
+        )
+        coordinator._recover_and_fill = AsyncMock()
+
+        async def exercise():
+            await coordinator.start()
+            worker_count = len(coordinator._workers)
+            await coordinator.stop()
+            return worker_count
+
+        self.assertEqual(asyncio.run(exercise()), 1)
+
+
+class DocumentProcessingServiceTests(unittest.TestCase):
+    def _service_fixture(self):
+        record = SimpleNamespace(
+            upload_id="upload-1",
+            task_id="task-1",
+            lease_owner="instance-1",
+            status="active",
+            course_uuid="course-1",
+            course_id="CYBER",
+            original_filename="course.pdf",
+            storage_key="courses/course-1/documents/hash.pdf",
+        )
+        chunk = DocumentChunk(
+            id="upload-1:1:0",
+            text="Course content",
+            metadata={
+                "upload_id": "upload-1",
+                "document_id": "course-1",
+                "page_number": 1,
+            },
+        )
+        upload_service = SimpleNamespace(
+            get_upload=AsyncMock(return_value=record),
+            heartbeat=AsyncMock(return_value=True),
+            set_stage=AsyncMock(return_value=True),
+            mark_completed=AsyncMock(return_value=True),
+            mark_failed=AsyncMock(return_value=True),
+            release_lease=AsyncMock(return_value=True),
+        )
+        parser_service = SimpleNamespace(
+            extract_pages_from_bytes=Mock(return_value=[(1, "Course content")]),
+            chunk_pages=Mock(return_value=[chunk]),
+        )
+        graph = GraphExtractionResponse(
+            nodes=[ConceptNode(id="concept", name="Concept", type="topic")],
+            relationships=[],
+        )
+        ingestion_service = SimpleNamespace(
+            cleanup_upload=AsyncMock(),
+            upsert_chunks_to_qdrant=Mock(return_value=1),
+            extract_graph_from_chunks=AsyncMock(return_value=graph),
+            store_graph_extraction=AsyncMock(),
+        )
+        config = Settings(
+            _env_file=None,
+            PROCESSING_HEARTBEAT_SECONDS=30,
+            PROCESSING_LEASE_SECONDS=180,
+        )
+        service = DocumentProcessingService(
+            config=config,
+            ingestion_service=ingestion_service,
+            parser_service=parser_service,
+            upload_service=upload_service,
+        )
+        fake_session = SimpleNamespace()
+
+        async def run_with_session(operation):
+            return await operation(fake_session)
+
+        service._run_with_session = run_with_session
+        return service, upload_service, ingestion_service, chunk
+
+    def test_shared_processor_preserves_all_durable_stage_transitions(self):
+        service, upload_service, ingestion_service, chunk = self._service_fixture()
+
+        with (
+            patch(
+                "app.services.document_processing_service.storage_service.get_bytes",
+                return_value=b"%PDF-test",
+            ),
+            patch(
+                "app.services.document_processing_service.storage_service.exists",
+                return_value=True,
+            ),
+        ):
+            result = asyncio.run(
+                service.process_document(
+                    "upload-1", "task-1", lease_owner="instance-1"
+                )
             )
+
+        self.assertEqual(result["status"], "ready")
+        stages = [call.args[3] for call in upload_service.set_stage.await_args_list]
+        self.assertEqual(
+            stages,
+            [
+                ProcessingStage.EXTRACTING,
+                ProcessingStage.EXTRACTED,
+                ProcessingStage.CHUNKING,
+                ProcessingStage.CHUNKED,
+                ProcessingStage.EMBEDDING,
+                ProcessingStage.EMBEDDED,
+                ProcessingStage.BUILDING_GRAPH,
+                ProcessingStage.GRAPH_BUILT,
+            ],
+        )
+        self.assertEqual(chunk.metadata["execution_token"], "task-1")
+        ingestion_service.cleanup_upload.assert_awaited_once_with(
+            "upload-1", "course-1"
+        )
+        graph_call = ingestion_service.store_graph_extraction.await_args
+        self.assertEqual(graph_call.kwargs["execution_token"], "task-1")
+        upload_service.mark_completed.assert_awaited_once()
+
+    def test_processing_failure_cleans_partial_outputs_and_marks_failed(self):
+        service, upload_service, ingestion_service, _ = self._service_fixture()
+        ingestion_service.upsert_chunks_to_qdrant.side_effect = RuntimeError(
+            "Qdrant connection failed"
+        )
+
+        with patch(
+            "app.services.document_processing_service.storage_service.get_bytes",
+            return_value=b"%PDF-test",
+        ):
+            result = asyncio.run(
+                service.process_document(
+                    "upload-1", "task-1", lease_owner="instance-1"
+                )
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(ingestion_service.cleanup_upload.await_count, 2)
+        upload_service.mark_failed.assert_awaited_once()
+
+
+class ProcessingLeaseTests(unittest.TestCase):
+    def test_valid_foreign_lease_cannot_be_claimed(self):
+        service = UploadService()
+        record = SimpleNamespace(
+            status="active",
+            stage=ProcessingStage.UPLOADED.value,
+            lease_owner="other-instance",
+            lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+        )
+        result = SimpleNamespace(scalar_one_or_none=lambda: record)
+        session = SimpleNamespace(
+            execute=AsyncMock(return_value=result),
+            rollback=AsyncMock(),
+        )
+
+        claimed = asyncio.run(
+            service.claim_for_processing(
+                session,
+                upload_id="upload-1",
+                task_id="task-1",
+                lease_owner="this-instance",
+                lease_seconds=180,
+            )
+        )
+
+        self.assertIsNone(claimed)
+        session.rollback.assert_awaited_once()
+
+    def test_expired_lease_is_claimed_and_extended(self):
+        service = UploadService()
+        record = SimpleNamespace(
+            status="active",
+            stage=ProcessingStage.UPLOADED.value,
+            lease_owner="old-instance",
+            lease_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+            last_heartbeat_at=None,
+        )
+        attempt = SimpleNamespace(last_heartbeat_at=None)
+        result = SimpleNamespace(scalar_one_or_none=lambda: record)
+        session = SimpleNamespace(
+            execute=AsyncMock(return_value=result),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+        service._current_attempt = AsyncMock(return_value=attempt)
+
+        claimed = asyncio.run(
+            service.claim_for_processing(
+                session,
+                upload_id="upload-1",
+                task_id="task-1",
+                lease_owner="new-instance",
+                lease_seconds=180,
+            )
+        )
+
+        self.assertIs(claimed, record)
+        self.assertEqual(record.lease_owner, "new-instance")
+        self.assertGreater(record.lease_expires_at, datetime.now(timezone.utc))
+        session.commit.assert_awaited_once()
+
+    def test_interrupted_execution_creates_a_real_recovery_attempt(self):
+        service = UploadService()
+        record = SimpleNamespace(
+            upload_id="upload-1",
+            task_id="old-task",
+            status="active",
+            stage=ProcessingStage.EMBEDDED.value,
+            attempt_count=1,
+            failure_category=None,
+            retryable=False,
+            error_message=None,
+            result_json={"partial": True},
+            last_attempted_at=None,
+            last_heartbeat_at=None,
+            started_at=datetime.now(timezone.utc),
+            completed_at=None,
+            lease_owner="dead-instance",
+            lease_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+        previous_attempt = SimpleNamespace(
+            stage=ProcessingStage.EMBEDDED.value,
+            failure_category=None,
+            retryable=False,
+            error_message=None,
+            completed_at=None,
+            last_heartbeat_at=None,
+        )
+        result = SimpleNamespace(
+            scalars=lambda: SimpleNamespace(all=lambda: [record])
+        )
+        session = SimpleNamespace(
+            execute=AsyncMock(return_value=result),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+        service._current_attempt = AsyncMock(return_value=previous_attempt)
+
+        recovered = asyncio.run(service.prepare_stale_recoveries(session))
+
+        self.assertEqual(recovered, [record])
+        self.assertEqual(record.attempt_count, 2)
+        self.assertNotEqual(record.task_id, "old-task")
+        self.assertEqual(record.stage, ProcessingStage.UPLOADED.value)
+        self.assertIsNone(record.lease_owner)
+        self.assertEqual(previous_attempt.stage, ProcessingStage.FAILED.value)
+        self.assertEqual(
+            previous_attempt.failure_category,
+            FailureCategory.WORKER_ERROR.value,
+        )
+        session.add.assert_called_once()
+        session.commit.assert_awaited_once()
 
 
 if __name__ == "__main__":

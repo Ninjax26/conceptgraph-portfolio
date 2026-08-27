@@ -1,7 +1,6 @@
 services:
   neo4j:
     image: neo4j:5-community
-    platform: linux/arm64
     container_name: conceptgraph-neo4j
     restart: unless-stopped
     environment:
@@ -20,7 +19,6 @@ services:
 
   qdrant:
     image: qdrant/qdrant:latest
-    platform: linux/arm64
     container_name: conceptgraph-qdrant
     restart: unless-stopped
     ports:
@@ -30,7 +28,6 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    platform: linux/arm64
     container_name: conceptgraph-postgres
     restart: unless-stopped
     environment:
@@ -42,20 +39,8 @@ services:
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7-alpine
-    platform: linux/arm64
-    container_name: conceptgraph-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - ./data/redis:/data
-    command: ["redis-server", "--appendonly", "yes"]
-
   minio:
     image: minio/minio:latest
-    platform: linux/arm64
     container_name: conceptgraph-minio
     restart: unless-stopped
     environment:
