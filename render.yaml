@@ -30,7 +30,7 @@ services:
       - key: QDRANT_API_KEY
         sync: false
       - key: QDRANT_COLLECTION_NAME
-        value: conceptgraph_chunks
+        value: conceptgraph_portfolio_chunks
       - key: EMBEDDING_PROVIDER
         value: qdrant_cloud
       - key: EMBEDDING_MODEL_NAME
@@ -50,7 +50,7 @@ services:
       - key: S3_BUCKET
         sync: false
       - key: S3_REGION
-        value: us-east-1
+        value: auto
       - key: S3_ENDPOINT_URL
         sync: false
       - key: S3_ACCESS_KEY_ID
