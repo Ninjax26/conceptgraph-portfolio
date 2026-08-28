@@ -636,6 +636,19 @@ class ProcessingRulesTests(unittest.TestCase):
             "postgresql+asyncpg://user:password@db/course",
         )
 
+    def test_neon_postgres_url_normalizes_libpq_ssl_parameters(self):
+        config = Settings(
+            DATABASE_URL=(
+                "postgresql://user:password@db.neon.tech/course"
+                "?sslmode=require&channel_binding=require"
+            )
+        )
+
+        self.assertEqual(
+            config.postgres_dsn,
+            "postgresql+asyncpg://user:password@db.neon.tech/course?ssl=require",
+        )
+
     def test_pdf_preview_supports_byte_ranges(self):
         response = ingest._pdf_response(b"0123456789", "Course Notes.pdf", "bytes=2-5")
 

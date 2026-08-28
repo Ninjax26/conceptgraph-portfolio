@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -280,20 +281,38 @@ class Settings(BaseSettings):
     def postgres_dsn(self) -> str:
         if self.database_url:
             if self.database_url.startswith("postgresql+asyncpg://"):
-                return self.database_url
-            if self.database_url.startswith("postgresql://"):
-                return self.database_url.replace(
+                dsn = self.database_url
+            elif self.database_url.startswith("postgresql://"):
+                dsn = self.database_url.replace(
                     "postgresql://",
                     "postgresql+asyncpg://",
                     1,
                 )
-            if self.database_url.startswith("postgres://"):
-                return self.database_url.replace(
+            elif self.database_url.startswith("postgres://"):
+                dsn = self.database_url.replace(
                     "postgres://",
                     "postgresql+asyncpg://",
                     1,
                 )
-            raise ValueError("DATABASE_URL must use a PostgreSQL URL.")
+            else:
+                raise ValueError("DATABASE_URL must use a PostgreSQL URL.")
+
+            # Managed PostgreSQL providers commonly emit libpq parameters.
+            # asyncpg accepts `ssl` instead of `sslmode` and does not accept
+            # libpq's `channel_binding` parameter.
+            parsed = urlsplit(dsn)
+            query = parse_qsl(parsed.query, keep_blank_values=True)
+            has_ssl = any(key == "ssl" for key, _ in query)
+            normalized_query: list[tuple[str, str]] = []
+            for key, value in query:
+                if key == "channel_binding":
+                    continue
+                if key == "sslmode":
+                    if not has_ssl:
+                        normalized_query.append(("ssl", value))
+                    continue
+                normalized_query.append((key, value))
+            return urlunsplit(parsed._replace(query=urlencode(normalized_query)))
         return (
             "postgresql+asyncpg://"
             f"{self.postgres_user}:{self.postgres_password}"
