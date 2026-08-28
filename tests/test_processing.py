@@ -9,7 +9,7 @@ from unittest.mock import ANY, AsyncMock, Mock, patch
 
 import pymupdf as fitz
 import httpx
-from botocore.exceptions import EndpointConnectionError
+from botocore.exceptions import ClientError, EndpointConnectionError
 from fastapi import HTTPException, Request, UploadFile
 from groq import BadRequestError
 from starlette.responses import JSONResponse
@@ -698,6 +698,38 @@ class StorageServiceTests(unittest.TestCase):
         self.assertEqual(service.get_bytes(key), b"pdf-content")
         service.delete(key)
         self.assertFalse(client.objects)
+
+    def test_readiness_creates_a_missing_bucket_when_local_auto_create_is_enabled(self):
+        class MissingBucket(self.FakeS3):
+            def __init__(self):
+                super().__init__()
+                self.bucket_exists = False
+
+            def head_bucket(self, **kwargs):
+                if not self.bucket_exists:
+                    raise ClientError(
+                        {
+                            "Error": {"Code": "NoSuchBucket"},
+                            "ResponseMetadata": {"HTTPStatusCode": 404},
+                        },
+                        "HeadBucket",
+                    )
+                return {}
+
+            def create_bucket(self, **kwargs):
+                self.bucket_exists = True
+
+        client = MissingBucket()
+        config = Settings(
+            OBJECT_STORAGE_BACKEND="s3",
+            S3_BUCKET="test-pdfs",
+            S3_ENDPOINT_URL="http://localhost:9000",
+            S3_AUTO_CREATE_BUCKET=True,
+        )
+
+        StorageService(config, client=client).check_ready()
+
+        self.assertTrue(client.bucket_exists)
 
     def test_legacy_local_reference_remains_readable_for_migration(self):
         with tempfile.TemporaryDirectory() as upload_dir:

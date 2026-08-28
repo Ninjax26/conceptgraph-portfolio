@@ -128,12 +128,7 @@ class StorageService:
             if not root.exists() or not root.is_dir():
                 raise ObjectStorageError("Local object storage directory is unavailable.")
             return
-        try:
-            self.client.head_bucket(Bucket=self.config.s3_bucket)
-        except (BotoCoreError, ClientError) as exc:
-            raise ObjectStorageError(
-                "The configured object-storage bucket is unavailable."
-            ) from exc
+        self._ensure_bucket()
 
     @property
     def client(self) -> BaseClient:
