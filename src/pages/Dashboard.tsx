@@ -1,5 +1,6 @@
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Check,
   ChevronDown,
@@ -531,9 +532,26 @@ export default function Dashboard(): JSX.Element {
               </button>
             </div>
           ) : null}
-          <article className="prose prose-slate max-w-none text-sm dark:prose-invert">
+          <article className="prose prose-slate max-w-none break-words text-sm prose-headings:mb-2 prose-headings:mt-5 prose-p:my-3 prose-p:leading-6 prose-li:my-1 dark:prose-invert">
             {response?.answer ? (
-              <ReactMarkdown>{response.answer}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  table: ({ node: _node, ...props }) => (
+                    <div className="my-4 overflow-x-auto rounded-md border border-slate-200 dark:border-white/10">
+                      <table className="m-0 min-w-[34rem] border-collapse text-left text-xs" {...props} />
+                    </div>
+                  ),
+                  th: ({ node: _node, ...props }) => (
+                    <th className="border-b border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200" {...props} />
+                  ),
+                  td: ({ node: _node, ...props }) => (
+                    <td className="border-b border-slate-100 px-3 py-2 align-top leading-5 last:border-b-0 dark:border-white/5" {...props} />
+                  ),
+                }}
+              >
+                {response.answer}
+              </ReactMarkdown>
             ) : (
               <p className="text-slate-500">
                 The answer and syllabus citations will appear here after a query.
