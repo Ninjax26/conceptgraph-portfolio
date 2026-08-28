@@ -70,6 +70,24 @@ class ProcessingRulesTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Settings(_env_file=None, DEMO_ACCESS_TOKEN="short-token")
 
+    def test_cross_site_session_cookie_requires_secure_transport(self):
+        with self.assertRaisesRegex(
+            ValidationError,
+            "AUTH_COOKIE_SECURE must be true",
+        ):
+            Settings(
+                _env_file=None,
+                AUTH_COOKIE_SAMESITE="none",
+                AUTH_COOKIE_SECURE=False,
+            )
+
+        config = Settings(
+            _env_file=None,
+            AUTH_COOKIE_SAMESITE="none",
+            AUTH_COOKIE_SECURE=True,
+        )
+        self.assertEqual(config.auth_cookie_samesite, "none")
+
     def test_strict_public_startup_rejects_missing_secrets(self):
         with self.assertRaises(ValidationError) as raised:
             Settings(_env_file=None, STRICT_STARTUP_VALIDATION=True)

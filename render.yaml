@@ -68,7 +68,7 @@ services:
       - key: AUTH_COOKIE_SECURE
         value: "true"
       - key: AUTH_COOKIE_SAMESITE
-        value: lax
+        value: none
       - key: AUTH_SESSION_TTL_SECONDS
         value: "43200"
       - key: RATE_LIMIT_REQUESTS_PER_MINUTE

@@ -190,8 +190,12 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_demo_security(self) -> "Settings":
         self.auth_cookie_samesite = self.auth_cookie_samesite.strip().lower()
-        if self.auth_cookie_samesite not in {"lax", "strict"}:
-            raise ValueError("AUTH_COOKIE_SAMESITE must be lax or strict.")
+        if self.auth_cookie_samesite not in {"lax", "strict", "none"}:
+            raise ValueError("AUTH_COOKIE_SAMESITE must be lax, strict, or none.")
+        if self.auth_cookie_samesite == "none" and not self.auth_cookie_secure:
+            raise ValueError(
+                "AUTH_COOKIE_SECURE must be true when AUTH_COOKIE_SAMESITE=none."
+            )
         if not self.auth_cookie_name.strip():
             raise ValueError("AUTH_COOKIE_NAME cannot be empty.")
         token = self.demo_access_token_value
