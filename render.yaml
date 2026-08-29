@@ -92,7 +92,7 @@ services:
       - key: REQUIRE_UPLOAD_AUTH
         value: "true"
       - key: PUBLIC_SAMPLE_COURSE_ID
-        value: ADA
+        value: CYBER
       - key: DEMO_UPLOAD_RETENTION_DAYS
         value: "3"
       - key: DEMO_CLEANUP_INTERVAL_SECONDS
