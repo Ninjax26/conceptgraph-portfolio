@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from groq import BadRequestError, Groq
 from neo4j import AsyncDriver
@@ -22,16 +23,25 @@ from qdrant_client.models import (
 
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
-from app.core.exceptions import LLMConfigurationError
+from app.core.exceptions import GraphStructureError, LLMConfigurationError
 from app.schemas.extraction import (
     ALLOWED_RELATIONSHIP_TYPES,
     ConceptNode,
+    ConceptRelationship,
     GraphExtractionResponse,
+    normalize_concept_name,
 )
 from app.services.parser_service import DocumentChunk
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class GraphSectionBatch:
+    section_key: str
+    section_label: str
+    chunks: tuple[DocumentChunk, ...]
 
 
 class IngestionService:
@@ -102,13 +112,51 @@ class IngestionService:
         if not chunks:
             return GraphExtractionResponse()
 
-        sampled_chunks = self._sample_graph_chunks(chunks)
-        context = "\n\n".join(
-            self._format_graph_excerpt(chunk)
-            for chunk in sampled_chunks
+        batches = self._graph_section_batches(chunks)
+        section_labels = {
+            batch.section_key: batch.section_label
+            for batch in batches
+        }
+        represented_sections: set[str] = set()
+        successful_batches = 0
+        failed_batches = 0
+        partials: list[GraphExtractionResponse] = []
+
+        for batch in batches:
+            context = "\n\n".join(
+                self._format_graph_excerpt(chunk)
+                for chunk in batch.chunks
+            )
+            try:
+                extraction = await self.extract_graph_from_text(context)
+            except GraphStructureError:
+                failed_batches += 1
+                logger.warning(
+                    "Skipped one malformed graph batch for section %s",
+                    batch.section_label,
+                )
+                continue
+
+            successful_batches += 1
+            enriched = self._attach_provenance(extraction, batch.chunks)
+            if enriched.nodes:
+                represented_sections.add(batch.section_key)
+            partials.append(enriched)
+
+        failed_sections = set(section_labels) - represented_sections
+        return self._merge_graph_extractions(
+            partials,
+            sections_total=len(section_labels),
+            sections_succeeded=len(represented_sections),
+            sections_failed=len(section_labels) - len(represented_sections),
+            batches_total=len(batches),
+            batches_succeeded=successful_batches,
+            batches_failed=failed_batches,
+            failed_section_labels=sorted(
+                section_labels[key]
+                for key in failed_sections
+            ),
         )
-        extraction = await self.extract_graph_from_text(context)
-        return self._attach_provenance(extraction, sampled_chunks)
 
     async def extract_graph_from_text(self, text: str) -> GraphExtractionResponse:
         provider = settings.llm_provider.lower()
@@ -154,7 +202,10 @@ class IngestionService:
                         c.execution_token = $execution_token,
                         c.document_name = $document_name,
                         c.page_number = $page_number,
-                        c.section_heading = $section_heading
+                        c.section_heading = $section_heading,
+                        c.source_chunk_ids = $source_chunk_ids,
+                        c.page_numbers = $page_numbers,
+                        c.section_headings = $section_headings
                     WITH c
                     MATCH (course:Course {id: $course_id})
                     MERGE (course)-[:CONTAINS]->(c)
@@ -172,6 +223,9 @@ class IngestionService:
                     document_name=node.document_name or document_name,
                     page_number=node.page_number,
                     section_heading=node.section_heading,
+                    source_chunk_ids=node.source_chunk_ids,
+                    page_numbers=node.page_numbers,
+                    section_headings=node.section_headings,
                 )
 
             for relationship in extraction.relationships:
@@ -369,23 +423,37 @@ class IngestionService:
             except BadRequestError as exc:
                 if not self._is_json_validation_failure(exc):
                     raise
-                if attempt == len(contexts) - 1:
-                    logger.warning(
-                        "Groq could not produce a valid graph after %s attempts; "
-                        "continuing with vector retrieval only",
-                        len(contexts),
-                    )
-                    return GraphExtractionResponse()
             except ValidationError:
-                if attempt == len(contexts) - 1:
-                    logger.warning(
-                        "Groq returned graph data that failed local validation after %s "
-                        "attempts; continuing with vector retrieval only",
-                        len(contexts),
-                    )
-                    return GraphExtractionResponse()
+                pass
 
-        raise RuntimeError("Graph extraction exhausted its provider attempts.")
+        # Some compatible models reject strict JSON Schema even when they can
+        # return valid JSON. Use the smallest context for one simpler fallback,
+        # then still validate the graph locally before accepting it.
+        try:
+            completion = client.chat.completions.create(
+                model=settings.groq_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"{self._extraction_system_prompt()} Return one JSON object "
+                            "with exactly two arrays named nodes and relationships."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": contexts[-1],
+                    },
+                ],
+                temperature=0,
+                response_format={"type": "json_object"},
+            )
+            content = completion.choices[0].message.content or "{}"
+            return GraphExtractionResponse.model_validate_json(content)
+        except (BadRequestError, ValidationError, ValueError) as exc:
+            raise GraphStructureError(
+                "json_validate_failed: Groq could not produce a valid graph for this section."
+            ) from exc
 
     @staticmethod
     def _graph_extraction_contexts(text: str) -> tuple[str, ...]:
@@ -429,7 +497,12 @@ class IngestionService:
             },
             request_options={"timeout": settings.provider_timeout_seconds},
         )
-        return GraphExtractionResponse.model_validate_json(response.text or "{}")
+        try:
+            return GraphExtractionResponse.model_validate_json(response.text or "{}")
+        except ValidationError as exc:
+            raise GraphStructureError(
+                "json_validate_failed: Gemini could not produce a valid graph for this section."
+            ) from exc
 
     @staticmethod
     def _extraction_system_prompt() -> str:
@@ -529,6 +602,37 @@ class IngestionService:
             sampled.extend(section_chunks[position] for position in positions)
         return sampled
 
+    @classmethod
+    def _graph_section_batches(
+        cls,
+        chunks: Sequence[DocumentChunk],
+        *,
+        batch_size: int = 3,
+    ) -> list[GraphSectionBatch]:
+        """Create bounded requests while preserving each document section."""
+
+        sections: dict[str, tuple[str, list[DocumentChunk]]] = {}
+        for chunk in cls._sample_graph_chunks(chunks):
+            document = str(chunk.metadata.get("document_name") or "unknown")
+            heading = str(chunk.metadata.get("section_heading") or "").strip()
+            page = chunk.metadata.get("page_number")
+            section_identity = heading.casefold() if heading else f"page:{page or 'unknown'}"
+            section_key = f"{document.casefold()}::{section_identity}"
+            section_label = heading or f"Page {page or 'unknown'}"
+            sections.setdefault(section_key, (section_label, []))[1].append(chunk)
+
+        batches: list[GraphSectionBatch] = []
+        for section_key, (section_label, section_chunks) in sections.items():
+            for offset in range(0, len(section_chunks), batch_size):
+                batches.append(
+                    GraphSectionBatch(
+                        section_key=section_key,
+                        section_label=section_label,
+                        chunks=tuple(section_chunks[offset : offset + batch_size]),
+                    )
+                )
+        return batches
+
     @staticmethod
     def _format_graph_excerpt(chunk: DocumentChunk) -> str:
         metadata = chunk.metadata
@@ -574,6 +678,13 @@ class IngestionService:
                             metadata.get("section_heading") or "Unlabelled section"
                         ),
                         "upload_id": str(metadata.get("upload_id") or ""),
+                        "source_chunk_ids": [node.source_chunk_id],
+                        "page_numbers": (
+                            [page_number] if isinstance(page_number, int) else []
+                        ),
+                        "section_headings": [
+                            str(metadata.get("section_heading") or "Unlabelled section")
+                        ],
                     }
                 )
             )
@@ -586,6 +697,106 @@ class IngestionService:
             and relationship.target_node_id in retained_ids
         ]
         return GraphExtractionResponse(nodes=nodes, relationships=relationships)
+
+    @staticmethod
+    def _merge_graph_extractions(
+        extractions: Sequence[GraphExtractionResponse],
+        *,
+        sections_total: int,
+        sections_succeeded: int,
+        sections_failed: int,
+        batches_total: int,
+        batches_succeeded: int,
+        batches_failed: int,
+        failed_section_labels: list[str],
+    ) -> GraphExtractionResponse:
+        """Merge section graphs by normalized name with stable first-seen IDs."""
+
+        canonical_nodes: dict[str, ConceptNode] = {}
+        endpoint_maps: list[dict[str, str]] = []
+
+        for extraction in extractions:
+            endpoint_map: dict[str, str] = {}
+            for node in extraction.nodes:
+                normalized_name = normalize_concept_name(node.name)
+                if not normalized_name:
+                    continue
+                existing = canonical_nodes.get(normalized_name)
+                if existing is None:
+                    canonical_nodes[normalized_name] = node.model_copy(
+                        update={"normalized_name": normalized_name}
+                    )
+                    endpoint_map[node.id] = node.id
+                    continue
+
+                endpoint_map[node.id] = existing.id
+                canonical_nodes[normalized_name] = existing.model_copy(
+                    update={
+                        "source_chunk_ids": list(
+                            dict.fromkeys(
+                                [
+                                    *existing.source_chunk_ids,
+                                    *node.source_chunk_ids,
+                                    node.source_chunk_id,
+                                ]
+                            )
+                        ),
+                        "page_numbers": list(
+                            dict.fromkeys(
+                                [
+                                    *existing.page_numbers,
+                                    *node.page_numbers,
+                                    *([node.page_number] if node.page_number else []),
+                                ]
+                            )
+                        ),
+                        "section_headings": list(
+                            dict.fromkeys(
+                                heading
+                                for heading in [
+                                    *existing.section_headings,
+                                    *node.section_headings,
+                                    node.section_heading,
+                                ]
+                                if heading
+                            )
+                        ),
+                    }
+                )
+            endpoint_maps.append(endpoint_map)
+
+        relationships: list[ConceptRelationship] = []
+        seen_relationships: set[tuple[str, str, str]] = set()
+        for extraction, endpoint_map in zip(extractions, endpoint_maps, strict=True):
+            for relationship in extraction.relationships:
+                source_id = endpoint_map.get(relationship.source_node_id)
+                target_id = endpoint_map.get(relationship.target_node_id)
+                if not source_id or not target_id or source_id == target_id:
+                    continue
+                key = (source_id, target_id, relationship.relation_type)
+                if key in seen_relationships:
+                    continue
+                seen_relationships.add(key)
+                relationships.append(
+                    relationship.model_copy(
+                        update={
+                            "source_node_id": source_id,
+                            "target_node_id": target_id,
+                        }
+                    )
+                )
+
+        return GraphExtractionResponse(
+            nodes=list(canonical_nodes.values()),
+            relationships=relationships,
+            sections_total=sections_total,
+            sections_succeeded=sections_succeeded,
+            sections_failed=sections_failed,
+            batches_total=batches_total,
+            batches_succeeded=batches_succeeded,
+            batches_failed=batches_failed,
+            failed_section_labels=failed_section_labels,
+        )
 
     @staticmethod
     def _qdrant_point_id(chunk_id: str) -> str:

@@ -686,9 +686,16 @@ export default function Dashboard(): JSX.Element {
                     {job.failure_category ? ` · ${job.failure_category.split("_").join(" ")}` : ""}
                   </p>
                   {job.graph_status ? (
-                    <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${graphStatusStyle(job.graph_status)}`}>
-                      {graphStatusLabel(job.graph_status)}
-                    </span>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${graphStatusStyle(job.graph_status)}`}>
+                        {graphStatusLabel(job.graph_status)}
+                      </span>
+                      {graphCoverageLabel(job.result_json) ? (
+                        <span className="text-[10px] font-medium text-slate-500">
+                          {graphCoverageLabel(job.result_json)}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               ))}
@@ -726,6 +733,11 @@ export default function Dashboard(): JSX.Element {
               {selectedCourse?.graph_status ? (
                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${graphStatusStyle(selectedCourse.graph_status)}`}>
                   {graphStatusLabel(selectedCourse.graph_status)}
+                </span>
+              ) : null}
+              {selectedCourse && selectedCourse.graph_sections_total > 0 ? (
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600">
+                  {selectedCourse.graph_sections_succeeded} of {selectedCourse.graph_sections_total} sections represented
                 </span>
               ) : null}
             </div>
@@ -867,6 +879,20 @@ function graphStatusStyle(status: GraphStatus): string {
   if (status === "GRAPH_READY") return "bg-emerald-50 text-emerald-700";
   if (status === "GRAPH_PARTIAL") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function graphCoverageLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
+  if (!resultJson) return null;
+  const represented = resultJson.graph_sections_succeeded;
+  const total = resultJson.graph_sections_total;
+  if (
+    typeof represented !== "number" ||
+    typeof total !== "number" ||
+    total <= 0
+  ) {
+    return null;
+  }
+  return `${represented} of ${total} sections represented`;
 }
 
 function statusClass(status: UploadStatusResponse["status"]): string {

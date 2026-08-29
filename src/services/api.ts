@@ -9,6 +9,9 @@ export interface ConceptNode {
   page_number?: number | null;
   section_heading?: string;
   upload_id?: string;
+  source_chunk_ids?: string[];
+  page_numbers?: number[];
+  section_headings?: string[];
 }
 
 export type GraphStatus = "GRAPH_READY" | "GRAPH_PARTIAL" | "READY_WITHOUT_GRAPH";
@@ -304,6 +307,9 @@ export interface CourseSummary {
   graph_node_count: number;
   graph_edge_count: number;
   graph_status?: GraphStatus | null;
+  graph_sections_total: number;
+  graph_sections_succeeded: number;
+  graph_batches_failed: number;
   last_updated_at?: string | null;
   historical_records: number;
   duplicate_records: number;

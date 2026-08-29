@@ -33,6 +33,9 @@ class ConceptNode(BaseModel):
     page_number: int | None = Field(default=None, ge=1)
     section_heading: StrictStr = ""
     upload_id: StrictStr = ""
+    source_chunk_ids: list[StrictStr] = Field(default_factory=list)
+    page_numbers: list[int] = Field(default_factory=list)
+    section_headings: list[StrictStr] = Field(default_factory=list)
 
 
 class ConceptRelationship(BaseModel):
@@ -48,6 +51,13 @@ class GraphExtractionResponse(BaseModel):
 
     nodes: list[ConceptNode] = Field(default_factory=list)
     relationships: list[ConceptRelationship] = Field(default_factory=list)
+    sections_total: int = Field(default=0, ge=0)
+    sections_succeeded: int = Field(default=0, ge=0)
+    sections_failed: int = Field(default=0, ge=0)
+    batches_total: int = Field(default=0, ge=0)
+    batches_succeeded: int = Field(default=0, ge=0)
+    batches_failed: int = Field(default=0, ge=0)
+    failed_section_labels: list[StrictStr] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_graph_integrity(self) -> "GraphExtractionResponse":

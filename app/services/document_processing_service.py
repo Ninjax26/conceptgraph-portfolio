@@ -154,7 +154,17 @@ class DocumentProcessingService:
                 "graph_status": assess_graph_status(
                     len(graph.nodes),
                     len(graph.relationships),
+                    sections_total=graph.sections_total,
+                    sections_succeeded=graph.sections_succeeded,
+                    batches_failed=graph.batches_failed,
                 ).value,
+                "graph_sections_total": graph.sections_total,
+                "graph_sections_succeeded": graph.sections_succeeded,
+                "graph_sections_failed": graph.sections_failed,
+                "graph_batches_total": graph.batches_total,
+                "graph_batches_succeeded": graph.batches_succeeded,
+                "graph_batches_failed": graph.batches_failed,
+                "graph_failed_sections": graph.failed_section_labels,
             }
             completed = await self._run_with_session(
                 lambda session: self.upload_service.mark_completed(

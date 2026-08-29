@@ -18,6 +18,7 @@ from starlette.datastructures import Headers
 from app.api.endpoints import auth, ingest, public_demo, query
 from app.api.endpoints.query import QueryRequest
 from app.core.config import Settings
+from app.core.exceptions import GraphStructureError
 from app.core.processing import (
     FailureCategory,
     GraphStatus,
@@ -683,7 +684,7 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertLess(len(second_context), len(first_context))
         self.assertEqual(result, GraphExtractionResponse())
 
-    def test_groq_exhausted_schema_failures_degrade_to_an_empty_graph(self):
+    def test_groq_exhausted_schema_failures_use_json_object_fallback(self):
         failure = BadRequestError(
             "Failed to validate JSON",
             response=httpx.Response(
@@ -693,7 +694,14 @@ class ProcessingRulesTests(unittest.TestCase):
             body={"error": {"code": "json_validate_failed"}},
         )
         client = Mock()
-        client.chat.completions.create.side_effect = [failure, failure, failure]
+        fallback = SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(content='{"nodes": [], "relationships": []}')
+                )
+            ]
+        )
+        client.chat.completions.create.side_effect = [failure, failure, failure, fallback]
         service = IngestionService(
             graph_driver=SimpleNamespace(),
             vector_client=SimpleNamespace(),
@@ -705,8 +713,43 @@ class ProcessingRulesTests(unittest.TestCase):
         ):
             result = service._extract_with_groq("Course text\n" * 2000)
 
-        self.assertEqual(client.chat.completions.create.call_count, 3)
+        self.assertEqual(client.chat.completions.create.call_count, 4)
+        self.assertEqual(
+            client.chat.completions.create.call_args.kwargs["response_format"],
+            {"type": "json_object"},
+        )
         self.assertEqual(result, GraphExtractionResponse())
+
+    def test_groq_invalid_json_object_fallback_raises_structure_error(self):
+        failure = BadRequestError(
+            "Failed to validate JSON",
+            response=httpx.Response(
+                400,
+                request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions"),
+            ),
+            body={"error": {"code": "json_validate_failed"}},
+        )
+        invalid_fallback = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"nodes": "bad"}'))]
+        )
+        client = Mock()
+        client.chat.completions.create.side_effect = [
+            failure,
+            failure,
+            failure,
+            invalid_fallback,
+        ]
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+
+        with (
+            patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),
+            patch("app.services.ingestion_service.Groq", return_value=client),
+            self.assertRaises(GraphStructureError),
+        ):
+            service._extract_with_groq("Course text\n" * 2000)
 
     def test_groq_does_not_retry_unrelated_bad_requests(self):
         failure = BadRequestError(
@@ -877,6 +920,94 @@ class ProcessingRulesTests(unittest.TestCase):
             ["a-0", "a-1", "a-2", "a-3", "b-0", "b-1", "b-2", "b-3", "b-4"],
         )
         self.assertGreater(len(sampled), 8)
+
+    def test_section_graphs_keep_successful_batches_and_merge_duplicate_concepts(self):
+        chunks = [
+            DocumentChunk(
+                id="alpha-1",
+                text="Shared concept and alpha",
+                metadata={
+                    "document_name": "course.pdf",
+                    "section_heading": "Alpha",
+                    "page_number": 1,
+                    "upload_id": "upload-1",
+                },
+            ),
+            DocumentChunk(
+                id="beta-1",
+                text="Shared concept and beta",
+                metadata={
+                    "document_name": "course.pdf",
+                    "section_heading": "Beta",
+                    "page_number": 2,
+                    "upload_id": "upload-1",
+                },
+            ),
+            DocumentChunk(
+                id="gamma-1",
+                text="Malformed section",
+                metadata={
+                    "document_name": "course.pdf",
+                    "section_heading": "Gamma",
+                    "page_number": 3,
+                    "upload_id": "upload-1",
+                },
+            ),
+        ]
+        first_graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(
+                    id="shared-a",
+                    name="Shared Concept",
+                    type="topic",
+                    source_chunk_id="alpha-1",
+                )
+            ]
+        )
+        second_graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(
+                    id="shared-b",
+                    name=" shared   concept ",
+                    type="topic",
+                    source_chunk_id="beta-1",
+                )
+            ]
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+        service.extract_graph_from_text = AsyncMock(
+            side_effect=[
+                first_graph,
+                second_graph,
+                GraphStructureError("json_validate_failed"),
+            ]
+        )
+
+        graph = asyncio.run(service.extract_graph_from_chunks(chunks))
+
+        self.assertEqual(len(graph.nodes), 1)
+        self.assertEqual(graph.nodes[0].source_chunk_ids, ["alpha-1", "beta-1"])
+        self.assertEqual(graph.nodes[0].page_numbers, [1, 2])
+        self.assertEqual(graph.sections_total, 3)
+        self.assertEqual(graph.sections_succeeded, 2)
+        self.assertEqual(graph.sections_failed, 1)
+        self.assertEqual(graph.batches_failed, 1)
+        self.assertEqual(graph.failed_section_labels, ["Gamma"])
+
+    def test_graph_status_is_partial_when_section_coverage_is_incomplete(self):
+        self.assertEqual(
+            assess_graph_status(
+                4,
+                3,
+                sections_total=3,
+                sections_succeeded=2,
+                batches_failed=1,
+            ),
+            GraphStatus.GRAPH_PARTIAL,
+        )
 
     def test_graph_context_truncation_never_removes_source_identifier(self):
         excerpt = (
@@ -2040,6 +2171,13 @@ class DocumentProcessingServiceTests(unittest.TestCase):
         graph = GraphExtractionResponse(
             nodes=[ConceptNode(id="concept", name="Concept", type="topic")],
             relationships=[],
+            sections_total=2,
+            sections_succeeded=1,
+            sections_failed=1,
+            batches_total=2,
+            batches_succeeded=1,
+            batches_failed=1,
+            failed_section_labels=["Appendix"],
         )
         ingestion_service = SimpleNamespace(
             cleanup_upload=AsyncMock(),
@@ -2110,6 +2248,10 @@ class DocumentProcessingServiceTests(unittest.TestCase):
         upload_service.mark_completed.assert_awaited_once()
         completed_result = upload_service.mark_completed.await_args.args[3]
         self.assertEqual(completed_result["graph_status"], GraphStatus.GRAPH_PARTIAL.value)
+        self.assertEqual(completed_result["graph_sections_total"], 2)
+        self.assertEqual(completed_result["graph_sections_succeeded"], 1)
+        self.assertEqual(completed_result["graph_batches_failed"], 1)
+        self.assertEqual(completed_result["graph_failed_sections"], ["Appendix"])
 
     def test_empty_provider_graph_keeps_vectorized_document_ready(self):
         service, upload_service, ingestion_service, _ = self._service_fixture()

@@ -48,6 +48,9 @@ class CourseSummary:
     graph_node_count: int
     graph_edge_count: int
     graph_status: str | None
+    graph_sections_total: int
+    graph_sections_succeeded: int
+    graph_batches_failed: int
     last_updated_at: datetime | None
     historical_records: int
     duplicate_records: int
@@ -99,6 +102,18 @@ class CourseService:
                         _aggregate_graph_status(tuple(ready_documents))
                         if ready_documents
                         else None
+                    ),
+                    graph_sections_total=sum(
+                        _result_int(document, "graph_sections_total")
+                        for document in ready_documents
+                    ),
+                    graph_sections_succeeded=sum(
+                        _result_int(document, "graph_sections_succeeded")
+                        for document in ready_documents
+                    ),
+                    graph_batches_failed=sum(
+                        _result_int(document, "graph_batches_failed")
+                        for document in ready_documents
                     ),
                     last_updated_at=max((document.updated_at for document in records), default=None),
                     historical_records=len(records),
@@ -176,6 +191,14 @@ def _document_graph_status(document: DocumentUpload) -> str:
         int(getattr(document, "graph_node_count", 0)),
         int(getattr(document, "graph_edge_count", 0)),
     ).value
+
+
+def _result_int(document: DocumentUpload, key: str) -> int:
+    result = getattr(document, "result_json", None)
+    if not isinstance(result, dict):
+        return 0
+    value = result.get(key)
+    return value if isinstance(value, int) and value >= 0 else 0
 
 
 def _aggregate_graph_status(documents: tuple[DocumentUpload, ...]) -> str:

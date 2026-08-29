@@ -22,12 +22,24 @@ class GraphStatus(StrEnum):
     READY_WITHOUT_GRAPH = "READY_WITHOUT_GRAPH"
 
 
-def assess_graph_status(node_count: int, relationship_count: int) -> GraphStatus:
+def assess_graph_status(
+    node_count: int,
+    relationship_count: int,
+    *,
+    sections_total: int = 0,
+    sections_succeeded: int | None = None,
+    batches_failed: int = 0,
+) -> GraphStatus:
     """Classify usable vector-ready documents without overstating graph quality."""
 
     if node_count <= 0:
         return GraphStatus.READY_WITHOUT_GRAPH
-    if node_count < 2 or relationship_count <= 0:
+    coverage_is_partial = (
+        sections_total > 0
+        and sections_succeeded is not None
+        and sections_succeeded < sections_total
+    )
+    if node_count < 2 or relationship_count <= 0 or batches_failed > 0 or coverage_is_partial:
         return GraphStatus.GRAPH_PARTIAL
     return GraphStatus.GRAPH_READY
 

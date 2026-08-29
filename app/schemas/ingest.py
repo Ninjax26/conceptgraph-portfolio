@@ -59,6 +59,9 @@ class CourseSummaryResponse(BaseModel):
     graph_node_count: int = 0
     graph_edge_count: int = 0
     graph_status: GraphStatus | None = None
+    graph_sections_total: int = 0
+    graph_sections_succeeded: int = 0
+    graph_batches_failed: int = 0
     last_updated_at: datetime | None = None
     historical_records: int = 0
     duplicate_records: int = 0
