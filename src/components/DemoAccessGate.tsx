@@ -82,15 +82,23 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
       return <>{children}</>;
     }
     return (
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => void lock()}
-          className="fixed right-4 top-[4.55rem] z-40 inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur transition hover:text-ink dark:border-white/10 dark:bg-[#15151b]/95 dark:text-slate-300 dark:hover:text-white"
-        >
-          <LockKeyhole className="h-3.5 w-3.5" />
-          Lock dashboard
-        </button>
+      <div>
+        <div className="border-b border-slate-200 bg-slate-50/90 dark:border-white/10 dark:bg-[#111117]">
+          <div className="mx-auto flex h-10 w-full max-w-[1800px] items-center justify-between gap-3 px-4 lg:px-6">
+            <span className="inline-flex min-w-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
+              <span className="truncate">Protected demo session active</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void lock()}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-ink dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            >
+              <LockKeyhole className="h-3.5 w-3.5" />
+              End session
+            </button>
+          </div>
+        </div>
         {children}
       </div>
     );

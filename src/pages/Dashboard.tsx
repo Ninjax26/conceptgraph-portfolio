@@ -307,7 +307,7 @@ export default function Dashboard(): JSX.Element {
   }
 
   return (
-    <main className="grid min-h-[calc(100vh-64px)] grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(360px,440px)_1fr] lg:p-6">
+    <main className="mx-auto grid min-h-[calc(100vh-104px)] w-full max-w-[1800px] grid-cols-1 gap-4 bg-slate-50/60 p-4 lg:grid-cols-[minmax(360px,420px)_1fr] lg:p-6 xl:grid-cols-[minmax(380px,440px)_1fr]">
       <PdfPreviewModal
         isOpen={selectedPreview !== null}
         onClose={() => setSelectedPreview(null)}
@@ -319,7 +319,7 @@ export default function Dashboard(): JSX.Element {
         onClose={() => setIsUploadModalOpen(false)}
         onUploaded={handleUploadCreated}
       />
-      <section className="flex min-h-[calc(100vh-96px)] flex-col rounded-md border border-slate-200 bg-white shadow-panel">
+      <section className="flex min-h-[calc(100vh-136px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-panel">
         <form className="border-b border-slate-200 p-4" onSubmit={handleSubmit}>
           <div className="space-y-3">
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -393,14 +393,121 @@ export default function Dashboard(): JSX.Element {
           </div>
         </form>
 
+        <div className="relative border-b border-slate-200 bg-gradient-to-b from-white to-slate-50/70 p-4">
+          {isLoading ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-600" />
+                Building a grounded answer…
+              </span>
+            </div>
+          ) : null}
+
+          <div className="mb-3 flex min-h-7 items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grounded answer</p>
+              {response?.answer ? (
+                <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${confidenceClass(response.confidence.level)}`}>
+                  {response.confidence.level} confidence · {Math.round(response.confidence.score * 100)}%
+                </span>
+              ) : null}
+            </div>
+            {response?.answer ? (
+              <button className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50" onClick={() => void copyAnswer()} type="button">
+                {answerCopied ? <Check className="h-3.5 w-3.5 text-teal-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {answerCopied ? "Copied" : "Copy"}
+              </button>
+            ) : null}
+          </div>
+
+          {error ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+
+          <article className="prose prose-slate max-h-[28rem] max-w-none overflow-y-auto break-words pr-1 text-sm prose-headings:mb-2 prose-headings:mt-5 prose-p:my-3 prose-p:leading-6 prose-li:my-1 dark:prose-invert">
+            {response?.answer ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  table: ({ node: _node, ...props }) => (
+                    <div className="my-4 overflow-x-auto rounded-md border border-slate-200 dark:border-white/10">
+                      <table className="m-0 min-w-[34rem] border-collapse text-left text-xs" {...props} />
+                    </div>
+                  ),
+                  th: ({ node: _node, ...props }) => (
+                    <th className="border-b border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200" {...props} />
+                  ),
+                  td: ({ node: _node, ...props }) => (
+                    <td className="border-b border-slate-100 px-3 py-2 align-top leading-5 last:border-b-0 dark:border-white/5" {...props} />
+                  ),
+                }}
+              >
+                {response.answer}
+              </ReactMarkdown>
+            ) : (
+              <p className="my-0 text-slate-500">
+                Ask a course question to see a formatted answer, confidence score, and page-level evidence here.
+              </p>
+            )}
+          </article>
+
+          {response?.sources.length ? (
+            <div className="mt-5 space-y-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Evidence · {response.sources.length} passages
+              </h2>
+              {response.sources.map((source, index) => (
+                <details className="rounded-md border border-slate-200 bg-white p-3" key={source.source_id}>
+                  <summary className="cursor-pointer list-none text-xs font-semibold text-slate-600">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate">{source.document_name} · {formatPage(source.page_number)}{source.section_heading ? ` · ${source.section_heading}` : ""}</span>
+                      <span className="shrink-0 text-teal-700">View evidence</span>
+                    </span>
+                  </summary>
+                  <button
+                    className="mb-2 mt-3 inline-flex items-center gap-2 text-xs font-semibold text-teal-700 hover:text-teal-800"
+                    onClick={() => {
+                      const uploadId = typeof source.document_id === "string" ? source.document_id : "";
+                      if (!uploadId) return;
+                      const pageNumber = typeof source.page_number === "number" ? source.page_number : undefined;
+                      const pageSuffix = typeof pageNumber === "number" ? `#page=${pageNumber}` : "";
+                      setSelectedPreview({
+                        title: typeof pageNumber === "number" ? `Source ${index + 1} · Page ${pageNumber}` : `Source ${index + 1}`,
+                        previewUrl: `${API_BASE_URL}/ingest/uploads/${uploadId}/preview${pageSuffix}`,
+                      });
+                    }}
+                    type="button"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open cited PDF page
+                  </button>
+                  <p className="text-sm leading-6 text-slate-700">{source.supporting_passage}</p>
+                </details>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
         <Suspense fallback={<div className="border-b border-slate-200 p-4 text-xs text-slate-500">Loading practice tools...</div>}>
           <ExamPanel courseId={courseId} />
         </Suspense>
 
-        <div className="border-b border-slate-200 p-4">
+        <details className="group border-b border-slate-200 bg-slate-50/40">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 transition hover:bg-slate-50">
+            <span className="inline-flex items-center gap-2">
+              Documents & processing
+              <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
+            </span>
+            <span className="normal-case tracking-normal text-slate-400">
+              {queueMetrics.active} active · {queueMetrics.ready} ready · {queueMetrics.failed} failed
+            </span>
+          </summary>
+          <div className="border-t border-slate-200 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Processing Queue
+              Processing queue
             </h2>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400">{uploadJobs.length} documents</span>
@@ -506,136 +613,34 @@ export default function Dashboard(): JSX.Element {
               Upload a syllabus to see live processing progress here.
             </p>
           )}
-        </div>
+          </div>
+        </details>
 
-        <div className="relative flex-1 overflow-y-auto p-4">
-          {isLoading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-[#0B0B0F]/60">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
-            </div>
-          )}
-
-          {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
-
-          {response?.answer ? (
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${confidenceClass(response.confidence.level)}`}>
-                {response.confidence.level} confidence · {Math.round(response.confidence.score * 100)}%
-              </span>
-              <button className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50" onClick={() => void copyAnswer()} type="button">
-                {answerCopied ? <Check className="h-3.5 w-3.5 text-teal-600" /> : <Copy className="h-3.5 w-3.5" />}
-                {answerCopied ? "Copied" : "Copy answer"}
-              </button>
-            </div>
-          ) : null}
-          <article className="prose prose-slate max-w-none break-words text-sm prose-headings:mb-2 prose-headings:mt-5 prose-p:my-3 prose-p:leading-6 prose-li:my-1 dark:prose-invert">
-            {response?.answer ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  table: ({ node: _node, ...props }) => (
-                    <div className="my-4 overflow-x-auto rounded-md border border-slate-200 dark:border-white/10">
-                      <table className="m-0 min-w-[34rem] border-collapse text-left text-xs" {...props} />
-                    </div>
-                  ),
-                  th: ({ node: _node, ...props }) => (
-                    <th className="border-b border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200" {...props} />
-                  ),
-                  td: ({ node: _node, ...props }) => (
-                    <td className="border-b border-slate-100 px-3 py-2 align-top leading-5 last:border-b-0 dark:border-white/5" {...props} />
-                  ),
-                }}
-              >
-                {response.answer}
-              </ReactMarkdown>
-            ) : (
-              <p className="text-slate-500">
-                The answer and syllabus citations will appear here after a query.
-              </p>
-            )}
-          </article>
-
-          {response?.sources.length ? (
-            <div className="mt-6 space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Source Citations
-              </h2>
-              {response.sources.map((source, index) => (
-                <details
-                  className="rounded-md border border-slate-200 bg-panel p-3"
-                    key={source.source_id}
-                >
-                  <summary className="cursor-pointer list-none text-xs font-semibold text-slate-600">
-                    <span className="flex items-center justify-between gap-3">
-                      <span>{source.document_name} · {formatPage(source.page_number)}{source.section_heading ? ` · ${source.section_heading}` : ""}</span>
-                      <span className="text-slate-400">View passage</span>
-                    </span>
-                  </summary>
-                  <button
-                    className="mb-2 inline-flex items-center gap-2 text-xs font-semibold text-teal-700 hover:text-teal-800"
-                    onClick={() => {
-                      const uploadId =
-                        typeof source.document_id === "string"
-                          ? source.document_id
-                          : "";
-                      if (!uploadId) {
-                        return;
-                      }
-
-                      const pageNumber =
-                        typeof source.page_number === "number"
-                          ? source.page_number
-                          : undefined;
-                      const pageSuffix =
-                        typeof pageNumber === "number" ? `#page=${pageNumber}` : "";
-                      setSelectedPreview({
-                        title:
-                          typeof pageNumber === "number"
-                            ? `Chunk ${index + 1} · Page ${pageNumber}`
-                            : `Chunk ${index + 1}`,
-                        previewUrl: `${API_BASE_URL}/ingest/uploads/${uploadId}/preview${pageSuffix}`,
-                      });
-                    }}
-                    type="button"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Open PDF preview
-                  </button>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {source.supporting_passage}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {typeof source.page_number === "number"
-                      ? `Page ${source.page_number}`
-                      : "Page unavailable"}
-                  </p>
-                </details>
-              ))}
-            </div>
-          ) : null}
-        </div>
       </section>
 
-      <section className="min-h-[calc(100vh-96px)] rounded-md border border-slate-200 bg-white p-4 shadow-panel">
+      <section className="min-h-[calc(100vh-136px)] overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-panel">
         <div className="mb-3 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-base font-semibold text-ink">Concept Map</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base font-semibold text-ink">Concept map</h1>
+              {selectedCourse ? (
+                <span className="max-w-64 truncate rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-700">
+                  {selectedCourse.course_name}
+                </span>
+              ) : null}
+            </div>
             <p className="text-sm text-slate-500">
               {response?.graph_metadata
                 ? `Showing ${response.graph_metadata.displayed_nodes} of ${response.graph_metadata.total_nodes} concepts and ${response.graph_metadata.displayed_edges} of ${response.graph_metadata.total_edges} relationships.`
-                : `${graphElements.nodes.length} concepts, ${graphElements.edges.length} relationships`}
+                : "Ask a question to retrieve the most relevant concepts and prerequisite links."}
             </p>
           </div>
           <button
             onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-100 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-md bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-100 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50"
           >
             <UploadCloud className="h-4 w-4" />
-            Upload Syllabus
+            Add PDF
           </button>
         </div>
         <div className="relative h-[calc(100%-56px)]">
@@ -652,8 +657,14 @@ export default function Dashboard(): JSX.Element {
               />
             </Suspense>
           ) : (
-            <div className="grid h-full min-h-[480px] place-items-center rounded-md border border-slate-200 bg-panel px-8 text-center text-sm text-slate-500">
-              Ask a question to load the conceptual prerequisite map.
+            <div className="grid h-full min-h-[480px] place-items-center rounded-lg border border-dashed border-slate-300 bg-[radial-gradient(circle_at_center,_rgba(13,148,136,0.06),_transparent_55%)] px-8 text-center">
+              <div className="max-w-sm">
+                <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-lg font-bold text-teal-700">CG</div>
+                <p className="font-semibold text-ink">Your course graph will appear here</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Select a ready course and ask a question to reveal relevant concepts, relationships, and prerequisites.
+                </p>
+              </div>
             </div>
           )}
         </div>
