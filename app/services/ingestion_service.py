@@ -1,9 +1,11 @@
 import asyncio
+import logging
 import re
 from collections.abc import Sequence
 
 from groq import BadRequestError, Groq
 from neo4j import AsyncDriver
+from pydantic import ValidationError
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
@@ -27,6 +29,9 @@ from app.schemas.extraction import (
     GraphExtractionResponse,
 )
 from app.services.parser_service import DocumentChunk
+
+
+logger = logging.getLogger(__name__)
 
 
 class IngestionService:
@@ -362,8 +367,23 @@ class IngestionService:
                 content = completion.choices[0].message.content or "{}"
                 return GraphExtractionResponse.model_validate_json(content)
             except BadRequestError as exc:
-                if not self._is_json_validation_failure(exc) or attempt == len(contexts) - 1:
+                if not self._is_json_validation_failure(exc):
                     raise
+                if attempt == len(contexts) - 1:
+                    logger.warning(
+                        "Groq could not produce a valid graph after %s attempts; "
+                        "continuing with vector retrieval only",
+                        len(contexts),
+                    )
+                    return GraphExtractionResponse()
+            except ValidationError:
+                if attempt == len(contexts) - 1:
+                    logger.warning(
+                        "Groq returned graph data that failed local validation after %s "
+                        "attempts; continuing with vector retrieval only",
+                        len(contexts),
+                    )
+                    return GraphExtractionResponse()
 
         raise RuntimeError("Graph extraction exhausted its provider attempts.")
 

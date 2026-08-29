@@ -43,7 +43,7 @@ UPLOADED -> EXTRACTING -> EXTRACTED -> CHUNKING -> CHUNKED
 -> EMBEDDING -> EMBEDDED -> BUILDING_GRAPH -> GRAPH_BUILT -> READY
 ```
 
-`READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Empty graph output is reported as `READY_WITHOUT_GRAPH` instead of being presented as a successful graph. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
+`READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Empty graph output—including exhausted provider schema-validation attempts—is reported as `READY_WITHOUT_GRAPH` instead of failing an otherwise searchable document or pretending a graph succeeded. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
 
 Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page.
 

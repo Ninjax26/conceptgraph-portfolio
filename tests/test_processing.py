@@ -675,12 +675,37 @@ class ProcessingRulesTests(unittest.TestCase):
             patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),
             patch("app.services.ingestion_service.Groq", return_value=client),
         ):
-            result = service._extract_with_groq("Course text\n" * 500)
+            result = service._extract_with_groq("Course text\n" * 2000)
 
         self.assertEqual(client.chat.completions.create.call_count, 2)
         first_context = client.chat.completions.create.call_args_list[0].kwargs["messages"][1]["content"]
         second_context = client.chat.completions.create.call_args_list[1].kwargs["messages"][1]["content"]
         self.assertLess(len(second_context), len(first_context))
+        self.assertEqual(result, GraphExtractionResponse())
+
+    def test_groq_exhausted_schema_failures_degrade_to_an_empty_graph(self):
+        failure = BadRequestError(
+            "Failed to validate JSON",
+            response=httpx.Response(
+                400,
+                request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions"),
+            ),
+            body={"error": {"code": "json_validate_failed"}},
+        )
+        client = Mock()
+        client.chat.completions.create.side_effect = [failure, failure, failure]
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+
+        with (
+            patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),
+            patch("app.services.ingestion_service.Groq", return_value=client),
+        ):
+            result = service._extract_with_groq("Course text\n" * 2000)
+
+        self.assertEqual(client.chat.completions.create.call_count, 3)
         self.assertEqual(result, GraphExtractionResponse())
 
     def test_groq_does_not_retry_unrelated_bad_requests(self):
@@ -2085,6 +2110,33 @@ class DocumentProcessingServiceTests(unittest.TestCase):
         upload_service.mark_completed.assert_awaited_once()
         completed_result = upload_service.mark_completed.await_args.args[3]
         self.assertEqual(completed_result["graph_status"], GraphStatus.GRAPH_PARTIAL.value)
+
+    def test_empty_provider_graph_keeps_vectorized_document_ready(self):
+        service, upload_service, ingestion_service, _ = self._service_fixture()
+        ingestion_service.extract_graph_from_chunks.return_value = GraphExtractionResponse()
+
+        with (
+            patch(
+                "app.services.document_processing_service.storage_service.get_bytes",
+                return_value=b"%PDF-test",
+            ),
+            patch(
+                "app.services.document_processing_service.storage_service.exists",
+                return_value=True,
+            ),
+        ):
+            result = asyncio.run(
+                service.process_document(
+                    "upload-1", "task-1", lease_owner="instance-1"
+                )
+            )
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(
+            result["graph_status"], GraphStatus.READY_WITHOUT_GRAPH.value
+        )
+        upload_service.mark_completed.assert_awaited_once()
+        upload_service.mark_failed.assert_not_awaited()
 
     def test_processing_failure_cleans_partial_outputs_and_marks_failed(self):
         service, upload_service, ingestion_service, _ = self._service_fixture()
