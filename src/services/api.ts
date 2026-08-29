@@ -308,9 +308,9 @@ export async function retryUpload(uploadId: string): Promise<IngestResponse> {
   return response.json() as Promise<IngestResponse>;
 }
 
-export async function removeFailedUpload(uploadId: string): Promise<void> {
+export async function removeUpload(uploadId: string): Promise<void> {
   await fetchWithTimeout(`${API_BASE_URL}/ingest/uploads/${uploadId}`, {
     method: "DELETE",
-    timeout: 15000,
+    timeout: 30000,
   });
 }

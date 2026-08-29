@@ -52,6 +52,34 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(config.qdrant_api_key_value, "qdrant-secret")
         self.assertNotIn("qdrant-secret", repr(config.qdrant_api_key))
 
+    def test_cleanup_removes_document_graph_and_orphaned_course_node(self):
+        graph_session = SimpleNamespace(run=AsyncMock())
+
+        class GraphSessionContext:
+            async def __aenter__(self):
+                return graph_session
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        service = IngestionService(
+            graph_driver=SimpleNamespace(session=Mock(return_value=GraphSessionContext())),
+            vector_client=SimpleNamespace(collection_exists=Mock(return_value=False)),
+        )
+
+        asyncio.run(service.cleanup_upload("upload-1", "course-1"))
+
+        self.assertEqual(graph_session.run.await_count, 2)
+        delete_concepts = graph_session.run.await_args_list[0]
+        delete_course = graph_session.run.await_args_list[1]
+        self.assertIn("DETACH DELETE concept", delete_concepts.args[0])
+        self.assertEqual(
+            delete_concepts.kwargs,
+            {"course_id": "course-1", "upload_id": "upload-1"},
+        )
+        self.assertIn("WHERE NOT (course)-[:CONTAINS]->(:Concept)", delete_course.args[0])
+        self.assertEqual(delete_course.kwargs, {"course_id": "course-1"})
+
     def test_demo_cookie_is_signed_tamper_resistant_and_expires(self):
         config = Settings(
             _env_file=None,
@@ -842,15 +870,28 @@ class UploadEndpointTests(unittest.TestCase):
     def test_failed_duplicate_deletion_keeps_shared_object(self):
         record = SimpleNamespace(
             upload_id="failed-duplicate",
+            course_uuid="course-1",
+            course_id="COURSE",
             storage_key="courses/course-1/documents/hash.pdf",
+            stage=ProcessingStage.FAILED.value,
         )
         db = SimpleNamespace(rollback=AsyncMock())
 
         with (
             patch.object(
                 ingest.upload_service,
-                "lock_failed_for_deletion",
+                "get_upload",
                 AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.upload_service,
+                "lock_for_deletion",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.document_processing_service.ingestion_service,
+                "cleanup_upload",
+                AsyncMock(),
             ),
             patch.object(
                 ingest.upload_service,
@@ -859,12 +900,12 @@ class UploadEndpointTests(unittest.TestCase):
             ),
             patch.object(
                 ingest.upload_service,
-                "delete_failed",
+                "delete_document",
                 AsyncMock(return_value=record),
             ),
             patch.object(ingest.storage_service, "delete") as delete_object,
         ):
-            asyncio.run(ingest.remove_failed_upload(record.upload_id, db))
+            asyncio.run(ingest.remove_upload(record.upload_id, db))
 
         delete_object.assert_not_called()
 
@@ -872,14 +913,21 @@ class UploadEndpointTests(unittest.TestCase):
         record = SimpleNamespace(
             upload_id="failed-upload",
             course_uuid="course-1",
+            course_id="COURSE",
             storage_key="courses/course-1/documents/hash.pdf",
+            stage=ProcessingStage.FAILED.value,
         )
         db = SimpleNamespace(rollback=AsyncMock())
 
         with (
             patch.object(
                 ingest.upload_service,
-                "lock_failed_for_deletion",
+                "get_upload",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.upload_service,
+                "lock_for_deletion",
                 AsyncMock(return_value=record),
             ),
             patch.object(
@@ -894,13 +942,176 @@ class UploadEndpointTests(unittest.TestCase):
             ),
             patch.object(
                 ingest.upload_service,
-                "delete_failed",
+                "delete_document",
                 AsyncMock(return_value=record),
             ),
         ):
-            asyncio.run(ingest.remove_failed_upload(record.upload_id, db))
+            asyncio.run(ingest.remove_upload(record.upload_id, db))
 
         cleanup.assert_awaited_once_with("failed-upload", "course-1")
+
+    def test_ready_deletion_cleans_derived_artifacts_and_source_object(self):
+        record = SimpleNamespace(
+            upload_id="ready-upload",
+            course_uuid="course-1",
+            course_id="COURSE",
+            storage_key="courses/course-1/documents/hash.pdf",
+            stage=ProcessingStage.READY.value,
+        )
+        db = SimpleNamespace(rollback=AsyncMock())
+
+        with (
+            patch.object(
+                ingest.upload_service,
+                "get_upload",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.upload_service,
+                "lock_for_deletion",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.document_processing_service.ingestion_service,
+                "cleanup_upload",
+                AsyncMock(),
+            ) as cleanup,
+            patch.object(
+                ingest.upload_service,
+                "storage_key_is_shared",
+                AsyncMock(return_value=False),
+            ),
+            patch.object(ingest.storage_service, "delete") as delete_object,
+            patch.object(
+                ingest.upload_service,
+                "delete_document",
+                AsyncMock(return_value=record),
+            ) as delete_document,
+        ):
+            asyncio.run(ingest.remove_upload(record.upload_id, db))
+
+        cleanup.assert_awaited_once_with("ready-upload", "course-1")
+        delete_object.assert_called_once_with(record.storage_key)
+        delete_document.assert_awaited_once_with(db, "ready-upload")
+
+    def test_active_document_cannot_be_deleted(self):
+        record = SimpleNamespace(
+            upload_id="active-upload",
+            stage=ProcessingStage.EMBEDDING.value,
+        )
+        db = SimpleNamespace(rollback=AsyncMock())
+
+        with (
+            patch.object(
+                ingest.upload_service,
+                "get_upload",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.upload_service,
+                "lock_for_deletion",
+                AsyncMock(),
+            ) as lock_for_deletion,
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(ingest.remove_upload(record.upload_id, db))
+
+        self.assertEqual(raised.exception.status_code, 409)
+        lock_for_deletion.assert_not_awaited()
+
+    def test_cleanup_failure_preserves_document_and_source_object(self):
+        record = SimpleNamespace(
+            upload_id="ready-upload",
+            course_uuid="course-1",
+            course_id="COURSE",
+            storage_key="courses/course-1/documents/hash.pdf",
+            stage=ProcessingStage.READY.value,
+        )
+        db = SimpleNamespace(rollback=AsyncMock())
+
+        with (
+            patch.object(
+                ingest.upload_service,
+                "get_upload",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.upload_service,
+                "lock_for_deletion",
+                AsyncMock(return_value=record),
+            ),
+            patch.object(
+                ingest.document_processing_service.ingestion_service,
+                "cleanup_upload",
+                AsyncMock(side_effect=RuntimeError("Neo4j unavailable")),
+            ),
+            patch.object(ingest.storage_service, "delete") as delete_object,
+            patch.object(
+                ingest.upload_service,
+                "delete_document",
+                AsyncMock(),
+            ) as delete_document,
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(ingest.remove_upload(record.upload_id, db))
+
+        self.assertEqual(raised.exception.status_code, 503)
+        db.rollback.assert_awaited_once()
+        delete_object.assert_not_called()
+        delete_document.assert_not_awaited()
+
+
+class UploadDeletionServiceTests(unittest.TestCase):
+    def test_deleting_last_document_also_removes_orphaned_course(self):
+        service = UploadService()
+        record = SimpleNamespace(
+            upload_id="ready-upload",
+            course_uuid="course-1",
+            stage=ProcessingStage.READY.value,
+        )
+        course = SimpleNamespace(id="course-1")
+        remaining_result = Mock()
+        remaining_result.scalar_one.return_value = 0
+        course_result = Mock()
+        course_result.scalar_one_or_none.return_value = course
+        session = SimpleNamespace(
+            delete=AsyncMock(),
+            flush=AsyncMock(),
+            execute=AsyncMock(side_effect=[remaining_result, course_result]),
+            commit=AsyncMock(),
+        )
+        service.get_upload = AsyncMock(return_value=record)
+
+        deleted = asyncio.run(service.delete_document(session, record.upload_id))
+
+        self.assertIs(deleted, record)
+        self.assertEqual(session.delete.await_args_list[0].args, (record,))
+        self.assertEqual(session.delete.await_args_list[1].args, (course,))
+        session.flush.assert_awaited_once()
+        session.commit.assert_awaited_once()
+
+    def test_deleting_document_keeps_course_when_another_document_exists(self):
+        service = UploadService()
+        record = SimpleNamespace(
+            upload_id="ready-upload",
+            course_uuid="course-1",
+            stage=ProcessingStage.READY.value,
+        )
+        remaining_result = Mock()
+        remaining_result.scalar_one.return_value = 1
+        session = SimpleNamespace(
+            delete=AsyncMock(),
+            flush=AsyncMock(),
+            execute=AsyncMock(return_value=remaining_result),
+            commit=AsyncMock(),
+        )
+        service.get_upload = AsyncMock(return_value=record)
+
+        deleted = asyncio.run(service.delete_document(session, record.upload_id))
+
+        self.assertIs(deleted, record)
+        session.delete.assert_awaited_once_with(record)
+        session.commit.assert_awaited_once()
 
 
 class ProcessingFencingTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -31,7 +31,7 @@ import {
   listCourses,
   listUploads,
   retryUpload,
-  removeFailedUpload,
+  removeUpload,
   sendQuery,
 } from "../services/api";
 
@@ -59,6 +59,10 @@ export default function Dashboard(): JSX.Element {
   const [pendingCourseSelection, setPendingCourseSelection] = useState<string | null>(null);
   const [showAllUploads, setShowAllUploads] = useState(false);
   const [retryingUploadId, setRetryingUploadId] = useState<string | null>(null);
+  const [deletingUploadId, setDeletingUploadId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UploadJob | null>(null);
+  const deleteCancelButtonRef = useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [answerCopied, setAnswerCopied] = useState(false);
   const [queueFilter, setQueueFilter] = useState<"active" | "ready" | "failed" | "all">("all");
   const [selectedPreview, setSelectedPreview] = useState<{
@@ -113,6 +117,22 @@ export default function Dashboard(): JSX.Element {
   useEffect(() => {
     void refreshUploads();
   }, []);
+
+  useEffect(() => {
+    if (!deleteTarget) {
+      deleteTriggerRef.current?.focus();
+      deleteTriggerRef.current = null;
+      return undefined;
+    }
+    deleteCancelButtonRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && deletingUploadId === null) {
+        setDeleteTarget(null);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [deleteTarget, deletingUploadId]);
 
   useEffect(() => {
     const selectedCourseIsReady = courses.some(
@@ -267,12 +287,21 @@ export default function Dashboard(): JSX.Element {
   }
 
   async function handleRemove(job: UploadJob): Promise<void> {
+    setDeletingUploadId(job.upload_id);
     setError(null);
     try {
-      await removeFailedUpload(job.upload_id);
+      await removeUpload(job.upload_id);
       setUploadJobs((current) => current.filter((item) => item.upload_id !== job.upload_id));
+      if (job.course_id === courseId) {
+        setResponse(null);
+      }
+      setSelectedPreview(null);
+      setDeleteTarget(null);
+      await refreshUploads();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to remove record.");
+      setError(requestError instanceof Error ? requestError.message : "Unable to delete document.");
+    } finally {
+      setDeletingUploadId(null);
     }
   }
 
@@ -319,6 +348,55 @@ export default function Dashboard(): JSX.Element {
         onClose={() => setIsUploadModalOpen(false)}
         onUploaded={handleUploadCreated}
       />
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <section
+            aria-describedby="delete-document-description"
+            aria-labelledby="delete-document-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl"
+            role="dialog"
+          >
+            <div className="mb-4 grid h-10 w-10 place-items-center rounded-lg bg-red-50 text-red-600">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <h2 className="text-lg font-semibold text-ink" id="delete-document-title">
+              Delete this PDF?
+            </h2>
+            <p className="mt-2 break-words text-sm font-medium text-slate-700">
+              {deleteTarget.original_filename}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-500" id="delete-document-description">
+              This permanently removes its processing record, vector chunks, graph concepts,
+              relationships, and stored PDF. This action cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                disabled={deletingUploadId !== null}
+                onClick={() => setDeleteTarget(null)}
+                ref={deleteCancelButtonRef}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+                disabled={deletingUploadId !== null}
+                onClick={() => void handleRemove(deleteTarget)}
+                type="button"
+              >
+                {deletingUploadId === deleteTarget.upload_id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Delete permanently
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       <section className="flex min-h-[calc(100vh-136px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-panel">
         <form className="border-b border-slate-200 p-4" onSubmit={handleSubmit}>
           <div className="space-y-3">
@@ -579,8 +657,17 @@ export default function Dashboard(): JSX.Element {
                           Retry
                         </button>
                       ) : null}
-                      {job.status === "failed" ? (
-                        <button aria-label={`Remove ${job.original_filename}`} className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-white text-slate-400 hover:bg-red-50 hover:text-red-600" onClick={() => void handleRemove(job)} type="button">
+                      {job.status === "ready" || job.status === "failed" ? (
+                        <button
+                          aria-label={`Delete ${job.original_filename}`}
+                          className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                          onClick={(event) => {
+                            deleteTriggerRef.current = event.currentTarget;
+                            setDeleteTarget(job);
+                          }}
+                          title="Delete document and indexed data"
+                          type="button"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       ) : null}

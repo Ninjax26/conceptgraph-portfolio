@@ -12,6 +12,11 @@ from app.models.document_upload import Course, DocumentUpload, ProcessingAttempt
 
 
 class UploadService:
+    DELETABLE_STAGES = {
+        ProcessingStage.READY.value,
+        ProcessingStage.FAILED.value,
+    }
+
     async def create_upload(
         self,
         session: AsyncSession,
@@ -296,15 +301,34 @@ class UploadService:
         await session.refresh(record)
         return record
 
-    async def delete_failed(self, session: AsyncSession, upload_id: str) -> DocumentUpload | None:
+    async def delete_document(
+        self,
+        session: AsyncSession,
+        upload_id: str,
+    ) -> DocumentUpload | None:
         record = await self.get_upload(session, upload_id)
-        if record is None or record.stage != ProcessingStage.FAILED.value:
+        if record is None or record.stage not in self.DELETABLE_STAGES:
             return None
+        course_uuid = record.course_uuid
         await session.delete(record)
+        await session.flush()
+        if course_uuid:
+            remaining = await session.execute(
+                select(func.count(DocumentUpload.upload_id)).where(
+                    DocumentUpload.course_uuid == course_uuid
+                )
+            )
+            if int(remaining.scalar_one()) == 0:
+                course_result = await session.execute(
+                    select(Course).where(Course.id == course_uuid)
+                )
+                course = course_result.scalar_one_or_none()
+                if course is not None:
+                    await session.delete(course)
         await session.commit()
         return record
 
-    async def lock_failed_for_deletion(
+    async def lock_for_deletion(
         self,
         session: AsyncSession,
         upload_id: str,
@@ -315,7 +339,7 @@ class UploadService:
             .with_for_update()
         )
         record = result.scalar_one_or_none()
-        if record is None or record.stage != ProcessingStage.FAILED.value:
+        if record is None or record.stage not in self.DELETABLE_STAGES:
             return None
         return record
 

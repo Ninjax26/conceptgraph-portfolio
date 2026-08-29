@@ -233,6 +233,14 @@ class IngestionService:
                 course_id=course_id,
                 upload_id=upload_id,
             )
+            await session.run(
+                """
+                MATCH (course:Course {id: $course_id})
+                WHERE NOT (course)-[:CONTAINS]->(:Concept)
+                DETACH DELETE course
+                """,
+                course_id=course_id,
+            )
 
     def _collection_exists_for_cleanup(self) -> bool:
         try:

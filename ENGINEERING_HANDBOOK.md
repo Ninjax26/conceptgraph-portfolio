@@ -109,7 +109,7 @@ Any processor failure:
 3. records attempt/document failure if fencing still permits it;
 4. clears the lease.
 
-Failed-record deletion repeats derived cleanup before removing metadata. The source object is deleted only if no other retained record references its content-addressed key.
+READY and FAILED document deletion repeats provenance-scoped Qdrant and Neo4j cleanup before removing PostgreSQL metadata. It also removes an empty Neo4j course node after its final concepts are deleted. The source object is deleted only if no other retained record references its content-addressed key, and a PostgreSQL course row is removed only after its final document is deleted. Active documents remain protected from deletion while a worker can still own their lease.
 
 ## Recovery and retries
 

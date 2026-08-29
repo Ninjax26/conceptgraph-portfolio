@@ -323,26 +323,39 @@ async def preview_upload(
 
 
 @router.delete("/uploads/{upload_id}", status_code=204)
-async def remove_failed_upload(
+async def remove_upload(
     upload_id: str,
     db: AsyncSession = Depends(get_postgres_session),
 ) -> None:
-    record = await upload_service.lock_failed_for_deletion(db, upload_id)
+    existing = await upload_service.get_upload(db, upload_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Upload not found.")
+    if existing.stage not in upload_service.DELETABLE_STAGES:
+        raise HTTPException(
+            status_code=409,
+            detail="Only ready or failed document records can be removed.",
+        )
+
+    record = await upload_service.lock_for_deletion(db, upload_id)
     if record is None:
-        raise HTTPException(status_code=409, detail="Only failed document records can be removed.")
-    course_uuid = getattr(record, "course_uuid", None)
-    if course_uuid:
-        try:
-            await document_processing_service.ingestion_service.cleanup_upload(
-                record.upload_id,
-                course_uuid,
-            )
-        except Exception as exc:
-            await db.rollback()
-            raise HTTPException(
-                status_code=503,
-                detail="Indexed document artifacts are temporarily unavailable.",
-            ) from exc
+        raise HTTPException(
+            status_code=409,
+            detail="The document state changed before removal.",
+        )
+
+    course_scope = record.course_uuid or record.course_id
+    try:
+        await document_processing_service.ingestion_service.cleanup_upload(
+            record.upload_id,
+            course_scope,
+        )
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Indexed document artifacts are temporarily unavailable.",
+        ) from exc
+
     shared_object = await upload_service.storage_key_is_shared(
         db,
         record.storage_key,
@@ -354,8 +367,9 @@ async def remove_failed_upload(
         except ObjectStorageError as exc:
             await db.rollback()
             raise HTTPException(status_code=503, detail="Document storage is temporarily unavailable.") from exc
-    deleted = await upload_service.delete_failed(db, upload_id)
+    deleted = await upload_service.delete_document(db, upload_id)
     if deleted is None:
+        await db.rollback()
         raise HTTPException(status_code=409, detail="The document state changed before removal.")
 
 
