@@ -11,7 +11,11 @@ from app.core.config import settings
 from app.services.security_service import demo_access_service, rate_limit_service
 
 PUBLIC_PATHS = {"/api/v1/health", "/api/v1/ready"}
-PUBLIC_METHOD_PATHS = {("POST", "/api/v1/auth/session")}
+PUBLIC_PREFIXES = ("/api/v1/public/",)
+PUBLIC_METHOD_PATHS = {
+    ("GET", "/api/v1/auth/session"),
+    ("POST", "/api/v1/auth/session"),
+}
 EXPENSIVE_PATHS = {
     "/api/v1/query",
     "/api/v1/exam/generate",
@@ -72,7 +76,11 @@ def _is_protected(request: Request) -> bool:
     path = request.url.path.rstrip("/") or "/"
     if request.method == "OPTIONS":
         return False
-    if path in PUBLIC_PATHS or (request.method, path) in PUBLIC_METHOD_PATHS:
+    if (
+        path in PUBLIC_PATHS
+        or path.startswith(PUBLIC_PREFIXES)
+        or (request.method, path) in PUBLIC_METHOD_PATHS
+    ):
         return False
     return path.startswith("/api/v1") or path in {"/docs", "/redoc", "/openapi.json"}
 

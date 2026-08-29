@@ -6,6 +6,7 @@ import {
   deleteAuthSession,
   getAuthSession,
 } from "@/services/api";
+import PublicSampleCourse from "@/components/PublicSampleCourse";
 
 type AccessState = "checking" | "locked" | "unlocked" | "error";
 
@@ -45,9 +46,13 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
     setSubmitting(true);
     setMessage("");
     try {
-      const session = await createAuthSession(accessCode);
-      if (session.authenticated) {
-        setProtectionEnabled(session.enabled);
+      const issuedSession = await createAuthSession(accessCode);
+      if (issuedSession.authenticated) {
+        const verifiedSession = await getAuthSession();
+        if (!verifiedSession.authenticated) {
+          throw new Error("The temporary session could not be verified. Please try again.");
+        }
+        setProtectionEnabled(verifiedSession.enabled);
         setAccessCode("");
         setState("unlocked");
       }
@@ -87,7 +92,7 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
           <div className="mx-auto flex h-10 w-full max-w-[1800px] items-center justify-between gap-3 px-4 lg:px-6">
             <span className="inline-flex min-w-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
-              <span className="truncate">Protected demo session active</span>
+              <span className="truncate">Shared portfolio demo · verified reviewer session</span>
             </span>
             <button
               type="button"
@@ -105,16 +110,17 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
   }
 
   return (
-    <main className="grid min-h-[calc(100vh-64px)] place-items-center bg-[radial-gradient(circle_at_top_left,_rgba(13,148,136,0.08),_transparent_35%)] px-4 py-12 dark:bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.09),_transparent_35%)]">
-      <section className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-white/10 dark:bg-[#15151b] dark:shadow-black/30">
+    <main className="min-h-[calc(100vh-64px)] bg-[radial-gradient(circle_at_top_left,_rgba(13,148,136,0.08),_transparent_35%)] px-4 py-10 dark:bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.09),_transparent_35%)]">
+      <div className="mx-auto grid w-full max-w-6xl items-start gap-5 lg:grid-cols-[minmax(320px,400px)_1fr]">
+      <section className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-white/10 dark:bg-[#15151b] dark:shadow-black/30">
         <div className="mb-5 flex items-start gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="font-semibold text-ink dark:text-white">Protected demo dashboard</h1>
+            <h1 className="font-semibold text-ink dark:text-white">Shared portfolio demo</h1>
             <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-              Enter the deployment access code. It is exchanged for a temporary secure session and is not stored in this browser.
+              Reviewers can enter the private access code for a temporary verified session. Public visitors can explore the prepared sample course.
             </p>
           </div>
         </div>
@@ -152,6 +158,10 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
           </button>
         </form>
 
+        <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
+          Reviewer uploads are temporary and automatically removed after a few days. This is a controlled demo, not a multi-user account system.
+        </p>
+
         {state === "error" && (
           <button
             type="button"
@@ -162,6 +172,8 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
           </button>
         )}
       </section>
+      <PublicSampleCourse />
+      </div>
     </main>
   );
 }

@@ -53,6 +53,9 @@ export default function App(): JSX.Element {
                   Academic graph retrieval dashboard
                 </p>
               </div>
+              <span className="hidden rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-700 sm:inline-flex">
+                Shared portfolio demo
+              </span>
             </button>
           </div>
 

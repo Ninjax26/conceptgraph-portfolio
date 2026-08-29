@@ -91,6 +91,12 @@ services:
         value: "50"
       - key: REQUIRE_UPLOAD_AUTH
         value: "true"
+      - key: PUBLIC_SAMPLE_COURSE_ID
+        value: ADA
+      - key: DEMO_UPLOAD_RETENTION_DAYS
+        value: "3"
+      - key: DEMO_CLEANUP_INTERVAL_SECONDS
+        value: "21600"
       - key: STRICT_STARTUP_VALIDATION
         value: "true"
 

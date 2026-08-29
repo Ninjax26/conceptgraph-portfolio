@@ -45,6 +45,7 @@ class DocumentUpload(Base):
     processed_chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     graph_node_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     graph_edge_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    graph_status: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     result_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -1,0 +1,224 @@
+{
+  "dataset": "CYBER course retrieval baseline",
+  "course_id": "CYBER",
+  "generated_at": "2026-08-29T21:35:27.077782+00:00",
+  "summary": {
+    "correct_document_top_5": 8,
+    "document_question_count": 10,
+    "correct_source_page_top_5": 8,
+    "page_question_count": 10,
+    "answers_with_citations": 6,
+    "supported_question_count": 10,
+    "unsupported_questions_refused": 5,
+    "unsupported_question_count": 5,
+    "average_query_seconds": 7.584,
+    "request_errors": 0
+  },
+  "results": [
+    {
+      "question": "What is Cybercrime-as-a-Service, and why does it lower the barrier to cybercrime?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": false,
+      "refused": false,
+      "latency_seconds": 25.005,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 2
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "How does generative AI make scam emails harder to identify?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": false,
+      "refused": false,
+      "latency_seconds": 2.458,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 2
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "Why can tech-savvy students still fall for simple online scams?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": true,
+      "refused": false,
+      "latency_seconds": 1.543,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 3
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "How do urgency and cognitive overload help fraudsters manipulate victims?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": true,
+      "refused": false,
+      "latency_seconds": 5.209,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 3
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "How does the fake internship registration-fee scam target students?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": true,
+      "refused": false,
+      "latency_seconds": 12.053,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 3
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "How does the counterfeit-check fake employer scam work?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": true,
+      "refused": false,
+      "latency_seconds": 8.782,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 4
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "What is quishing, and what is the golden rule when receiving money by QR code?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": true,
+      "refused": false,
+      "latency_seconds": 24.594,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 4
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "How can malicious QR codes placed over legitimate ones steal information?",
+      "should_refuse": false,
+      "document_correct": true,
+      "page_correct": true,
+      "citation_present": true,
+      "refused": false,
+      "latency_seconds": 25.091,
+      "top_sources": [
+        {
+          "document_name": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+          "page_number": 4
+        }
+      ],
+      "error": null
+    },
+    {
+      "question": "What is online sextortion and how can deepfake AI be involved?",
+      "should_refuse": false,
+      "document_correct": false,
+      "page_correct": false,
+      "citation_present": false,
+      "refused": true,
+      "latency_seconds": 2.782,
+      "top_sources": [],
+      "error": null
+    },
+    {
+      "question": "What are the four core cyber-hygiene habits recommended in the course?",
+      "should_refuse": false,
+      "document_correct": false,
+      "page_correct": false,
+      "citation_present": false,
+      "refused": true,
+      "latency_seconds": 1.052,
+      "top_sources": [],
+      "error": null
+    },
+    {
+      "question": "What is the chemical formula for photosynthesis?",
+      "should_refuse": true,
+      "document_correct": null,
+      "page_correct": null,
+      "citation_present": false,
+      "refused": true,
+      "latency_seconds": 0.915,
+      "top_sources": [],
+      "error": null
+    },
+    {
+      "question": "Who led France during the Battle of Waterloo?",
+      "should_refuse": true,
+      "document_correct": null,
+      "page_correct": null,
+      "citation_present": false,
+      "refused": true,
+      "latency_seconds": 1.168,
+      "top_sources": [],
+      "error": null
+    },
+    {
+      "question": "Explain Newton's second law with a numerical example.",
+      "should_refuse": true,
+      "document_correct": null,
+      "page_correct": null,
+      "citation_present": false,
+      "refused": true,
+      "latency_seconds": 1.03,
+      "top_sources": [],
+      "error": null
+    },
+    {
+      "question": "How does DNA replication work?",
+      "should_refuse": true,
+      "document_correct": null,
+      "page_correct": null,
+      "citation_present": false,
+      "refused": true,
+      "latency_seconds": 1.099,
+      "top_sources": [],
+      "error": null
+    },
+    {
+      "question": "What monetary policy should a central bank use to reduce inflation?",
+      "should_refuse": true,
+      "document_correct": null,
+      "page_correct": null,
+      "citation_present": false,
+      "refused": true,
+      "latency_seconds": 0.985,
+      "top_sources": [],
+      "error": null
+    }
+  ]
+}

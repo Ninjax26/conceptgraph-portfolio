@@ -53,14 +53,22 @@ async def create_session(
 
 
 @router.get("/session", response_model=AuthSessionResponse)
-async def get_session(response: Response) -> AuthSessionResponse:
+async def get_session(request: Request, response: Response) -> AuthSessionResponse:
     response.headers["Cache-Control"] = "no-store"
+    if not demo_access_service.enabled:
+        return AuthSessionResponse(
+            enabled=False,
+            authenticated=True,
+            expires_in_seconds=None,
+        )
+
+    expires_in = demo_access_service.session_expires_in(
+        request.cookies.get(settings.auth_cookie_name)
+    )
     return AuthSessionResponse(
-        enabled=demo_access_service.enabled,
-        authenticated=True,
-        expires_in_seconds=(
-            settings.auth_session_ttl_seconds if demo_access_service.enabled else None
-        ),
+        enabled=True,
+        authenticated=expires_in is not None,
+        expires_in_seconds=expires_in,
     )
 
 

@@ -7,7 +7,12 @@ from uuid import uuid4
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.processing import FailureCategory, MAX_PROCESSING_ATTEMPTS, ProcessingStage
+from app.core.processing import (
+    FailureCategory,
+    GraphStatus,
+    MAX_PROCESSING_ATTEMPTS,
+    ProcessingStage,
+)
 from app.models.document_upload import Course, DocumentUpload, ProcessingAttempt
 
 
@@ -112,6 +117,33 @@ class UploadService:
             select(DocumentUpload).order_by(desc(DocumentUpload.created_at)).limit(limit)
         )
         return list(result.scalars().all())
+
+    async def list_expired_upload_ids(
+        self,
+        session: AsyncSession,
+        *,
+        created_before: datetime,
+        excluded_course_uuid: str | None = None,
+        limit: int = 100,
+    ) -> list[str]:
+        query = (
+            select(DocumentUpload.upload_id)
+            .where(
+                DocumentUpload.created_at < created_before,
+                DocumentUpload.stage.in_(self.DELETABLE_STAGES),
+            )
+            .order_by(DocumentUpload.created_at)
+            .limit(limit)
+        )
+        if excluded_course_uuid:
+            query = query.where(
+                or_(
+                    DocumentUpload.course_uuid.is_(None),
+                    DocumentUpload.course_uuid != excluded_course_uuid,
+                )
+            )
+        result = await session.execute(query)
+        return [str(upload_id) for upload_id in result.scalars().all()]
 
     async def list_dispatchable(
         self,
@@ -281,6 +313,7 @@ class UploadService:
         record.stage = ProcessingStage.UPLOADED.value
         record.error_message = None
         record.result_json = None
+        record.graph_status = None
         record.failure_category = None
         record.retryable = False
         record.attempt_count += 1
@@ -428,15 +461,17 @@ class UploadService:
         if record is None or record.status != "active":
             return False
         chunk_count = int(result_json.get("chunks_indexed", 0))
+        graph_status = str(result_json.get("graph_status", ""))
         if (
             record.stage != ProcessingStage.GRAPH_BUILT.value
             or not record.course_uuid
             or not record.storage_key
             or chunk_count <= 0
+            or graph_status not in {status.value for status in GraphStatus}
         ):
             raise ValueError(
                 "READY requires GRAPH_BUILT, a canonical course, a source object key, "
-                "and at least one committed chunk."
+                "at least one committed chunk, and a validated graph status."
             )
         record.status = "ready"
         record.stage = ProcessingStage.READY.value
@@ -444,6 +479,7 @@ class UploadService:
         record.processed_chunk_count = chunk_count
         record.graph_node_count = int(result_json.get("nodes_upserted", 0))
         record.graph_edge_count = int(result_json.get("relationships_upserted", 0))
+        record.graph_status = graph_status
         record.completed_at = datetime.now(timezone.utc)
         record.error_message = None
         record.failure_category = None

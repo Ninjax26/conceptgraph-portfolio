@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, settings
 from app.core.database import AsyncSessionLocal
-from app.core.processing import ProcessingStage, classify_failure
+from app.core.processing import ProcessingStage, assess_graph_status, classify_failure
 from app.models.document_upload import DocumentUpload
 from app.services.ingestion_service import IngestionService
 from app.services.parser_service import ParserService
@@ -151,6 +151,10 @@ class DocumentProcessingService:
                 "chunks_indexed": vector_count,
                 "nodes_upserted": len(graph.nodes),
                 "relationships_upserted": len(graph.relationships),
+                "graph_status": assess_graph_status(
+                    len(graph.nodes),
+                    len(graph.relationships),
+                ).value,
             }
             completed = await self._run_with_session(
                 lambda session: self.upload_service.mark_completed(

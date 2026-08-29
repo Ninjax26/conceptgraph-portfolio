@@ -3,7 +3,15 @@ export interface ConceptNode {
   name: string;
   type: string;
   description: string;
+  normalized_name?: string;
+  source_chunk_id?: string;
+  document_name?: string;
+  page_number?: number | null;
+  section_heading?: string;
+  upload_id?: string;
 }
+
+export type GraphStatus = "GRAPH_READY" | "GRAPH_PARTIAL" | "READY_WITHOUT_GRAPH";
 
 export interface ConceptRelationship {
   source_node_id: string;
@@ -19,6 +27,7 @@ export interface SourceChunk {
   section_heading: string | null;
   supporting_passage: string;
   source_type: "pdf";
+  preview_url?: string | null;
   metadata: Record<string, string | number | boolean | null>;
 }
 
@@ -48,6 +57,7 @@ export interface QueryResponse {
     displayed_nodes: number;
     displayed_edges: number;
     filter_reason: string;
+    graph_status: GraphStatus;
   };
   confidence: {
     level: "high" | "medium" | "low" | "insufficient";
@@ -55,6 +65,21 @@ export interface QueryResponse {
     evidence_count: number;
     reason: string;
   };
+}
+
+export interface PublicSampleDocument {
+  upload_id: string;
+  filename: string;
+  page_preview_url: string;
+}
+
+export interface PublicSampleResponse {
+  course_id: string;
+  course_name: string;
+  graph_status: GraphStatus;
+  documents: PublicSampleDocument[];
+  graph_context: GraphContextItem[];
+  graph_metadata: QueryResponse["graph_metadata"];
 }
 
 export const API_BASE_URL =
@@ -137,6 +162,14 @@ export async function deleteAuthSession(): Promise<void> {
     method: "DELETE",
     timeout: 15000,
   });
+}
+
+export async function getPublicSample(): Promise<PublicSampleResponse> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/public/sample`, {
+    method: "GET",
+    timeout: 15000,
+  });
+  return response.json() as Promise<PublicSampleResponse>;
 }
 
 export async function sendQuery(
@@ -250,6 +283,7 @@ export interface UploadStatusResponse {
   processed_chunk_count: number;
   graph_node_count: number;
   graph_edge_count: number;
+  graph_status?: GraphStatus | null;
   error_message?: string | null;
   result_json?: Record<string, unknown> | null;
   created_at: string;
@@ -269,6 +303,7 @@ export interface CourseSummary {
   processed_chunk_count: number;
   graph_node_count: number;
   graph_edge_count: number;
+  graph_status?: GraphStatus | null;
   last_updated_at?: string | null;
   historical_records: number;
   duplicate_records: number;

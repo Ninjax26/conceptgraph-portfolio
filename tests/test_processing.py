@@ -15,25 +15,40 @@ from groq import BadRequestError
 from starlette.responses import JSONResponse
 from starlette.datastructures import Headers
 
-from app.api.endpoints import auth, ingest
+from app.api.endpoints import auth, ingest, public_demo, query
+from app.api.endpoints.query import QueryRequest
 from app.core.config import Settings
-from app.core.processing import FailureCategory, ProcessingStage, classify_failure, normalize_course_name
+from app.core.processing import (
+    FailureCategory,
+    GraphStatus,
+    ProcessingStage,
+    assess_graph_status,
+    classify_failure,
+    normalize_course_name,
+)
 from app.core.processing_coordinator import EnqueueDisposition, ProcessingCoordinator
 from app.core.security import DemoProtectionMiddleware
 from app.schemas.auth import AccessCodeRequest
 from app.services.citation_service import assess_evidence, build_sources
 from app.services.course_service import CourseNotReadyError, CourseService
 from app.services.document_processing_service import DocumentProcessingService
+from app.services.demo_retention_service import DemoRetentionService
 from app.services.exam_service import ExamService
 from app.services.ingestion_service import IngestionService
-from app.services.parser_service import DocumentChunk
+from app.services.parser_service import DocumentChunk, ParserService
 from app.services.rag_service import RetrievalService
 from app.services.rerank_service import RerankService
 from app.services.security_service import DemoAccessService, RateLimitResult, RateLimitService
+from app.services.synthesis_service import SynthesisService
 from app.services.storage_service import ObjectStorageError, StorageService
 from app.services.upload_service import UploadService
 from app.schemas.exam import ExamSource
-from app.schemas.extraction import ConceptNode, ConceptRelationship, GraphExtractionResponse
+from app.schemas.extraction import (
+    ALLOWED_RELATIONSHIP_TYPES,
+    ConceptNode,
+    ConceptRelationship,
+    GraphExtractionResponse,
+)
 from pydantic import SecretStr, ValidationError
 
 
@@ -143,6 +158,7 @@ class ProcessingRulesTests(unittest.TestCase):
             ALLOWED_ORIGINS="https://portfolio.example.test",
             DEMO_ACCESS_TOKEN="a-strong-demo-secret-value-123456",
             REQUIRE_UPLOAD_AUTH=True,
+            PUBLIC_SAMPLE_COURSE_ID="SAMPLE",
             LLM_PROVIDER="groq",
             GROQ_API_KEY="groq-secret",
         )
@@ -188,6 +204,35 @@ class ProcessingRulesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
         call_next.assert_not_awaited()
+
+    def test_public_sample_route_does_not_require_the_reviewer_cookie(self):
+        config = Settings(
+            _env_file=None,
+            DEMO_ACCESS_TOKEN="a-strong-demo-secret-value-123456",
+        )
+        middleware = DemoProtectionMiddleware(AsyncMock())
+        request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/v1/public/sample",
+                "query_string": b"",
+                "headers": [],
+                "scheme": "https",
+                "server": ("api.example.com", 443),
+                "client": ("127.0.0.1", 1234),
+            }
+        )
+        call_next = AsyncMock(return_value=JSONResponse({"ok": True}))
+
+        with patch(
+            "app.core.security.demo_access_service",
+            DemoAccessService(config),
+        ):
+            response = asyncio.run(middleware.dispatch(request, call_next))
+
+        self.assertEqual(response.status_code, 200)
+        call_next.assert_awaited_once_with(request)
 
     def test_valid_bearer_is_rate_limited_and_forwarded(self):
         token = "a-strong-demo-secret-value-123456"
@@ -275,6 +320,117 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertIn("SameSite=lax", set_cookie)
         self.assertNotIn(token, set_cookie)
 
+    def test_session_status_requires_the_newly_issued_signed_cookie(self):
+        token = "a-strong-demo-secret-value-123456"
+        config = Settings(
+            _env_file=None,
+            DEMO_ACCESS_TOKEN=token,
+            AUTH_SESSION_TTL_SECONDS=300,
+        )
+        access_service = DemoAccessService(config)
+        cookie = access_service.issue_cookie(now=1_000)
+
+        missing_request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/v1/auth/session",
+                "query_string": b"",
+                "headers": [],
+                "scheme": "https",
+                "server": ("api.example.com", 443),
+                "client": ("127.0.0.1", 1234),
+            }
+        )
+        verified_request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/v1/auth/session",
+                "query_string": b"",
+                "headers": [
+                    (
+                        b"cookie",
+                        f"{config.auth_cookie_name}={cookie}".encode(),
+                    )
+                ],
+                "scheme": "https",
+                "server": ("api.example.com", 443),
+                "client": ("127.0.0.1", 1234),
+            }
+        )
+
+        with (
+            patch("app.api.endpoints.auth.demo_access_service", access_service),
+            patch("app.services.security_service.time.time", return_value=1_100),
+        ):
+            missing = asyncio.run(auth.get_session(missing_request, JSONResponse({})))
+            verified = asyncio.run(auth.get_session(verified_request, JSONResponse({})))
+
+        self.assertFalse(missing.authenticated)
+        self.assertTrue(verified.authenticated)
+        self.assertEqual(verified.expires_in_seconds, 200)
+
+    def test_public_sample_is_read_only_and_does_not_call_an_llm(self):
+        document = SimpleNamespace(
+            upload_id="sample-upload",
+            original_filename="sample.pdf",
+        )
+        context = SimpleNamespace(
+            course=SimpleNamespace(id="sample-course", display_name="SAMPLE"),
+            documents=(document,),
+            graph_status=GraphStatus.GRAPH_READY.value,
+        )
+        graph = SimpleNamespace(
+            concepts=[
+                {
+                    "concept": {"id": "node-1", "name": "Sample concept"},
+                    "related_concepts": [],
+                    "prerequisites": [],
+                    "relationships": [],
+                }
+            ],
+            metadata={
+                "total_nodes": 1,
+                "total_edges": 0,
+                "displayed_nodes": 1,
+                "displayed_edges": 0,
+                "filter_reason": "public_sample",
+                "graph_status": GraphStatus.GRAPH_READY.value,
+            },
+        )
+        retrieval = SimpleNamespace(fetch_course_graph=AsyncMock(return_value=graph))
+        request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/v1/public/sample",
+                "query_string": b"",
+                "headers": [],
+                "scheme": "https",
+                "server": ("api.example.com", 443),
+                "client": ("127.0.0.1", 1234),
+            }
+        )
+
+        with (
+            patch.object(public_demo, "_apply_public_rate_limit", AsyncMock()),
+            patch.object(public_demo, "_get_sample_context", AsyncMock(return_value=context)),
+        ):
+            result = asyncio.run(
+                public_demo.get_public_sample(
+                    request,
+                    JSONResponse({}),
+                    SimpleNamespace(),
+                    retrieval,
+                )
+            )
+
+        self.assertEqual(result.course_id, "sample-course")
+        self.assertEqual(result.documents[0].upload_id, "sample-upload")
+        self.assertEqual(result.graph_metadata["filter_reason"], "public_sample")
+        retrieval.fetch_course_graph.assert_awaited_once_with(context)
+
     def test_configuration_failure_is_permanent(self):
         category, retryable, _ = classify_failure(RuntimeError("GROQ_API_KEY is not configured"))
         self.assertEqual(category, FailureCategory.CONFIGURATION_ERROR)
@@ -290,6 +446,50 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(category, FailureCategory.CONFIGURATION_ERROR)
         self.assertFalse(retryable)
         self.assertIn("model is unavailable", message)
+
+    def test_provider_timeout_is_safe_and_retryable(self):
+        category, retryable, message = classify_failure(
+            TimeoutError("Groq request timed out")
+        )
+
+        self.assertEqual(category, FailureCategory.TIMEOUT_ERROR)
+        self.assertTrue(retryable)
+        self.assertNotIn("Groq", message)
+
+    def test_provider_rate_limit_is_safe_and_retryable(self):
+        category, retryable, message = classify_failure(
+            RuntimeError("Provider returned 429 rate_limit_exceeded")
+        )
+
+        self.assertEqual(category, FailureCategory.TIMEOUT_ERROR)
+        self.assertTrue(retryable)
+        self.assertEqual(message, "The AI service is temporarily busy. Retry in a minute.")
+
+    def test_synthesis_prompt_bounds_graph_context_for_provider_limits(self):
+        graph_context = [
+            {
+                "concept": {
+                    "id": f"concept-{index}",
+                    "name": f"Concept {index}",
+                    "description": "large graph description " * 200,
+                }
+            }
+            for index in range(30)
+        ]
+        sources = [
+            {
+                "document_name": "Cyber.pdf",
+                "page_number": 4,
+                "section_heading": "QR Code Scams",
+                "supporting_passage": "Quishing uses QR codes.",
+            }
+        ]
+
+        prompt = SynthesisService._user_prompt("What is quishing?", graph_context, sources)
+
+        self.assertLess(len(prompt), SynthesisService.MAX_GRAPH_CONTEXT_CHARS + 1_000)
+        self.assertIn("Quishing uses QR codes.", prompt)
+        self.assertIn("Graph context (bounded)", prompt)
 
     def test_existing_qdrant_collection_gets_upload_filter_index(self):
         vector_client = SimpleNamespace(
@@ -541,6 +741,10 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(sources[0]["source_id"], "source-1")
         self.assertNotIn("internal-vector-uuid", str(sources))
         self.assertEqual(sources[0]["document_name"], "Cyber.pdf")
+        self.assertEqual(
+            sources[0]["preview_url"],
+            "/ingest/uploads/document-uuid/preview#page=6",
+        )
 
     def test_graph_rejects_relationships_with_missing_entities(self):
         with self.assertRaises(ValidationError):
@@ -569,6 +773,294 @@ class ProcessingRulesTests(unittest.TestCase):
             relationships=[relationship, relationship],
         )
         self.assertEqual(len(graph.relationships), 1)
+
+    def test_graph_normalizes_concept_names_and_filters_relationship_types(self):
+        graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(id="zero-trust-1", name="Zero Trust", type="concept"),
+                ConceptNode(id="zero-trust-2", name=" zero   trust ", type="concept"),
+                ConceptNode(id="identity", name="Identity", type="concept"),
+            ],
+            relationships=[
+                ConceptRelationship(
+                    source_node_id="zero-trust-2",
+                    target_node_id="identity",
+                    relation_type="applies to",
+                ),
+                ConceptRelationship(
+                    source_node_id="identity",
+                    target_node_id="zero-trust-1",
+                    relation_type="INVENTED_BY_MODEL",
+                ),
+            ],
+        )
+
+        self.assertEqual([node.normalized_name for node in graph.nodes], ["zerotrust", "identity"])
+        self.assertEqual(len(graph.relationships), 1)
+        self.assertEqual(graph.relationships[0].source_node_id, "zero-trust-1")
+        self.assertEqual(graph.relationships[0].relation_type, "APPLIES_TO")
+        self.assertTrue(
+            all(
+                relationship.relation_type in ALLOWED_RELATIONSHIP_TYPES
+                for relationship in graph.relationships
+            )
+        )
+
+    def test_unsupported_relationship_type_is_removed(self):
+        graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(id="a", name="A", type="concept"),
+                ConceptNode(id="b", name="B", type="concept"),
+            ],
+            relationships=[
+                ConceptRelationship(
+                    source_node_id="a",
+                    target_node_id="b",
+                    relation_type="MODEL_INVENTED_RELATIONSHIP",
+                )
+            ],
+        )
+
+        self.assertEqual(graph.relationships, [])
+
+    def test_graph_status_distinguishes_ready_partial_and_empty(self):
+        self.assertEqual(assess_graph_status(4, 3), GraphStatus.GRAPH_READY)
+        self.assertEqual(assess_graph_status(3, 0), GraphStatus.GRAPH_PARTIAL)
+        self.assertEqual(assess_graph_status(0, 0), GraphStatus.READY_WITHOUT_GRAPH)
+
+    def test_graph_sampling_takes_beginning_middle_and_end_of_each_section(self):
+        chunks = [
+            DocumentChunk(
+                id=f"a-{index}",
+                text=f"Alpha {index}",
+                metadata={"document_name": "course.pdf", "section_heading": "Alpha", "page_number": 1},
+            )
+            for index in range(4)
+        ] + [
+            DocumentChunk(
+                id=f"b-{index}",
+                text=f"Beta {index}",
+                metadata={"document_name": "course.pdf", "section_heading": "Beta", "page_number": 2},
+            )
+            for index in range(5)
+        ]
+
+        sampled = IngestionService._sample_graph_chunks(chunks)
+
+        self.assertEqual(
+            [chunk.id for chunk in sampled],
+            ["a-0", "a-1", "a-2", "a-3", "b-0", "b-1", "b-2", "b-3", "b-4"],
+        )
+        self.assertGreater(len(sampled), 8)
+
+    def test_graph_context_truncation_never_removes_source_identifier(self):
+        excerpt = (
+            "[Source chunk ID: upload-1:12:3 | PDF: Cyber.pdf | Page: 12 | Section: Identity]\n"
+            + "evidence " * 200
+        )
+
+        shortened = IngestionService._truncate_excerpt(excerpt, 40)
+
+        self.assertIn("Source chunk ID: upload-1:12:3", shortened)
+
+    def test_parser_preserves_detected_section_heading_on_each_chunk(self):
+        parser = ParserService(chunk_size=5, chunk_overlap=1)
+        chunks = parser.chunk_pages(
+            [
+                (
+                    3,
+                    "INTRODUCTION\nalpha beta gamma delta epsilon zeta\n"
+                    "Threat Models\none two three four five six",
+                )
+            ],
+            "course-1",
+            "upload-1",
+            "Cyber.pdf",
+        )
+
+        headings = {str(chunk.metadata["section_heading"]) for chunk in chunks}
+        self.assertEqual(headings, {"INTRODUCTION", "Threat Models"})
+        self.assertTrue(all(chunk.metadata["page_number"] == 3 for chunk in chunks))
+
+    def test_scanned_pdf_without_text_produces_no_pages_or_chunks(self):
+        document = fitz.open()
+        document.new_page()
+        content = document.tobytes()
+        document.close()
+        parser = ParserService()
+
+        pages = parser.extract_pages_from_bytes(content)
+        chunks = parser.chunk_pages(pages, "course-1", "upload-1", "scan.pdf")
+        category, retryable, _ = classify_failure(
+            ValueError("No extractable text was found in this PDF.")
+        )
+
+        self.assertEqual(pages, [])
+        self.assertEqual(chunks, [])
+        self.assertEqual(category, FailureCategory.DOCUMENT_ERROR)
+        self.assertFalse(retryable)
+
+    def test_query_returns_evidence_when_graph_is_empty(self):
+        context = SimpleNamespace()
+        chunk = {
+            "id": "vector-1",
+            "text": "Quishing is QR-code phishing.",
+            "score": 0.9,
+            "rerank_score": 5.0,
+            "metadata": {
+                "upload_id": "upload-1",
+                "document_name": "Cyber.pdf",
+                "page_number": 4,
+                "section_heading": "QR Code Scams",
+            },
+        }
+        retrieval = SimpleNamespace(
+            retrieve=AsyncMock(
+                return_value={
+                    "chunks": [chunk],
+                    "graph_context": [],
+                    "graph_metadata": {
+                        "total_nodes": 0,
+                        "total_edges": 0,
+                        "displayed_nodes": 0,
+                        "displayed_edges": 0,
+                        "filter_reason": "query_subgraph",
+                        "graph_status": GraphStatus.READY_WITHOUT_GRAPH.value,
+                    },
+                }
+            )
+        )
+        reranker = SimpleNamespace(rerank=AsyncMock(return_value=[chunk]))
+        synthesizer = SimpleNamespace(
+            synthesize=AsyncMock(return_value="Quishing uses QR codes. [Source 1]")
+        )
+
+        with (
+            patch.object(
+                query.CourseService,
+                "get_ready_context",
+                AsyncMock(return_value=context),
+            ),
+            patch.object(query, "get_rerank_service", return_value=reranker),
+            patch.object(query, "get_synthesis_service", return_value=synthesizer),
+        ):
+            response = asyncio.run(
+                query.query_conceptgraph(
+                    QueryRequest(question="What is quishing?", course_id="CYBER"),
+                    retrieval,
+                    SimpleNamespace(),
+                )
+            )
+
+        self.assertEqual(response.graph_context, [])
+        self.assertEqual(
+            response.graph_metadata["graph_status"],
+            GraphStatus.READY_WITHOUT_GRAPH.value,
+        )
+        self.assertEqual(response.sources[0]["page_number"], 4)
+
+    def test_graph_extraction_attaches_pdf_page_section_and_upload_provenance(self):
+        chunk = DocumentChunk(
+            id="upload-1:6:0",
+            text="Zero trust verifies every request.",
+            metadata={
+                "document_name": "Cyber.pdf",
+                "page_number": 6,
+                "section_heading": "Zero Trust",
+                "upload_id": "upload-1",
+            },
+        )
+        raw_graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(
+                    id="zero_trust",
+                    name="Zero Trust",
+                    type="concept",
+                    source_chunk_id=chunk.id,
+                )
+            ]
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+        service.extract_graph_from_text = AsyncMock(return_value=raw_graph)
+
+        graph = asyncio.run(service.extract_graph_from_chunks([chunk]))
+
+        self.assertEqual(len(graph.nodes), 1)
+        node = graph.nodes[0]
+        self.assertEqual(node.document_name, "Cyber.pdf")
+        self.assertEqual(node.page_number, 6)
+        self.assertEqual(node.section_heading, "Zero Trust")
+        self.assertEqual(node.upload_id, "upload-1")
+        context = service.extract_graph_from_text.await_args.args[0]
+        self.assertIn("Source chunk ID: upload-1:6:0", context)
+
+    def test_graph_drops_nodes_that_invent_source_chunk_ids(self):
+        chunk = DocumentChunk(
+            id="real-source",
+            text="Course evidence",
+            metadata={"upload_id": "upload-1", "page_number": 1},
+        )
+        graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(
+                    id="invented",
+                    name="Invented",
+                    type="concept",
+                    source_chunk_id="not-a-real-source",
+                )
+            ]
+        )
+
+        validated = IngestionService._attach_provenance(graph, [chunk])
+
+        self.assertEqual(validated, GraphExtractionResponse())
+
+    def test_neo4j_concept_write_includes_source_provenance(self):
+        graph_session = SimpleNamespace(run=AsyncMock())
+
+        class GraphSessionContext:
+            async def __aenter__(self):
+                return graph_session
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        service = IngestionService(
+            graph_driver=SimpleNamespace(session=Mock(return_value=GraphSessionContext())),
+            vector_client=SimpleNamespace(),
+        )
+        graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(
+                    id="identity",
+                    name="Identity",
+                    type="concept",
+                    source_chunk_id="upload-1:4:0",
+                    document_name="Cyber.pdf",
+                    page_number=4,
+                    section_heading="Identity",
+                    upload_id="upload-1",
+                )
+            ]
+        )
+
+        asyncio.run(
+            service.store_graph_extraction(
+                graph,
+                "course-1",
+                upload_id="upload-1",
+                document_name="Cyber.pdf",
+            )
+        )
+
+        concept_write = graph_session.run.await_args_list[1]
+        self.assertEqual(concept_write.kwargs["document_name"], "Cyber.pdf")
+        self.assertEqual(concept_write.kwargs["page_number"], 4)
+        self.assertEqual(concept_write.kwargs["section_heading"], "Identity")
+        self.assertEqual(concept_write.kwargs["upload_id"], "upload-1")
 
     def test_neo4j_relationship_uses_mapping_interface(self):
         class FakeRelationship:
@@ -1114,6 +1606,99 @@ class UploadDeletionServiceTests(unittest.TestCase):
         session.commit.assert_awaited_once()
 
 
+class DemoRetentionServiceTests(unittest.TestCase):
+    def test_retention_is_disabled_outside_the_protected_demo(self):
+        config = Settings(_env_file=None, REQUIRE_UPLOAD_AUTH=False)
+        service = DemoRetentionService(config=config)
+
+        self.assertEqual(asyncio.run(service.cleanup_once()), 0)
+
+    def test_retention_excludes_the_configured_public_sample(self):
+        config = Settings(
+            _env_file=None,
+            REQUIRE_UPLOAD_AUTH=True,
+            DEMO_ACCESS_TOKEN="a-strong-demo-secret-value-123456",
+            PUBLIC_SAMPLE_COURSE_ID="SAMPLE",
+            DEMO_UPLOAD_RETENTION_DAYS=3,
+        )
+        sample_course = SimpleNamespace(id="sample-course")
+        course_service = SimpleNamespace(
+            resolve=AsyncMock(return_value=sample_course),
+        )
+        upload_service = SimpleNamespace(
+            list_expired_upload_ids=AsyncMock(return_value=[]),
+        )
+        session = SimpleNamespace()
+
+        class SessionContext:
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        service = DemoRetentionService(
+            config=config,
+            course_service=course_service,
+            upload_service=upload_service,
+        )
+        now = datetime(2026, 8, 29, tzinfo=timezone.utc)
+
+        with patch(
+            "app.services.demo_retention_service.AsyncSessionLocal",
+            return_value=SessionContext(),
+        ):
+            deleted = asyncio.run(service.cleanup_once(now=now))
+
+        self.assertEqual(deleted, 0)
+        course_service.resolve.assert_awaited_once_with(session, "SAMPLE", required=False)
+        self.assertEqual(
+            upload_service.list_expired_upload_ids.await_args.kwargs,
+            {
+                "created_before": now - timedelta(days=3),
+                "excluded_course_uuid": "sample-course",
+            },
+        )
+
+    def test_expired_upload_cleanup_removes_every_backing_store(self):
+        config = Settings(
+            _env_file=None,
+            REQUIRE_UPLOAD_AUTH=True,
+            DEMO_ACCESS_TOKEN="a-strong-demo-secret-value-123456",
+        )
+        record = SimpleNamespace(
+            upload_id="expired-upload",
+            course_uuid="course-1",
+            course_id="COURSE",
+            storage_key="courses/course-1/documents/hash.pdf",
+        )
+        upload_service = SimpleNamespace(
+            lock_for_deletion=AsyncMock(return_value=record),
+            storage_key_is_shared=AsyncMock(return_value=False),
+            delete_document=AsyncMock(return_value=record),
+        )
+        storage = SimpleNamespace(delete=Mock())
+        session = SimpleNamespace(rollback=AsyncMock())
+        service = DemoRetentionService(
+            config=config,
+            upload_service=upload_service,
+            storage=storage,
+        )
+        service.ingestion_service = SimpleNamespace(cleanup_upload=AsyncMock())
+
+        deleted = asyncio.run(service._delete_upload(session, record.upload_id))
+
+        self.assertTrue(deleted)
+        service.ingestion_service.cleanup_upload.assert_awaited_once_with(
+            "expired-upload",
+            "course-1",
+        )
+        storage.delete.assert_called_once_with(record.storage_key)
+        upload_service.delete_document.assert_awaited_once_with(
+            session,
+            "expired-upload",
+        )
+
 class ProcessingFencingTests(unittest.TestCase):
     def test_stale_or_failed_attempt_cannot_advance_stage(self):
         service = UploadService()
@@ -1187,6 +1772,38 @@ class ProcessingFencingTests(unittest.TestCase):
             )
 
         session.commit.assert_not_awaited()
+
+    def test_ready_transition_persists_validated_graph_status(self):
+        service = UploadService()
+        record = SimpleNamespace(
+            status="active",
+            stage=ProcessingStage.GRAPH_BUILT.value,
+            course_uuid="course-1",
+            storage_key="courses/course-1/documents/hash.pdf",
+        )
+        attempt = SimpleNamespace()
+        service._get_current_upload = AsyncMock(return_value=record)
+        service._current_attempt = AsyncMock(return_value=attempt)
+        session = SimpleNamespace(commit=AsyncMock())
+
+        updated = asyncio.run(
+            service.mark_completed(
+                session,
+                "upload-1",
+                "task-1",
+                {
+                    "chunks_indexed": 4,
+                    "nodes_upserted": 0,
+                    "relationships_upserted": 0,
+                    "graph_status": GraphStatus.READY_WITHOUT_GRAPH.value,
+                },
+            )
+        )
+
+        self.assertTrue(updated)
+        self.assertEqual(record.graph_status, GraphStatus.READY_WITHOUT_GRAPH.value)
+        self.assertEqual(record.status, "ready")
+        session.commit.assert_awaited_once()
 
 
 class ReadyContextTests(unittest.TestCase):
@@ -1444,6 +2061,7 @@ class DocumentProcessingServiceTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["graph_status"], GraphStatus.GRAPH_PARTIAL.value)
         stages = [call.args[3] for call in upload_service.set_stage.await_args_list]
         self.assertEqual(
             stages,
@@ -1465,6 +2083,8 @@ class DocumentProcessingServiceTests(unittest.TestCase):
         graph_call = ingestion_service.store_graph_extraction.await_args
         self.assertEqual(graph_call.kwargs["execution_token"], "task-1")
         upload_service.mark_completed.assert_awaited_once()
+        completed_result = upload_service.mark_completed.await_args.args[3]
+        self.assertEqual(completed_result["graph_status"], GraphStatus.GRAPH_PARTIAL.value)
 
     def test_processing_failure_cleans_partial_outputs_and_marks_failed(self):
         service, upload_service, ingestion_service, _ = self._service_fixture()

@@ -1,0 +1,112 @@
+{
+  "name": "CYBER course retrieval baseline",
+  "course_id": "CYBER",
+  "annotation_note": "Expected pages were manually checked against the indexed text of the portfolio's READY CYBER PDF on 2026-08-29.",
+  "questions": [
+    {
+      "question": "What is Cybercrime-as-a-Service, and why does it lower the barrier to cybercrime?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 2,
+      "expected_concepts": ["cybercrime-as-a-service", "hacking tools"],
+      "should_refuse": false
+    },
+    {
+      "question": "How does generative AI make scam emails harder to identify?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 2,
+      "expected_concepts": ["generative AI", "phishing"],
+      "should_refuse": false
+    },
+    {
+      "question": "Why can tech-savvy students still fall for simple online scams?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 3,
+      "expected_concepts": ["human psychology", "heuristic processing"],
+      "should_refuse": false
+    },
+    {
+      "question": "How do urgency and cognitive overload help fraudsters manipulate victims?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 3,
+      "expected_concepts": ["manufactured urgency", "cognitive overload"],
+      "should_refuse": false
+    },
+    {
+      "question": "How does the fake internship registration-fee scam target students?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 3,
+      "expected_concepts": ["fake internship", "registration fee"],
+      "should_refuse": false
+    },
+    {
+      "question": "How does the counterfeit-check fake employer scam work?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 4,
+      "expected_concepts": ["counterfeit check", "fake employer"],
+      "should_refuse": false
+    },
+    {
+      "question": "What is quishing, and what is the golden rule when receiving money by QR code?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 4,
+      "expected_concepts": ["quishing", "QR code"],
+      "should_refuse": false
+    },
+    {
+      "question": "How can malicious QR codes placed over legitimate ones steal information?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 4,
+      "expected_concepts": ["malicious QR code", "fake banking website"],
+      "should_refuse": false
+    },
+    {
+      "question": "What is online sextortion and how can deepfake AI be involved?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 4,
+      "expected_concepts": ["sextortion", "deepfake AI"],
+      "should_refuse": false
+    },
+    {
+      "question": "What are the four core cyber-hygiene habits recommended in the course?",
+      "expected_document": "ASSIGNMENT-1_APOORVPAL_24-SE-034.pdf",
+      "expected_page": 5,
+      "expected_concepts": ["strong passwords", "multi-factor authentication", "software updates", "phishing"],
+      "should_refuse": false
+    },
+    {
+      "question": "What is the chemical formula for photosynthesis?",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_concepts": [],
+      "should_refuse": true
+    },
+    {
+      "question": "Who led France during the Battle of Waterloo?",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_concepts": [],
+      "should_refuse": true
+    },
+    {
+      "question": "Explain Newton's second law with a numerical example.",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_concepts": [],
+      "should_refuse": true
+    },
+    {
+      "question": "How does DNA replication work?",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_concepts": [],
+      "should_refuse": true
+    },
+    {
+      "question": "What monetary policy should a central bank use to reduce inflation?",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_concepts": [],
+      "should_refuse": true
+    }
+  ]
+}

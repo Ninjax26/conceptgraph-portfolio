@@ -84,15 +84,26 @@ async def initialize_database_schema() -> None:
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS processed_chunk_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_node_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_edge_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_status VARCHAR(32)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_course_uuid ON document_uploads (course_uuid)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_content_hash ON document_uploads (content_hash)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_stage ON document_uploads (stage)",
+            "CREATE INDEX IF NOT EXISTS ix_document_uploads_graph_status ON document_uploads (graph_status)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_lease_expires_at ON document_uploads (lease_expires_at)",
             "ALTER TABLE processing_attempts ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ",
         ]
         for statement in migrations:
             await conn.execute(text(statement))
         await _migrate_legacy_uploads(conn)
+        await conn.execute(
+            text(
+                "UPDATE document_uploads SET graph_status = CASE "
+                "WHEN graph_node_count <= 0 THEN 'READY_WITHOUT_GRAPH' "
+                "WHEN graph_edge_count <= 0 THEN 'GRAPH_PARTIAL' "
+                "ELSE 'GRAPH_READY' END "
+                "WHERE stage = 'READY' AND graph_status IS NULL"
+            )
+        )
 
 
 async def _migrate_legacy_uploads(conn) -> None:

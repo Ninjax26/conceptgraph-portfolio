@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Any
 
 from groq import Groq
@@ -8,6 +9,8 @@ from app.core.exceptions import LLMConfigurationError
 
 
 class SynthesisService:
+    MAX_GRAPH_CONTEXT_CHARS = 6_000
+
     def validate_provider_configured(self) -> None:
         provider = settings.llm_provider.lower()
         if provider == "groq" and not settings.groq_api_key:
@@ -103,8 +106,14 @@ class SynthesisService:
             f"{source['supporting_passage']}"
             for index, source in enumerate(sources, start=1)
         )
+        compact_graph_context = json.dumps(
+            graph_context,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            default=str,
+        )[: SynthesisService.MAX_GRAPH_CONTEXT_CHARS]
         return (
             f"Question:\n{question}\n\n"
-            f"Graph context:\n{graph_context}\n\n"
+            f"Graph context (bounded):\n{compact_graph_context}\n\n"
             f"Course sources:\n{source_context}"
         )

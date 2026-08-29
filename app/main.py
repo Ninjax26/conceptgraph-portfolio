@@ -9,6 +9,7 @@ from app.api.endpoints.auth import router as auth_router
 from app.api.endpoints.exam import router as exam_router
 from app.api.endpoints.ingest import router as ingest_router
 from app.api.endpoints.query import router as query_router
+from app.api.endpoints.public_demo import router as public_demo_router
 from app.core.database import close_database_connections, initialize_database_schema
 from app.core.database import neo4j_driver, postgres_engine, qdrant_client
 from app.core.config import settings
@@ -16,6 +17,7 @@ from app.core.processing_coordinator import processing_coordinator
 from app.core.security import DemoProtectionMiddleware
 from app.services.security_service import rate_limit_service
 from app.services.document_processing_service import document_processing_service
+from app.services.demo_retention_service import demo_retention_service
 from app.services.storage_service import storage_service
 from sqlalchemy import text
 
@@ -29,9 +31,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         document_processing_service.ingestion_service.validate_qdrant_collection
     )
     await processing_coordinator.start()
+    await demo_retention_service.start()
     try:
         yield
     finally:
+        await demo_retention_service.stop()
         await processing_coordinator.stop()
         await rate_limit_service.close()
         await close_database_connections()
@@ -58,6 +62,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(query_router)
+app.include_router(public_demo_router)
 app.include_router(exam_router)
 app.include_router(ingest_router)
 

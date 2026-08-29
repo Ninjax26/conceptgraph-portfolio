@@ -36,20 +36,31 @@ class DemoAccessService:
         return f"{timestamp}.{self._sign(timestamp)}"
 
     def verify_cookie(self, cookie_value: str | None, *, now: int | None = None) -> bool:
+        return self.session_expires_in(cookie_value, now=now) is not None
+
+    def session_expires_in(
+        self,
+        cookie_value: str | None,
+        *,
+        now: int | None = None,
+    ) -> int | None:
         if not cookie_value or not self.enabled:
-            return False
+            return None
         try:
             timestamp, signature = cookie_value.split(".", maxsplit=1)
             issued_at = int(timestamp)
         except (TypeError, ValueError):
-            return False
+            return None
 
         current_time = now if now is not None else int(time.time())
         if issued_at > current_time + 30:
-            return False
-        if current_time - issued_at > self.config.auth_session_ttl_seconds:
-            return False
-        return hmac.compare_digest(signature, self._sign(timestamp))
+            return None
+        age = current_time - issued_at
+        if age > self.config.auth_session_ttl_seconds:
+            return None
+        if not hmac.compare_digest(signature, self._sign(timestamp)):
+            return None
+        return max(0, self.config.auth_session_ttl_seconds - age)
 
     @staticmethod
     def fingerprint(credential: str) -> str:

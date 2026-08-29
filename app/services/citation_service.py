@@ -48,7 +48,7 @@ def assess_evidence(
     }
 
 
-def build_sources(chunks: list[dict[str, Any]], limit: int = 4) -> list[dict[str, Any]]:
+def build_sources(chunks: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]]:
     sources: list[dict[str, Any]] = []
     seen: set[tuple[str, int | None, str]] = set()
     for chunk in chunks:
@@ -60,6 +60,7 @@ def build_sources(chunks: list[dict[str, Any]], limit: int = 4) -> list[dict[str
         if not passage or key in seen:
             continue
         seen.add(key)
+        page_suffix = f"#page={page}" if page is not None else ""
         sources.append(
             {
                 "source_id": f"source-{len(sources) + 1}",
@@ -69,6 +70,11 @@ def build_sources(chunks: list[dict[str, Any]], limit: int = 4) -> list[dict[str
                 "section_heading": str(metadata.get("section_heading") or "") or None,
                 "supporting_passage": passage[:900],
                 "source_type": "pdf",
+                "preview_url": (
+                    f"/ingest/uploads/{document_id}/preview{page_suffix}"
+                    if document_id
+                    else None
+                ),
                 "metadata": {
                     "retrieval_score": chunk.get("rerank_score", chunk.get("score")),
                     "evidence_score": chunk.get("evidence_score"),

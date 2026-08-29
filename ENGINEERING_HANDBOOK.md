@@ -26,6 +26,7 @@ The production requirements use hosted embeddings/reranking so the API process d
 - current durable stage and safe failure classification;
 - lease owner, expiration, and last heartbeat;
 - source object key and derived-store counts;
+- validated graph quality status (`GRAPH_READY`, `GRAPH_PARTIAL`, or `READY_WITHOUT_GRAPH`);
 - completion and update timestamps.
 
 `processing_attempts` is append-only audit history for each execution. A recovered execution receives a new row and task token rather than mutating history to look successful.
@@ -92,9 +93,18 @@ At least one page and one chunk are mandatory. Every chunk must be accepted by t
 - non-empty canonical course UUID;
 - non-empty source storage key;
 - positive committed chunk count;
+- one validated graph quality status, including an explicit no-graph outcome;
 - source object still exists.
 
 `mark_completed` enforces these rules again at the persistence boundary.
+
+## Graph quality and provenance
+
+Graph extraction remains one bounded LLM request rather than a multi-agent workflow. The request samples the beginning, middle, and end of every detected PDF section and supplies stable source chunk IDs. Provider output is schema-validated, limited to six relationship types, checked for valid endpoints, deduplicated using lowercase whitespace-free concept names, and rejected at node level when it cites an unknown source chunk.
+
+Quality is reported separately from document readiness. Two or more concepts with at least one valid relationship are `GRAPH_READY`; a non-empty graph below that threshold is `GRAPH_PARTIAL`; zero retained concepts is `READY_WITHOUT_GRAPH`. All three documents remain vector-searchable, so an empty graph is visible without falsely turning successful PDF indexing into a processing failure.
+
+Each retained Neo4j concept stores upload ID, PDF filename, source chunk ID, page number, and detected section heading. Graph retrieval returns those properties to the dashboard, where a selected concept can open the original PDF at its source page.
 
 ## Idempotency and compensation
 
@@ -137,9 +147,15 @@ Reranking returns a provider-neutral logit. Cohere probabilities are converted t
 
 This is a shared-secret portfolio demo, not multi-user authentication. Public deployments require an access token of at least 24 characters. Login compares secrets in constant time and issues a signed, expiring, HttpOnly cookie. Secure cookies and exact CORS origins are required in production.
 
+The frontend does not trust the login response alone. It performs a separate session-status request and unlocks protected controls only when the API validates the signed cookie. The reviewer code exists only in deployment secrets and is never compiled into the SPA or published in documentation.
+
+Unauthenticated visitors receive one configured, pre-uploaded READY course through a dedicated read-only endpoint. That endpoint returns the bounded concept graph and permits PDF previews only for documents already belonging to that course; it cannot invoke LLM, upload, query, exam, retry, or deletion operations. Public sample reads have their own IP-fingerprinted process-local rate limit.
+
 Standard, expensive, and login routes have separate fixed-window budgets. Limits live in one process and reset during restart, matching the single-instance deployment boundary. Horizontal scaling requires an external shared limiter before it is safe.
 
 PDF buckets must be private. API credentials should be scoped to the single bucket and provider resources. No provider secret is exposed through Vite variables, API responses, logs, or committed examples.
+
+When demo protection is enabled, a background retention sweep removes READY and FAILED reviewer uploads older than the configured number of days. The configured sample course is explicitly excluded. Cleanup uses the same provenance-scoped deletion path as manual removal: derived Qdrant and Neo4j data first, an unshared source object next, and PostgreSQL metadata last. Active processing rows are never eligible.
 
 ## Operational endpoints
 

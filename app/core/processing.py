@@ -16,6 +16,22 @@ class ProcessingStage(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class GraphStatus(StrEnum):
+    GRAPH_READY = "GRAPH_READY"
+    GRAPH_PARTIAL = "GRAPH_PARTIAL"
+    READY_WITHOUT_GRAPH = "READY_WITHOUT_GRAPH"
+
+
+def assess_graph_status(node_count: int, relationship_count: int) -> GraphStatus:
+    """Classify usable vector-ready documents without overstating graph quality."""
+
+    if node_count <= 0:
+        return GraphStatus.READY_WITHOUT_GRAPH
+    if node_count < 2 or relationship_count <= 0:
+        return GraphStatus.GRAPH_PARTIAL
+    return GraphStatus.GRAPH_READY
+
+
 class FailureCategory(StrEnum):
     DOCUMENT_ERROR = "DOCUMENT_ERROR"
     CONFIGURATION_ERROR = "CONFIGURATION_ERROR"

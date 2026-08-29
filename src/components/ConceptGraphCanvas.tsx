@@ -5,7 +5,7 @@ import cytoscape, {
   type NodeSingular,
   type EdgeSingular,
 } from "cytoscape";
-import { Maximize2, X } from "lucide-react";
+import { ExternalLink, Maximize2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export interface GraphCanvasNode {
@@ -13,6 +13,10 @@ export interface GraphCanvasNode {
   label: string;
   type?: string;
   description?: string;
+  documentName?: string;
+  pageNumber?: number | null;
+  sectionHeading?: string;
+  uploadId?: string;
 }
 
 export interface GraphCanvasEdge {
@@ -25,11 +29,13 @@ export interface GraphCanvasEdge {
 interface ConceptGraphCanvasProps {
   nodes: GraphCanvasNode[];
   edges: GraphCanvasEdge[];
+  onOpenSource?: (node: GraphCanvasNode) => void;
 }
 
 export default function ConceptGraphCanvas({
   nodes,
   edges,
+  onOpenSource,
 }: ConceptGraphCanvasProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
@@ -126,8 +132,22 @@ export default function ConceptGraphCanvas({
       setSelectedNode({
         id: selected.id(),
         label: String(selected.data("label")),
-        type: String(selected.data("type")),
-        description: String(selected.data("description")),
+        type: selected.data("type") ? String(selected.data("type")) : undefined,
+        description: selected.data("description")
+          ? String(selected.data("description"))
+          : undefined,
+        documentName: selected.data("documentName")
+          ? String(selected.data("documentName"))
+          : undefined,
+        pageNumber: typeof selected.data("pageNumber") === "number"
+          ? Number(selected.data("pageNumber"))
+          : null,
+        sectionHeading: selected.data("sectionHeading")
+          ? String(selected.data("sectionHeading"))
+          : undefined,
+        uploadId: selected.data("uploadId")
+          ? String(selected.data("uploadId"))
+          : undefined,
       });
 
       // Reset and dim everything first
@@ -224,6 +244,10 @@ export default function ConceptGraphCanvas({
           label: node.label,
           type: node.type ?? "concept",
           description: node.description ?? "",
+          documentName: node.documentName ?? "",
+          pageNumber: node.pageNumber ?? null,
+          sectionHeading: node.sectionHeading ?? "",
+          uploadId: node.uploadId ?? "",
         },
       })),
       ...edges.map((edge) => ({
@@ -285,6 +309,25 @@ export default function ConceptGraphCanvas({
             </button>
           </div>
           <p className="mt-2 text-xs leading-5 text-slate-600">{selectedNode.description || "No description was extracted for this concept."}</p>
+          <div className="mt-3 rounded-md bg-slate-50 p-2.5 text-xs text-slate-600">
+            <p className="font-semibold text-slate-700">
+              {selectedNode.documentName || "Source PDF unavailable"}
+            </p>
+            <p className="mt-1">
+              {selectedNode.pageNumber ? `Page ${selectedNode.pageNumber}` : "Page unavailable"}
+              {selectedNode.sectionHeading ? ` · ${selectedNode.sectionHeading}` : ""}
+            </p>
+          </div>
+          {selectedNode.uploadId && onOpenSource ? (
+            <button
+              className="mt-3 inline-flex items-center gap-2 rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-800"
+              onClick={() => onOpenSource(selectedNode)}
+              type="button"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open source page
+            </button>
+          ) : null}
         </aside>
       ) : null}
     </div>

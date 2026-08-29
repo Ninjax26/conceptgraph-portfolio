@@ -169,6 +169,7 @@ async def get_upload_status(
         processed_chunk_count=record.processed_chunk_count,
         graph_node_count=record.graph_node_count,
         graph_edge_count=record.graph_edge_count,
+        graph_status=record.graph_status,
         error_message=record.error_message,
         result_json=record.result_json,
         created_at=record.created_at,
@@ -210,6 +211,7 @@ async def list_uploads(
             processed_chunk_count=record.processed_chunk_count,
             graph_node_count=record.graph_node_count,
             graph_edge_count=record.graph_edge_count,
+            graph_status=record.graph_status,
             error_message=record.error_message,
             result_json=record.result_json,
             created_at=record.created_at,
@@ -238,6 +240,7 @@ async def list_courses(
             processed_chunk_count=summary.processed_chunk_count,
             graph_node_count=summary.graph_node_count,
             graph_edge_count=summary.graph_edge_count,
+            graph_status=summary.graph_status,
             last_updated_at=summary.last_updated_at,
             historical_records=summary.historical_records,
             duplicate_records=summary.duplicate_records,
@@ -319,7 +322,7 @@ async def preview_upload(
     except ObjectStorageError as exc:
         raise HTTPException(status_code=503, detail="Document storage is temporarily unavailable.") from exc
 
-    return _pdf_response(content, record.original_filename, range_header)
+    return build_pdf_response(content, record.original_filename, range_header)
 
 
 @router.delete("/uploads/{upload_id}", status_code=204)
@@ -373,7 +376,7 @@ async def remove_upload(
         raise HTTPException(status_code=409, detail="The document state changed before removal.")
 
 
-def _pdf_response(content: bytes, filename: str, range_header: str | None) -> Response:
+def build_pdf_response(content: bytes, filename: str, range_header: str | None) -> Response:
     total = len(content)
     headers = {
         "Accept-Ranges": "bytes",
@@ -418,6 +421,9 @@ def _pdf_response(content: bytes, filename: str, range_header: str | None) -> Re
         media_type="application/pdf",
         headers=headers,
     )
+
+
+_pdf_response = build_pdf_response
 
 
 def _ingest_response(record, *, message: str, duplicate: bool) -> IngestResponse:

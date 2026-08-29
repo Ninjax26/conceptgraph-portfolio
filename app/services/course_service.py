@@ -5,7 +5,7 @@ from uuid import NAMESPACE_URL, uuid5
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.processing import ProcessingStage, normalize_course_name
+from app.core.processing import GraphStatus, ProcessingStage, assess_graph_status, normalize_course_name
 from app.models.document_upload import Course, DocumentUpload
 
 
@@ -32,6 +32,10 @@ class ReadyCourseContext:
         aliases.update(document.course_id for document in self.documents)
         return sorted(aliases)
 
+    @property
+    def graph_status(self) -> str:
+        return _aggregate_graph_status(self.documents)
+
 
 @dataclass(frozen=True, slots=True)
 class CourseSummary:
@@ -43,6 +47,7 @@ class CourseSummary:
     processed_chunk_count: int
     graph_node_count: int
     graph_edge_count: int
+    graph_status: str | None
     last_updated_at: datetime | None
     historical_records: int
     duplicate_records: int
@@ -89,6 +94,11 @@ class CourseService:
                     ),
                     graph_edge_count=sum(
                         document.graph_edge_count for document in ready_documents
+                    ),
+                    graph_status=(
+                        _aggregate_graph_status(tuple(ready_documents))
+                        if ready_documents
+                        else None
                     ),
                     last_updated_at=max((document.updated_at for document in records), default=None),
                     historical_records=len(records),
@@ -156,3 +166,22 @@ class CourseService:
                 "This course has no ready documents. Finish processing a PDF before continuing."
             )
         return ReadyCourseContext(course=course, documents=documents)
+
+
+def _document_graph_status(document: DocumentUpload) -> str:
+    stored_status = getattr(document, "graph_status", None)
+    if stored_status in {status.value for status in GraphStatus}:
+        return stored_status
+    return assess_graph_status(
+        int(getattr(document, "graph_node_count", 0)),
+        int(getattr(document, "graph_edge_count", 0)),
+    ).value
+
+
+def _aggregate_graph_status(documents: tuple[DocumentUpload, ...]) -> str:
+    statuses = {_document_graph_status(document) for document in documents}
+    if statuses == {GraphStatus.GRAPH_READY.value}:
+        return GraphStatus.GRAPH_READY.value
+    if statuses == {GraphStatus.READY_WITHOUT_GRAPH.value}:
+        return GraphStatus.READY_WITHOUT_GRAPH.value
+    return GraphStatus.GRAPH_PARTIAL.value

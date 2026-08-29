@@ -21,7 +21,11 @@ from qdrant_client.models import (
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
 from app.core.exceptions import LLMConfigurationError
-from app.schemas.extraction import GraphExtractionResponse
+from app.schemas.extraction import (
+    ALLOWED_RELATIONSHIP_TYPES,
+    ConceptNode,
+    GraphExtractionResponse,
+)
 from app.services.parser_service import DocumentChunk
 
 
@@ -93,18 +97,13 @@ class IngestionService:
         if not chunks:
             return GraphExtractionResponse()
 
-        # One representative request avoids rate-limit failures from making an
-        # LLM call for every vector chunk. All chunks are still indexed for search.
-        sample_count = min(8, len(chunks))
-        sample_indexes = {
-            round(index * (len(chunks) - 1) / max(sample_count - 1, 1))
-            for index in range(sample_count)
-        }
+        sampled_chunks = self._sample_graph_chunks(chunks)
         context = "\n\n".join(
-            f"[Document excerpt {index + 1}]\n{chunks[index].text[:700]}"
-            for index in sorted(sample_indexes)
+            self._format_graph_excerpt(chunk)
+            for chunk in sampled_chunks
         )
-        return await self.extract_graph_from_text(context)
+        extraction = await self.extract_graph_from_text(context)
+        return self._attach_provenance(extraction, sampled_chunks)
 
     async def extract_graph_from_text(self, text: str) -> GraphExtractionResponse:
         provider = settings.llm_provider.lower()
@@ -140,13 +139,17 @@ class IngestionService:
                     """
                     MERGE (c:Concept {id: $id})
                     SET c.name = $name,
+                        c.normalized_name = $normalized_name,
                         c.type = $type,
                         c.description = $description,
                         c.source_id = $source_id,
+                        c.source_chunk_id = $source_chunk_id,
                         c.course_id = $course_id,
                         c.upload_id = $upload_id,
                         c.execution_token = $execution_token,
-                        c.document_name = $document_name
+                        c.document_name = $document_name,
+                        c.page_number = $page_number,
+                        c.section_heading = $section_heading
                     WITH c
                     MATCH (course:Course {id: $course_id})
                     MERGE (course)-[:CONTAINS]->(c)
@@ -154,12 +157,16 @@ class IngestionService:
                     id=self._scoped_concept_id(course_id, upload_id, node.id),
                     source_id=node.id,
                     name=node.name,
+                    normalized_name=node.normalized_name,
                     type=node.type,
                     description=node.description,
+                    source_chunk_id=node.source_chunk_id,
                     course_id=course_id,
-                    upload_id=upload_id,
+                    upload_id=node.upload_id or upload_id,
                     execution_token=execution_token,
-                    document_name=document_name,
+                    document_name=node.document_name or document_name,
+                    page_number=node.page_number,
+                    section_heading=node.section_heading,
                 )
 
             for relationship in extraction.relationships:
@@ -364,10 +371,10 @@ class IngestionService:
     def _graph_extraction_contexts(text: str) -> tuple[str, ...]:
         contexts: list[str] = []
         excerpts = [excerpt.strip() for excerpt in text.split("\n\n") if excerpt.strip()]
-        for limit in (1800, 1200, 800):
-            per_excerpt = max(80, limit // max(1, len(excerpts)))
+        for limit in (16000, 8000, 4000):
+            per_excerpt = max(160, limit // max(1, len(excerpts)))
             shortened = "\n\n".join(
-                excerpt[:per_excerpt].rsplit(" ", 1)[0].strip()
+                IngestionService._truncate_excerpt(excerpt, per_excerpt)
                 for excerpt in excerpts
             ).strip()
             if shortened and (not contexts or shortened != contexts[-1]):
@@ -406,12 +413,14 @@ class IngestionService:
 
     @staticmethod
     def _extraction_system_prompt() -> str:
+        relationship_types = ", ".join(sorted(ALLOWED_RELATIONSHIP_TYPES))
         return (
-            "Extract academic concepts and prerequisite relationships from the text. "
+            "Extract academic concepts and relationships from the supplied source excerpts. "
             "Return only the requested structured response. Use stable lowercase snake_case "
-            "ids for nodes. Use uppercase snake_case relationship types such as "
-            "PREREQUISITE_OF, PART_OF, EXPLAINS, or RELATED_TO. Every relationship "
-            "endpoint must reference an extracted node."
+            "ids for nodes. Every concept must cite exactly one supplied Source chunk ID in "
+            "source_chunk_id; never invent a source ID. Every relationship endpoint must "
+            "reference an extracted node. The only permitted relationship types are: "
+            f"{relationship_types}."
         )
 
     @staticmethod
@@ -425,8 +434,9 @@ class IngestionService:
                 "name": {"type": "string"},
                 "type": {"type": "string"},
                 "description": {"type": "string"},
+                "source_chunk_id": {"type": "string"},
             },
-            "required": ["id", "name", "type", "description"],
+            "required": ["id", "name", "type", "description", "source_chunk_id"],
             "additionalProperties": False,
         }
         relationship = {
@@ -434,7 +444,10 @@ class IngestionService:
             "properties": {
                 "source_node_id": {"type": "string"},
                 "target_node_id": {"type": "string"},
-                "relation_type": {"type": "string"},
+                "relation_type": {
+                    "type": "string",
+                    "enum": sorted(ALLOWED_RELATIONSHIP_TYPES),
+                },
             },
             "required": ["source_node_id", "target_node_id", "relation_type"],
             "additionalProperties": False,
@@ -468,11 +481,91 @@ class IngestionService:
     @staticmethod
     def _safe_relationship_type(relation_type: str) -> str:
         normalized = re.sub(r"[^A-Za-z0-9_]", "_", relation_type.upper()).strip("_")
-        if not normalized:
-            return "RELATED_TO"
-        if normalized[0].isdigit():
-            return f"RELATED_{normalized}"
+        if normalized not in ALLOWED_RELATIONSHIP_TYPES:
+            raise ValueError(f"Unsupported graph relationship type: {relation_type}")
         return normalized
+
+    @staticmethod
+    def _sample_graph_chunks(chunks: Sequence[DocumentChunk]) -> list[DocumentChunk]:
+        """Cover each section, always including its beginning, middle, and end."""
+
+        sections: dict[tuple[str, str], list[DocumentChunk]] = {}
+        for chunk in chunks:
+            heading = str(chunk.metadata.get("section_heading") or "").strip()
+            page = str(chunk.metadata.get("page_number") or "unknown")
+            section_key = heading.casefold() if heading else f"page:{page}"
+            document = str(chunk.metadata.get("document_name") or "")
+            sections.setdefault((document, section_key), []).append(chunk)
+
+        sampled: list[DocumentChunk] = []
+        for section_chunks in sections.values():
+            sample_count = min(9, len(section_chunks))
+            positions = sorted(
+                {
+                    round(index * (len(section_chunks) - 1) / max(sample_count - 1, 1))
+                    for index in range(sample_count)
+                }
+            )
+            sampled.extend(section_chunks[position] for position in positions)
+        return sampled
+
+    @staticmethod
+    def _format_graph_excerpt(chunk: DocumentChunk) -> str:
+        metadata = chunk.metadata
+        return (
+            f"[Source chunk ID: {chunk.id} | "
+            f"PDF: {metadata.get('document_name') or 'unknown'} | "
+            f"Page: {metadata.get('page_number') or 'unknown'} | "
+            f"Section: {metadata.get('section_heading') or 'Unlabelled'}]\n"
+            f"{chunk.text}"
+        )
+
+    @staticmethod
+    def _truncate_excerpt(excerpt: str, limit: int) -> str:
+        if len(excerpt) <= limit:
+            return excerpt
+        header, separator, body = excerpt.partition("\n")
+        if not separator or len(header) >= limit:
+            return header
+        body_limit = limit - len(header) - len(separator)
+        shortened_body = body[:body_limit]
+        shortened_body = shortened_body.rsplit(" ", 1)[0].strip() or shortened_body.strip()
+        return f"{header}\n{shortened_body}" if shortened_body else header
+
+    @staticmethod
+    def _attach_provenance(
+        extraction: GraphExtractionResponse,
+        sampled_chunks: Sequence[DocumentChunk],
+    ) -> GraphExtractionResponse:
+        chunks_by_id = {chunk.id: chunk for chunk in sampled_chunks}
+        nodes: list[ConceptNode] = []
+        for node in extraction.nodes:
+            source = chunks_by_id.get(node.source_chunk_id)
+            if source is None:
+                continue
+            metadata = source.metadata
+            page_number = metadata.get("page_number")
+            nodes.append(
+                node.model_copy(
+                    update={
+                        "document_name": str(metadata.get("document_name") or ""),
+                        "page_number": page_number if isinstance(page_number, int) else None,
+                        "section_heading": str(
+                            metadata.get("section_heading") or "Unlabelled section"
+                        ),
+                        "upload_id": str(metadata.get("upload_id") or ""),
+                    }
+                )
+            )
+
+        retained_ids = {node.id for node in nodes}
+        relationships = [
+            relationship
+            for relationship in extraction.relationships
+            if relationship.source_node_id in retained_ids
+            and relationship.target_node_id in retained_ids
+        ]
+        return GraphExtractionResponse(nodes=nodes, relationships=relationships)
 
     @staticmethod
     def _qdrant_point_id(chunk_id: str) -> str:

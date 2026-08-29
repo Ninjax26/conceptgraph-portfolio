@@ -98,6 +98,48 @@ class RetrievalService:
                 session, context.graph_course_ids, context.document_ids
             )
 
+        return self._build_graph_result(
+            records,
+            totals,
+            cypher=cypher,
+            graph_status=context.graph_status,
+            filter_reason="query_subgraph",
+        )
+
+    async def fetch_course_graph(
+        self,
+        context: ReadyCourseContext,
+    ) -> GraphRetrievalResult:
+        """Return a bounded, read-only graph for the configured public sample."""
+
+        async with self.graph_driver.session() as session:
+            records = await self._fetch_course_graph(
+                session,
+                context.graph_course_ids,
+                context.document_ids,
+            )
+            totals = await self._fetch_graph_totals(
+                session,
+                context.graph_course_ids,
+                context.document_ids,
+            )
+        return self._build_graph_result(
+            records,
+            totals,
+            cypher="public_sample_course_graph",
+            graph_status=context.graph_status,
+            filter_reason="public_sample",
+        )
+
+    def _build_graph_result(
+        self,
+        records: list[Any],
+        totals: dict[str, int],
+        *,
+        cypher: str,
+        graph_status: str,
+        filter_reason: str,
+    ) -> GraphRetrievalResult:
         concepts: list[dict[str, Any]] = []
         prerequisite_names: list[str] = []
         displayed_edge_ids: set[tuple[str, str, str]] = set()
@@ -161,7 +203,8 @@ class RetrievalService:
                     if node.get("id")
                 }),
                 "displayed_edges": len(displayed_edge_ids),
-                "filter_reason": "query_subgraph",
+                "filter_reason": filter_reason,
+                "graph_status": graph_status,
             },
         )
 

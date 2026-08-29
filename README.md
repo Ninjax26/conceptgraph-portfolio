@@ -43,7 +43,9 @@ UPLOADED -> EXTRACTING -> EXTRACTED -> CHUNKING -> CHUNKED
 -> EMBEDDING -> EMBEDDED -> BUILDING_GRAPH -> GRAPH_BUILT -> READY
 ```
 
-`READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, and the document has a positive chunk count. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
+`READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Empty graph output is reported as `READY_WITHOUT_GRAPH` instead of being presented as a successful graph. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
+
+Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page.
 
 Every worker-owned transition is fenced by both the current task token and lease owner. A stale task cannot advance or complete a newer attempt. The coordinator:
 
@@ -116,15 +118,20 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `S3_*` | Private R2 bucket endpoint and scoped credentials |
 | `GROQ_API_KEY` | Secret graph/synthesis provider key |
 | `ALLOWED_ORIGINS` | Exact deployed frontend origin; comma-separated if necessary |
-| `DEMO_ACCESS_TOKEN` | Random value of at least 24 characters |
+| `DEMO_ACCESS_TOKEN` | Secret reviewer code of at least 24 characters; configure it only in the hosting dashboard |
 | `REQUIRE_UPLOAD_AUTH` | `true` for public deployments |
+| `PUBLIC_SAMPLE_COURSE_ID` | Existing READY course exposed publicly as the read-only sample |
+| `DEMO_UPLOAD_RETENTION_DAYS` | Delete reviewer uploads after this many days; default `3` |
+| `DEMO_CLEANUP_INTERVAL_SECONDS` | Retention sweep interval; default `21600` (6 hours) |
 | `STRICT_STARTUP_VALIDATION` | `true` for public deployments |
 | `PROCESSING_CONCURRENCY` | `1` by default; bounded to `1..4` |
 | `PROCESSING_QUEUE_CAPACITY` | In-memory admission buffer; durable overflow remains in PostgreSQL |
 | `MAX_PDF_SIZE_MB` | Default `10` |
 | `MAX_PDFS_PER_INSTALLATION` | Default `50` |
 
-Generate the demo secret with `openssl rand -base64 32`. The dashboard exchanges it for a signed, short-lived HttpOnly cookie; it is not stored in frontend JavaScript. Rate limiting is intentionally process-local because this deployment runs one API instance. Counters reset on restart and must be replaced by shared infrastructure before scaling horizontally.
+Generate the reviewer code with `openssl rand -base64 32` and save the result directly in the host's secret environment settings. Never paste the actual code into this README, `.env.example`, a commit, or a Vite variable. After login, the dashboard exchanges it for a signed, short-lived HttpOnly cookie and verifies that cookie with the API before enabling protected actions. Rate limiting is intentionally process-local because this deployment runs one API instance. Counters reset on restart and must be replaced by shared infrastructure before scaling horizontally.
+
+The public route exposes only the configured READY sample course and its source-PDF previews. It cannot upload documents, run queries, or generate exams. Uploads made during authenticated reviewer sessions are automatically removed from PostgreSQL, Qdrant, Neo4j, and object storage after the retention window; the configured public sample course is excluded from cleanup. Retention runs only when `REQUIRE_UPLOAD_AUTH=true`.
 
 Never commit `.env`, database URLs, provider keys, bucket credentials, or access tokens. The included example contains placeholders and local-only MinIO credentials.
 
@@ -198,6 +205,39 @@ The verified production image is about 140 MiB (147,140,460 bytes). The local mo
 
 The queue is intentionally conservative: one processor, eight buffered jobs, 10 MiB PDFs, and 50 PDFs per installation. Increasing concurrency multiplies parse buffers and provider traffic and should be backed by a new load/memory test.
 
+## Small retrieval evaluation
+
+The repository includes a deliberately small, human-annotated baseline rather than a large evaluation framework. [`evaluation/questions.json`](evaluation/questions.json) contains 15 questions for the READY `CYBER` course: 10 answerable questions with manually checked PDF pages and concepts, plus 5 out-of-scope questions that should be refused.
+
+Measured on 30 August 2026 against the configured local pipeline and persistent portfolio stores:
+
+| Metric | Result |
+| --- | ---: |
+| Correct document in top 5 | 8/10 |
+| Correct source page in top 5 | 8/10 |
+| Answers with inline citations | 6/10 |
+| Unsupported questions refused | 5/5 |
+| Average query time | 7.58s |
+
+The complete per-question result is committed in [`evaluation/baseline-2026-08-30.json`](evaluation/baseline-2026-08-30.json). The latency includes a 25-second first-query model cold start; subsequent queries were faster. The baseline had zero request errors after graph context was bounded for the provider prompt. Two answerable questions were conservatively refused, and two otherwise grounded answers omitted an inline citation label. Those misses are kept visible instead of being edited out.
+
+Run the same direct evaluation against the stores and providers configured in `.env`:
+
+```bash
+python scripts/run_evaluation.py \
+  --direct \
+  --output evaluation/baseline-local.json
+```
+
+To measure the deployed HTTP path, set `EVAL_API_BASE_URL` and keep `DEMO_ACCESS_TOKEN` in the environment or uncommitted `.env`; the runner never accepts or prints the reviewer code as a command-line argument:
+
+```bash
+EVAL_API_BASE_URL=https://your-api.example/api/v1 \
+  python scripts/run_evaluation.py --output evaluation/baseline-hosted.json
+```
+
+This baseline measures only document/page retrieval in the top five citation sources, inline citation presence, evidence-based refusal, and end-to-end query latency. Expected concepts remain annotation notes and are not turned into a subjective answer-quality score.
+
 ## Verification
 
 ```bash
@@ -209,20 +249,22 @@ npm run build
 docker compose config -q
 ```
 
-Tests cover durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY gating, hosted inference payloads, hosted reranking, object storage, PDF byte ranges, auth cookies, rate limits, citations, graph integrity, and readiness-sensitive course behavior.
+Tests focus on system boundaries and failure behavior: durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY deletion, demo retention, empty graphs, relationship validation, provider timeouts/rate limits, scanned PDFs without text, READY gating, graph sampling and provenance, hosted inference/reranking, object storage, PDF byte ranges and citation links, verified auth sessions, public sample isolation, evidence refusal, and readiness-sensitive course behavior.
 
 ## API surface
 
 - `GET /api/v1/health` — PostgreSQL liveness
 - `GET /api/v1/ready` — PostgreSQL, Qdrant, Neo4j, object storage, and coordinator readiness
 - `POST|GET|DELETE /api/v1/auth/session`
+- `GET /api/v1/public/sample` — rate-limited read-only sample graph
+- `GET /api/v1/public/sample/uploads/{upload_id}/preview` — sample-only PDF preview
 - `POST /api/v1/ingest/upload`
 - `GET /api/v1/ingest/status/{task_id}`
 - `GET /api/v1/ingest/uploads`
 - `GET /api/v1/ingest/courses`
 - `POST /api/v1/ingest/uploads/{upload_id}/retry`
 - `GET /api/v1/ingest/uploads/{upload_id}/preview`
-- `DELETE /api/v1/ingest/uploads/{upload_id}` (failed documents only)
+- `DELETE /api/v1/ingest/uploads/{upload_id}` (READY or FAILED documents only)
 - `POST /api/v1/query`
 - `POST /api/v1/exam/generate`
 

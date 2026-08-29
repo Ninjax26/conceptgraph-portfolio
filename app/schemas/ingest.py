@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.processing import GraphStatus
+
 
 class IngestResponse(BaseModel):
     message: str
@@ -36,6 +38,7 @@ class UploadStatusResponse(BaseModel):
     processed_chunk_count: int = 0
     graph_node_count: int = 0
     graph_edge_count: int = 0
+    graph_status: GraphStatus | None = None
     error_message: str | None = None
     result_json: dict[str, Any] | None = None
     created_at: datetime
@@ -55,6 +58,7 @@ class CourseSummaryResponse(BaseModel):
     processed_chunk_count: int = 0
     graph_node_count: int = 0
     graph_edge_count: int = 0
+    graph_status: GraphStatus | None = None
     last_updated_at: datetime | None = None
     historical_records: int = 0
     duplicate_records: int = 0

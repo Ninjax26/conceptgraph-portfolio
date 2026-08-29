@@ -24,6 +24,7 @@ import {
   API_BASE_URL,
   CourseSummary,
   GraphContextItem,
+  GraphStatus,
   IngestResponse,
   QueryResponse,
   UploadStatusResponse,
@@ -255,6 +256,7 @@ export default function Dashboard(): JSX.Element {
         processed_chunk_count: 0,
         graph_node_count: 0,
         graph_edge_count: 0,
+        graph_status: null,
         error_message: null,
         result_json: null,
         created_at: now,
@@ -551,9 +553,10 @@ export default function Dashboard(): JSX.Element {
                       if (!uploadId) return;
                       const pageNumber = typeof source.page_number === "number" ? source.page_number : undefined;
                       const pageSuffix = typeof pageNumber === "number" ? `#page=${pageNumber}` : "";
+                      const citationPath = source.preview_url || `/ingest/uploads/${uploadId}/preview${pageSuffix}`;
                       setSelectedPreview({
                         title: typeof pageNumber === "number" ? `Source ${index + 1} · Page ${pageNumber}` : `Source ${index + 1}`,
-                        previewUrl: `${API_BASE_URL}/ingest/uploads/${uploadId}/preview${pageSuffix}`,
+                        previewUrl: `${API_BASE_URL}${citationPath}`,
                       });
                     }}
                     type="button"
@@ -682,6 +685,11 @@ export default function Dashboard(): JSX.Element {
                     {job.stage.split("_").join(" ")} · Attempt {job.attempt_count} · {formatRelativeTime(job.updated_at)}
                     {job.failure_category ? ` · ${job.failure_category.split("_").join(" ")}` : ""}
                   </p>
+                  {job.graph_status ? (
+                    <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${graphStatusStyle(job.graph_status)}`}>
+                      {graphStatusLabel(job.graph_status)}
+                    </span>
+                  ) : null}
                 </div>
               ))}
               {filteredUploads.length > 4 ? (
@@ -715,6 +723,11 @@ export default function Dashboard(): JSX.Element {
                   {selectedCourse.course_name}
                 </span>
               ) : null}
+              {selectedCourse?.graph_status ? (
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${graphStatusStyle(selectedCourse.graph_status)}`}>
+                  {graphStatusLabel(selectedCourse.graph_status)}
+                </span>
+              ) : null}
             </div>
             <p className="text-sm text-slate-500">
               {response?.graph_metadata
@@ -741,15 +754,31 @@ export default function Dashboard(): JSX.Element {
               <ConceptGraphCanvas
                 nodes={graphElements.nodes}
                 edges={graphElements.edges}
+                onOpenSource={(node) => {
+                  if (!node.uploadId) return;
+                  const pageSuffix = node.pageNumber ? `#page=${node.pageNumber}` : "";
+                  setSelectedPreview({
+                    title: node.pageNumber
+                      ? `${node.documentName || "Source PDF"} · Page ${node.pageNumber}`
+                      : node.documentName || "Source PDF",
+                    previewUrl: `${API_BASE_URL}/ingest/uploads/${node.uploadId}/preview${pageSuffix}`,
+                  });
+                }}
               />
             </Suspense>
           ) : (
             <div className="grid h-full min-h-[480px] place-items-center rounded-lg border border-dashed border-slate-300 bg-[radial-gradient(circle_at_center,_rgba(13,148,136,0.06),_transparent_55%)] px-8 text-center">
               <div className="max-w-sm">
                 <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-lg font-bold text-teal-700">CG</div>
-                <p className="font-semibold text-ink">Your course graph will appear here</p>
+                <p className="font-semibold text-ink">
+                  {selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
+                    ? "No validated graph was produced"
+                    : "Your course graph will appear here"}
+                </p>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Select a ready course and ask a question to reveal relevant concepts, relationships, and prerequisites.
+                  {selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
+                    ? "The PDF is still searchable for grounded answers, but the extracted graph did not meet the minimum quality checks."
+                    : "Select a ready course and ask a question to reveal relevant concepts, relationships, and prerequisites."}
                 </p>
               </div>
             </div>
@@ -774,6 +803,10 @@ function buildGraphElements(graphContext: GraphContextItem[]): {
       label: item.concept.name ?? conceptId,
       type: item.concept.type,
       description: item.concept.description,
+      documentName: item.concept.document_name,
+      pageNumber: item.concept.page_number,
+      sectionHeading: item.concept.section_heading,
+      uploadId: item.concept.upload_id,
     });
 
     (item.related_concepts ?? item.prerequisites).forEach((relatedConcept, relatedIndex) => {
@@ -784,6 +817,10 @@ function buildGraphElements(graphContext: GraphContextItem[]): {
         label: relatedConcept.name ?? relatedId,
         type: relatedConcept.type,
         description: relatedConcept.description,
+        documentName: relatedConcept.document_name,
+        pageNumber: relatedConcept.page_number,
+        sectionHeading: relatedConcept.section_heading,
+        uploadId: relatedConcept.upload_id,
       });
 
     });
@@ -818,6 +855,18 @@ function formatRelativeTime(value: string): string {
 
 function formatPage(page: unknown): string {
   return typeof page === "number" ? `Page ${page}` : "PDF passage";
+}
+
+function graphStatusLabel(status: GraphStatus): string {
+  if (status === "GRAPH_READY") return "Graph ready";
+  if (status === "GRAPH_PARTIAL") return "Graph partial";
+  return "Ready without graph";
+}
+
+function graphStatusStyle(status: GraphStatus): string {
+  if (status === "GRAPH_READY") return "bg-emerald-50 text-emerald-700";
+  if (status === "GRAPH_PARTIAL") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
 }
 
 function statusClass(status: UploadStatusResponse["status"]): string {

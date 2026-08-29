@@ -103,6 +103,22 @@ class Settings(BaseSettings):
         default=False,
         alias="REQUIRE_UPLOAD_AUTH",
     )
+    public_sample_course_id: str = Field(
+        default="",
+        alias="PUBLIC_SAMPLE_COURSE_ID",
+    )
+    demo_upload_retention_days: int = Field(
+        default=3,
+        ge=1,
+        le=30,
+        alias="DEMO_UPLOAD_RETENTION_DAYS",
+    )
+    demo_cleanup_interval_seconds: int = Field(
+        default=6 * 60 * 60,
+        ge=60,
+        le=24 * 60 * 60,
+        alias="DEMO_CLEANUP_INTERVAL_SECONDS",
+    )
     strict_startup_validation: bool = Field(
         default=False,
         alias="STRICT_STARTUP_VALIDATION",
@@ -190,6 +206,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_demo_security(self) -> "Settings":
         self.auth_cookie_samesite = self.auth_cookie_samesite.strip().lower()
+        self.public_sample_course_id = self.public_sample_course_id.strip()
         if self.auth_cookie_samesite not in {"lax", "strict", "none"}:
             raise ValueError("AUTH_COOKIE_SAMESITE must be lax, strict, or none.")
         if self.auth_cookie_samesite == "none" and not self.auth_cookie_secure:
@@ -265,6 +282,8 @@ class Settings(BaseSettings):
             missing.append("DEMO_ACCESS_TOKEN")
         if not self.require_upload_auth:
             missing.append("REQUIRE_UPLOAD_AUTH=true")
+        if not self.public_sample_course_id:
+            missing.append("PUBLIC_SAMPLE_COURSE_ID")
         if self.object_storage_backend == "s3" and not self.s3_endpoint_url:
             missing.append("S3_ENDPOINT_URL")
         provider = self.llm_provider.strip().lower()
