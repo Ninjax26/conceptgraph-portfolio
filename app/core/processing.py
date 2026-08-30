@@ -109,6 +109,9 @@ def classify_failure(exc: Exception) -> tuple[FailureCategory, bool, str]:
         return FailureCategory.DATABASE_ERROR, True, "A storage service is temporarily unavailable. Please retry."
     if any(term in message for term in ("different loop", "worker", "interrupted")):
         return FailureCategory.WORKER_ERROR, True, "Processing was interrupted. Please retry."
-    if any(term in message for term in ("provider", "groq", "gemini", "503")):
+    if any(
+        term in message
+        for term in ("provider", "groq", "cerebras", "gemini", "503")
+    ):
         return FailureCategory.PROVIDER_ERROR, True, "The AI provider is temporarily unavailable. Please retry."
     return FailureCategory.UNKNOWN_ERROR, False, "Document processing failed. Check the server logs for details."

@@ -10,7 +10,13 @@ import json
 import logging
 from typing import Any
 
-from groq import Groq
+from groq import (
+    APIConnectionError,
+    APITimeoutError,
+    Groq,
+    InternalServerError,
+    RateLimitError,
+)
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
@@ -18,9 +24,16 @@ from qdrant_client.models import FieldCondition, Filter, MatchAny
 
 from app.core.config import settings
 from app.core.database import qdrant_client as default_qdrant_client
-from app.core.exceptions import LLMConfigurationError
+from app.core.exceptions import (
+    LLMConfigurationError,
+    LLMProviderRateLimitError,
+    LLMProviderRequestError,
+    LLMProviderUnavailableError,
+)
 from app.schemas.exam import ExamResponse, ExamSource, MockQuestion
 from app.services.course_service import ReadyCourseContext
+from app.services.cerebras_service import cerebras_service
+from app.services.provider_failover import provider_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -247,10 +260,60 @@ class ExamService:
                 self._generate_with_gemini, context_text, num_questions, sources,
             )
         if provider == "groq":
+            return await self._generate_with_failover(
+                context_text, num_questions, sources
+            )
+        if provider == "cerebras":
             return await asyncio.to_thread(
-                self._generate_with_groq, context_text, num_questions, sources,
+                self._generate_with_cerebras, context_text, num_questions, sources,
             )
         raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
+
+    async def _generate_with_failover(
+        self,
+        context_text: str,
+        num_questions: int,
+        sources: list[ExamSource],
+    ) -> list[MockQuestion]:
+        primary_error: Exception | None = None
+        if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
+            try:
+                return await asyncio.to_thread(
+                    self._generate_with_groq, context_text, num_questions, sources,
+                )
+            except (
+                RateLimitError,
+                APIConnectionError,
+                APITimeoutError,
+                InternalServerError,
+            ) as exc:
+                primary_error = exc
+                provider_circuit_breaker.block(
+                    "groq", settings.llm_failover_cooldown_seconds
+                )
+                logger.warning("Groq exam generation is unavailable; trying Cerebras")
+            except ValueError as exc:
+                primary_error = exc
+                logger.warning("Groq returned an invalid exam; trying Cerebras")
+
+        if cerebras_service.configured and provider_circuit_breaker.is_available("cerebras"):
+            try:
+                return await asyncio.to_thread(
+                    self._generate_with_cerebras, context_text, num_questions, sources,
+                )
+            except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
+                provider_circuit_breaker.block(
+                    "cerebras", settings.llm_failover_cooldown_seconds
+                )
+                logger.warning("Cerebras exam generation is temporarily unavailable")
+                primary_error = primary_error or exc
+            except (LLMProviderRequestError, LLMConfigurationError, ValueError) as exc:
+                logger.warning("Cerebras exam failover could not generate a valid exam")
+                primary_error = primary_error or exc
+
+        raise LLMProviderUnavailableError(
+            "No exam-generation provider is currently available"
+        ) from primary_error
 
     def _generate_with_groq(
         self,
@@ -264,6 +327,7 @@ class ExamService:
         client = Groq(
             api_key=settings.groq_api_key,
             timeout=settings.provider_timeout_seconds,
+            max_retries=0,
         )
         completion = client.chat.completions.create(
             model=settings.groq_model,
@@ -276,7 +340,29 @@ class ExamService:
         )
 
         raw = completion.choices[0].message.content or "{}"
-        return self._parse_questions(raw, sources)
+        questions = self._parse_questions(raw, sources)
+        if not questions:
+            raise ValueError("Groq returned no valid exam questions")
+        return questions
+
+    def _generate_with_cerebras(
+        self,
+        context_text: str,
+        num_questions: int,
+        sources: list[ExamSource],
+    ) -> list[MockQuestion]:
+        raw = cerebras_service.complete(
+            [
+                {"role": "system", "content": self._system_prompt(num_questions)},
+                {"role": "user", "content": self._user_prompt(context_text)},
+            ],
+            max_tokens=2_500,
+            response_format={"type": "json_object"},
+        )
+        questions = self._parse_questions(raw, sources)
+        if not questions:
+            raise ValueError("Cerebras returned no valid exam questions")
+        return questions
 
     def _generate_with_gemini(
         self,

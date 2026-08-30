@@ -3,10 +3,22 @@ import json
 import logging
 from typing import Any
 
-from groq import APITimeoutError, Groq, RateLimitError
+from groq import (
+    APIConnectionError,
+    APITimeoutError,
+    Groq,
+    InternalServerError,
+    RateLimitError,
+)
 
 from app.core.config import settings
-from app.core.exceptions import LLMConfigurationError
+from app.core.exceptions import (
+    LLMConfigurationError,
+    LLMProviderRateLimitError,
+    LLMProviderUnavailableError,
+)
+from app.services.cerebras_service import cerebras_service
+from app.services.provider_failover import provider_circuit_breaker
 
 
 logger = logging.getLogger(__name__)
@@ -17,8 +29,14 @@ class SynthesisService:
 
     def validate_provider_configured(self) -> None:
         provider = settings.llm_provider.lower()
-        if provider == "groq" and not settings.groq_api_key:
-            raise LLMConfigurationError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
+        if provider == "groq" and not settings.groq_api_key and not cerebras_service.configured:
+            raise LLMConfigurationError(
+                "GROQ_API_KEY or CEREBRAS_API_KEY is required when LLM_PROVIDER=groq"
+            )
+        if provider == "cerebras" and not cerebras_service.configured:
+            raise LLMConfigurationError(
+                "CEREBRAS_API_KEY is required when LLM_PROVIDER=cerebras"
+            )
         if provider == "gemini" and not settings.gemini_api_key:
             raise LLMConfigurationError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
 
@@ -38,6 +56,31 @@ class SynthesisService:
                 sources,
             )
         if provider == "groq":
+            return await self._synthesize_with_failover(
+                question, graph_context, sources
+            )
+        if provider == "cerebras":
+            try:
+                return await asyncio.to_thread(
+                    self._synthesize_with_cerebras,
+                    question,
+                    graph_context,
+                    sources,
+                )
+            except (LLMProviderRateLimitError, LLMProviderUnavailableError):
+                logger.warning(
+                    "Cerebras answer synthesis is unavailable; returning retrieved evidence"
+                )
+                return self._grounded_evidence_fallback(sources)
+        raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
+
+    async def _synthesize_with_failover(
+        self,
+        question: str,
+        graph_context: list[dict[str, Any]],
+        sources: list[dict[str, Any]],
+    ) -> str:
+        if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
                 return await asyncio.to_thread(
                     self._synthesize_with_groq,
@@ -45,12 +88,39 @@ class SynthesisService:
                     graph_context,
                     sources,
                 )
-            except (RateLimitError, APITimeoutError):
-                logger.warning(
-                    "Answer synthesis provider was unavailable; returning retrieved evidence"
+            except (
+                RateLimitError,
+                APIConnectionError,
+                APITimeoutError,
+                InternalServerError,
+            ):
+                provider_circuit_breaker.block(
+                    "groq", settings.llm_failover_cooldown_seconds
                 )
-                return self._grounded_evidence_fallback(sources)
-        raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
+                logger.warning(
+                    "Groq answer synthesis is temporarily unavailable; trying Cerebras"
+                )
+
+        if cerebras_service.configured and provider_circuit_breaker.is_available("cerebras"):
+            try:
+                return await asyncio.to_thread(
+                    self._synthesize_with_cerebras,
+                    question,
+                    graph_context,
+                    sources,
+                )
+            except (LLMProviderRateLimitError, LLMProviderUnavailableError):
+                provider_circuit_breaker.block(
+                    "cerebras", settings.llm_failover_cooldown_seconds
+                )
+                logger.warning("Cerebras answer synthesis is temporarily unavailable")
+            except LLMConfigurationError as exc:
+                logger.warning("Cerebras answer failover is misconfigured: %s", exc)
+
+        logger.warning(
+            "All answer synthesis providers are unavailable; returning retrieved evidence"
+        )
+        return self._grounded_evidence_fallback(sources)
 
     def _synthesize_with_groq(
         self,
@@ -61,6 +131,7 @@ class SynthesisService:
         client = Groq(
             api_key=settings.groq_api_key,
             timeout=settings.provider_timeout_seconds,
+            max_retries=0,
         )
         completion = client.chat.completions.create(
             model=settings.groq_model,
@@ -71,6 +142,23 @@ class SynthesisService:
             temperature=0,
         )
         return completion.choices[0].message.content or ""
+
+    def _synthesize_with_cerebras(
+        self,
+        question: str,
+        graph_context: list[dict[str, Any]],
+        sources: list[dict[str, Any]],
+    ) -> str:
+        return cerebras_service.complete(
+            [
+                {"role": "system", "content": self._system_prompt()},
+                {
+                    "role": "user",
+                    "content": self._user_prompt(question, graph_context, sources),
+                },
+            ],
+            max_tokens=1_200,
+        )
 
     @staticmethod
     def _grounded_evidence_fallback(sources: list[dict[str, Any]]) -> str:

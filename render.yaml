@@ -19,6 +19,14 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: openai/gpt-oss-20b
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: CEREBRAS_MODEL
+        value: gpt-oss-120b
+      - key: CEREBRAS_BASE_URL
+        value: https://api.cerebras.ai/v1
+      - key: LLM_FAILOVER_COOLDOWN_SECONDS
+        value: "300"
       - key: NEO4J_URI
         sync: false
       - key: NEO4J_USERNAME

@@ -13,7 +13,8 @@ flowchart LR
   API --> Q[(Qdrant Cloud\nvectors + inference)]
   API --> N[(Neo4j Aura\nconcept graph)]
   API --> R2[(Private R2 bucket\nsource PDFs)]
-  API --> LLM[Groq\ngraph extraction + answers]
+  API --> LLM[Groq primary\ngraph extraction + answers]
+  LLM -. quota or timeout .-> CB[Cerebras failover]
   API --> RR[Cohere\nreranking]
   API --> C[Bounded in-process coordinator]
   C --> PG
@@ -45,7 +46,7 @@ UPLOADED -> EXTRACTING -> EXTRACTED -> CHUNKING -> CHUNKED
 
 `READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Graph extraction runs in bounded section batches under a configurable free-tier request budget, retries strict-schema failures once with locally validated JSON, preserves successful batches, and deterministically merges concepts by normalized name. Provider quota exhaustion stops graph calls without discarding searchable vectors or completed graph sections. Incomplete coverage is reported as `GRAPH_PARTIAL`; zero validated concepts is reported as `READY_WITHOUT_GRAPH`. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
 
-Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page.
+Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page. Groq is the primary LLM, while an optional Cerebras key enables automatic failover for graph extraction, answers, and exams. A shared cooldown temporarily bypasses a provider after a quota response or timeout instead of repeating requests that are expected to fail.
 
 Every worker-owned transition is fenced by both the current task token and lease owner. A stale task cannot advance or complete a newer attempt. The coordinator:
 
@@ -65,12 +66,12 @@ On startup and periodically, expired active rows are recovered. The interrupted 
 - Qdrant for vectors; Qdrant Cloud Inference in the low-memory profile
 - Neo4j for document-provenance-scoped concepts and relationships
 - S3-compatible private storage (Cloudflare R2 in production, MinIO locally)
-- Groq for graph extraction, GraphRAG synthesis, and exam generation
+- Groq as the primary provider and Cerebras as the optional quota/timeout failover
 - Cohere Rerank for the low-memory hosted profile
 
 ## Local development
 
-Requirements: Python 3.12, Node.js, Docker, and a Groq API key.
+Requirements: Python 3.12, Node.js, Docker, and a Groq API key. A Cerebras API key is optional but recommended for failover.
 
 ```bash
 cp .env.example .env
@@ -117,6 +118,9 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `NEO4J_*` | Neo4j Aura credentials |
 | `S3_*` | Private R2 bucket endpoint and scoped credentials |
 | `GROQ_API_KEY` | Secret graph/synthesis provider key |
+| `CEREBRAS_API_KEY` | Optional secret fallback key; never expose it to Vite or commit it |
+| `CEREBRAS_MODEL` | Fallback model; default `gpt-oss-120b` |
+| `LLM_FAILOVER_COOLDOWN_SECONDS` | Time to bypass a provider after quota/timeout; default `300` |
 | `GRAPH_BATCH_SIZE` | Chunks per graph request; default `4` |
 | `GRAPH_MAX_BATCHES` | Maximum graph requests planned per PDF; default `6` for free-tier control |
 | `ALLOWED_ORIGINS` | Exact deployed frontend origin; comma-separated if necessary |

@@ -185,6 +185,18 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     groq_model: str = Field(default="openai/gpt-oss-20b", alias="GROQ_MODEL")
+    cerebras_api_key: SecretStr | None = Field(default=None, alias="CEREBRAS_API_KEY")
+    cerebras_model: str = Field(default="gpt-oss-120b", alias="CEREBRAS_MODEL")
+    cerebras_base_url: str = Field(
+        default="https://api.cerebras.ai/v1",
+        alias="CEREBRAS_BASE_URL",
+    )
+    llm_failover_cooldown_seconds: int = Field(
+        default=300,
+        ge=30,
+        le=3600,
+        alias="LLM_FAILOVER_COOLDOWN_SECONDS",
+    )
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="gemini-1.5-flash", alias="GEMINI_MODEL")
     evidence_min_score: float = Field(default=0.35, ge=0, le=1, alias="EVIDENCE_MIN_SCORE")
@@ -301,10 +313,12 @@ class Settings(BaseSettings):
         provider = self.llm_provider.strip().lower()
         if provider == "groq" and not self.groq_api_key:
             missing.append("GROQ_API_KEY")
+        elif provider == "cerebras" and not self.cerebras_api_key_value:
+            missing.append("CEREBRAS_API_KEY")
         elif provider == "gemini" and not self.gemini_api_key:
             missing.append("GEMINI_API_KEY")
-        elif provider not in {"groq", "gemini"}:
-            raise ValueError("LLM_PROVIDER must be either groq or gemini.")
+        elif provider not in {"groq", "cerebras", "gemini"}:
+            raise ValueError("LLM_PROVIDER must be groq, cerebras, or gemini.")
         if missing:
             raise ValueError(
                 "Missing required public-deployment environment variables: "
@@ -379,6 +393,12 @@ class Settings(BaseSettings):
         if self.cohere_api_key is None:
             return None
         return self.cohere_api_key.get_secret_value().strip() or None
+
+    @property
+    def cerebras_api_key_value(self) -> str | None:
+        if self.cerebras_api_key is None:
+            return None
+        return self.cerebras_api_key.get_secret_value().strip() or None
 
 
 @lru_cache

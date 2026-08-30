@@ -7,7 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.exceptions import LLMConfigurationError
+from app.core.exceptions import (
+    LLMConfigurationError,
+    LLMProviderRateLimitError,
+    LLMProviderRequestError,
+    LLMProviderUnavailableError,
+)
 from app.schemas.exam import ExamResponse
 from app.services.exam_service import ExamService
 from app.services.course_service import CourseNotFoundError, CourseNotReadyError, CourseService
@@ -75,6 +80,15 @@ async def generate_exam(
         raise HTTPException(
             status_code=503,
             detail=f"LLM provider is not configured: {exc}",
+        ) from exc
+    except (
+        LLMProviderRateLimitError,
+        LLMProviderRequestError,
+        LLMProviderUnavailableError,
+    ) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI exam providers are temporarily unavailable. Please try again later.",
         ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

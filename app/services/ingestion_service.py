@@ -4,7 +4,14 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from groq import APITimeoutError, BadRequestError, Groq, RateLimitError
+from groq import (
+    APIConnectionError,
+    APITimeoutError,
+    BadRequestError,
+    Groq,
+    InternalServerError,
+    RateLimitError,
+)
 from neo4j import AsyncDriver
 from pydantic import ValidationError
 from qdrant_client import QdrantClient
@@ -23,7 +30,13 @@ from qdrant_client.models import (
 
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
-from app.core.exceptions import GraphStructureError, LLMConfigurationError
+from app.core.exceptions import (
+    GraphStructureError,
+    LLMConfigurationError,
+    LLMProviderRateLimitError,
+    LLMProviderRequestError,
+    LLMProviderUnavailableError,
+)
 from app.schemas.extraction import (
     ALLOWED_RELATIONSHIP_TYPES,
     ConceptNode,
@@ -31,7 +44,9 @@ from app.schemas.extraction import (
     GraphExtractionResponse,
     normalize_concept_name,
 )
+from app.services.cerebras_service import cerebras_service
 from app.services.parser_service import DocumentChunk
+from app.services.provider_failover import provider_circuit_breaker
 
 
 logger = logging.getLogger(__name__)
@@ -142,7 +157,7 @@ class IngestionService:
             )
             try:
                 extraction = await self.extract_graph_from_text(context)
-            except RateLimitError:
+            except (RateLimitError, LLMProviderRateLimitError):
                 failed_batches += 1
                 provider_limited = True
                 skipped_batches += len(batches) - batch_index - 1
@@ -151,7 +166,12 @@ class IngestionService:
                     "preserving completed graph batches"
                 )
                 break
-            except APITimeoutError:
+            except (
+                APIConnectionError,
+                APITimeoutError,
+                InternalServerError,
+                LLMProviderUnavailableError,
+            ):
                 failed_batches += 1
                 consecutive_timeouts += 1
                 logger.warning(
@@ -204,8 +224,72 @@ class IngestionService:
         if provider == "gemini":
             return await asyncio.to_thread(self._extract_with_gemini, text)
         if provider == "groq":
-            return await asyncio.to_thread(self._extract_with_groq, text)
+            return await self._extract_with_failover(text)
+        if provider == "cerebras":
+            return await asyncio.to_thread(self._extract_with_cerebras, text)
         raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
+
+    async def _extract_with_failover(self, text: str) -> GraphExtractionResponse:
+        primary_error: Exception | None = None
+        if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
+            try:
+                return await asyncio.to_thread(self._extract_with_groq, text)
+            except (
+                RateLimitError,
+                APIConnectionError,
+                APITimeoutError,
+                InternalServerError,
+            ) as exc:
+                primary_error = exc
+                provider_circuit_breaker.block(
+                    "groq", settings.llm_failover_cooldown_seconds
+                )
+                logger.warning(
+                    "Groq graph extraction is temporarily unavailable; trying Cerebras"
+                )
+            except (BadRequestError, GraphStructureError) as exc:
+                primary_error = exc
+                logger.warning(
+                    "Groq could not produce a valid graph; trying Cerebras for this batch"
+                )
+        elif not settings.groq_api_key and not cerebras_service.configured:
+            raise LLMConfigurationError(
+                "GROQ_API_KEY or CEREBRAS_API_KEY is required when LLM_PROVIDER=groq"
+            )
+        elif not cerebras_service.configured:
+            raise LLMProviderRateLimitError(
+                "Groq is cooling down and Cerebras failover is not configured"
+            )
+
+        if cerebras_service.configured and provider_circuit_breaker.is_available("cerebras"):
+            try:
+                return await asyncio.to_thread(self._extract_with_cerebras, text)
+            except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
+                provider_circuit_breaker.block(
+                    "cerebras", settings.llm_failover_cooldown_seconds
+                )
+                logger.warning("Cerebras graph extraction is temporarily unavailable")
+                if primary_error is None:
+                    raise
+            except (LLMConfigurationError, GraphStructureError) as exc:
+                logger.warning("Cerebras graph failover could not complete the batch: %s", exc)
+                if primary_error is None:
+                    raise
+
+        if isinstance(primary_error, RateLimitError):
+            raise LLMProviderRateLimitError(
+                "Groq quota is exhausted and Cerebras failover was unavailable"
+            ) from primary_error
+        if isinstance(
+            primary_error,
+            (APIConnectionError, APITimeoutError, InternalServerError),
+        ):
+            raise LLMProviderUnavailableError(
+                "Groq and Cerebras are temporarily unavailable"
+            ) from primary_error
+        if primary_error is not None:
+            raise primary_error
+        raise LLMProviderUnavailableError("No graph-generation provider is available")
 
     async def store_graph_extraction(
         self,
@@ -461,7 +545,9 @@ class IngestionService:
                 },
             )
             content = completion.choices[0].message.content or "{}"
-            return GraphExtractionResponse.model_validate_json(content)
+            return self._validate_graph_batch_size(
+                GraphExtractionResponse.model_validate_json(content)
+            )
         except BadRequestError as exc:
             if not self._is_json_validation_failure(exc):
                 raise
@@ -492,10 +578,59 @@ class IngestionService:
                 response_format={"type": "json_object"},
             )
             content = completion.choices[0].message.content or "{}"
-            return GraphExtractionResponse.model_validate_json(content)
+            return self._validate_graph_batch_size(
+                GraphExtractionResponse.model_validate_json(content)
+            )
         except (BadRequestError, ValidationError, ValueError) as exc:
             raise GraphStructureError(
                 "json_validate_failed: Groq could not produce a valid graph for this section."
+            ) from exc
+
+    def _extract_with_cerebras(self, text: str) -> GraphExtractionResponse:
+        contexts = self._graph_extraction_contexts(text)
+        try:
+            content = cerebras_service.complete(
+                [
+                    {"role": "system", "content": self._extraction_system_prompt()},
+                    {"role": "user", "content": contexts[0]},
+                ],
+                max_tokens=1_000,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "concept_graph_extraction",
+                        "strict": True,
+                        "schema": self._cerebras_graph_extraction_schema(),
+                    },
+                },
+            )
+            return self._validate_graph_batch_size(
+                GraphExtractionResponse.model_validate_json(content)
+            )
+        except (LLMProviderRequestError, ValidationError, ValueError):
+            pass
+
+        try:
+            content = cerebras_service.complete(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            f"{self._extraction_system_prompt()} Return one JSON object "
+                            "with exactly two arrays named nodes and relationships."
+                        ),
+                    },
+                    {"role": "user", "content": contexts[-1]},
+                ],
+                max_tokens=1_000,
+                response_format={"type": "json_object"},
+            )
+            return self._validate_graph_batch_size(
+                GraphExtractionResponse.model_validate_json(content)
+            )
+        except (LLMProviderRequestError, ValidationError, ValueError) as exc:
+            raise GraphStructureError(
+                "json_validate_failed: Cerebras could not produce a valid graph for this section."
             ) from exc
 
     @staticmethod
@@ -511,6 +646,28 @@ class IngestionService:
             if shortened and (not contexts or shortened != contexts[-1]):
                 contexts.append(shortened)
         return tuple(contexts or [text])
+
+    @staticmethod
+    def _cerebras_graph_extraction_schema() -> dict:
+        schema = IngestionService._graph_extraction_schema()
+        # Cerebras structured outputs enforce the shape, while array-size limits
+        # remain in the prompt and local validation because maxItems is unsupported.
+        schema["properties"]["nodes"].pop("maxItems", None)
+        schema["properties"]["relationships"].pop("maxItems", None)
+        return schema
+
+    @staticmethod
+    def _validate_graph_batch_size(
+        extraction: GraphExtractionResponse,
+    ) -> GraphExtractionResponse:
+        if len(extraction.nodes) > IngestionService.MAX_CONCEPTS_PER_BATCH:
+            raise ValueError("Graph extraction exceeded the concept limit.")
+        if (
+            len(extraction.relationships)
+            > IngestionService.MAX_RELATIONSHIPS_PER_BATCH
+        ):
+            raise ValueError("Graph extraction exceeded the relationship limit.")
+        return extraction
 
     @staticmethod
     def _is_json_validation_failure(exc: BadRequestError) -> bool:
@@ -620,7 +777,14 @@ class IngestionService:
     def _validate_llm_configured() -> None:
         provider = settings.llm_provider.lower()
         if provider == "groq" and not settings.groq_api_key:
-            raise LLMConfigurationError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
+            if not cerebras_service.configured:
+                raise LLMConfigurationError(
+                    "GROQ_API_KEY or CEREBRAS_API_KEY is required when LLM_PROVIDER=groq"
+                )
+        if provider == "cerebras" and not cerebras_service.configured:
+            raise LLMConfigurationError(
+                "CEREBRAS_API_KEY is required when LLM_PROVIDER=cerebras"
+            )
         if provider == "gemini" and not settings.gemini_api_key:
             raise LLMConfigurationError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
 

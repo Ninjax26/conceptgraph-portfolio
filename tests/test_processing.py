@@ -18,7 +18,7 @@ from starlette.datastructures import Headers
 from app.api.endpoints import auth, ingest, public_demo, query
 from app.api.endpoints.query import QueryRequest
 from app.core.config import Settings
-from app.core.exceptions import GraphStructureError
+from app.core.exceptions import GraphStructureError, LLMProviderRateLimitError
 from app.core.processing import (
     FailureCategory,
     GraphStatus,
@@ -31,12 +31,14 @@ from app.core.processing_coordinator import EnqueueDisposition, ProcessingCoordi
 from app.core.security import DemoProtectionMiddleware
 from app.schemas.auth import AccessCodeRequest
 from app.services.citation_service import assess_evidence, build_sources
+from app.services.cerebras_service import CerebrasService
 from app.services.course_service import CourseNotReadyError, CourseService
 from app.services.document_processing_service import DocumentProcessingService
 from app.services.demo_retention_service import DemoRetentionService
 from app.services.exam_service import ExamService
 from app.services.ingestion_service import IngestionService
 from app.services.parser_service import DocumentChunk, ParserService
+from app.services.provider_failover import provider_circuit_breaker
 from app.services.rag_service import RetrievalService
 from app.services.rerank_service import RerankService
 from app.services.security_service import DemoAccessService, RateLimitResult, RateLimitService
@@ -54,6 +56,9 @@ from pydantic import SecretStr, ValidationError
 
 
 class ProcessingRulesTests(unittest.TestCase):
+    def setUp(self):
+        provider_circuit_breaker.clear()
+
     def test_course_normalization_collapses_case_and_space(self):
         self.assertEqual(normalize_course_name("  CYBER  "), "cyber")
         self.assertEqual(normalize_course_name("Cyber"), "cyber")
@@ -67,6 +72,78 @@ class ProcessingRulesTests(unittest.TestCase):
 
         self.assertEqual(config.qdrant_api_key_value, "qdrant-secret")
         self.assertNotIn("qdrant-secret", repr(config.qdrant_api_key))
+
+    def test_cerebras_key_is_unwrapped_only_for_provider_requests(self):
+        config = Settings(_env_file=None, CEREBRAS_API_KEY="cerebras-secret")
+
+        self.assertEqual(config.cerebras_api_key_value, "cerebras-secret")
+        self.assertNotIn("cerebras-secret", repr(config.cerebras_api_key))
+
+    def test_cerebras_client_uses_openai_compatible_chat_endpoint(self):
+        observed = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            observed["path"] = request.url.path
+            observed["authorization"] = request.headers.get("Authorization")
+            observed["payload"] = __import__("json").loads(request.content)
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": '{"nodes": []}'}}]},
+            )
+
+        client = httpx.Client(
+            transport=httpx.MockTransport(handler),
+            base_url="https://api.cerebras.ai/v1",
+        )
+        with (
+            patch(
+                "app.services.cerebras_service.settings.cerebras_api_key",
+                SecretStr("cerebras-secret"),
+            ),
+            patch(
+                "app.services.cerebras_service.settings.cerebras_model",
+                "gpt-oss-120b",
+            ),
+        ):
+            content = CerebrasService(client).complete(
+                [{"role": "user", "content": "Return JSON"}],
+                response_format={"type": "json_object"},
+            )
+        client.close()
+
+        self.assertEqual(content, '{"nodes": []}')
+        self.assertEqual(observed["path"], "/v1/chat/completions")
+        self.assertEqual(observed["authorization"], "Bearer cerebras-secret")
+        self.assertEqual(observed["payload"]["model"], "gpt-oss-120b")
+        self.assertEqual(observed["payload"]["max_completion_tokens"], 1_000)
+        self.assertNotIn("max_tokens", observed["payload"])
+        self.assertEqual(
+            observed["payload"]["response_format"], {"type": "json_object"}
+        )
+
+    def test_cerebras_rate_limit_is_normalized_without_leaking_response(self):
+        client = httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    429,
+                    json={"error": {"message": "secret provider detail"}},
+                )
+            ),
+            base_url="https://api.cerebras.ai/v1",
+        )
+        with (
+            patch(
+                "app.services.cerebras_service.settings.cerebras_api_key",
+                SecretStr("cerebras-secret"),
+            ),
+            self.assertRaises(LLMProviderRateLimitError) as raised,
+        ):
+            CerebrasService(client).complete(
+                [{"role": "user", "content": "hello"}]
+            )
+        client.close()
+
+        self.assertNotIn("secret provider detail", str(raised.exception))
 
     def test_cleanup_removes_document_graph_and_orphaned_course_node(self):
         graph_session = SimpleNamespace(run=AsyncMock())
@@ -644,6 +721,50 @@ class ProcessingRulesTests(unittest.TestCase):
         )
         self.assertEqual(result, GraphExtractionResponse())
 
+    def test_graph_extraction_fails_over_and_keeps_groq_on_cooldown(self):
+        rate_limit = RateLimitError(
+            "Daily token quota reached",
+            response=httpx.Response(
+                429,
+                request=httpx.Request(
+                    "POST", "https://api.groq.com/openai/v1/chat/completions"
+                ),
+            ),
+            body={"error": {"code": "rate_limit_exceeded"}},
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+        result = GraphExtractionResponse()
+        with (
+            patch("app.services.ingestion_service.settings.llm_provider", "groq"),
+            patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),
+            patch(
+                "app.services.cerebras_service.settings.cerebras_api_key",
+                SecretStr("cerebras-secret"),
+            ),
+            patch.object(service, "_extract_with_groq", side_effect=rate_limit) as groq,
+            patch.object(service, "_extract_with_cerebras", return_value=result) as cerebras,
+        ):
+            first = asyncio.run(service.extract_graph_from_text("Course text"))
+            second = asyncio.run(service.extract_graph_from_text("More course text"))
+
+        self.assertEqual(first, result)
+        self.assertEqual(second, result)
+        self.assertEqual(groq.call_count, 1)
+        self.assertEqual(cerebras.call_count, 2)
+
+    def test_cerebras_graph_schema_avoids_unsupported_array_constraints(self):
+        schema = IngestionService._cerebras_graph_extraction_schema()
+
+        self.assertNotIn("maxItems", schema["properties"]["nodes"])
+        self.assertNotIn("maxItems", schema["properties"]["relationships"])
+        self.assertFalse(schema["additionalProperties"])
+        self.assertFalse(
+            schema["properties"]["nodes"]["items"]["additionalProperties"]
+        )
+
     def test_json_schema_provider_failure_is_retryable(self):
         category, retryable, message = classify_failure(
             RuntimeError("Groq error code: json_validate_failed")
@@ -1111,6 +1232,37 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertIn("Phishing is a social-engineering attack.", answer)
         self.assertIn("[Source 1, p. 4]", answer)
 
+    def test_answer_synthesis_uses_cerebras_when_groq_quota_is_exhausted(self):
+        rate_limit = RateLimitError(
+            "Daily token quota reached",
+            response=httpx.Response(
+                429,
+                request=httpx.Request(
+                    "POST", "https://api.groq.com/openai/v1/chat/completions"
+                ),
+            ),
+            body={"error": {"code": "rate_limit_exceeded"}},
+        )
+        service = SynthesisService()
+        with (
+            patch("app.services.synthesis_service.settings.llm_provider", "groq"),
+            patch("app.services.synthesis_service.settings.groq_api_key", "test-key"),
+            patch(
+                "app.services.cerebras_service.settings.cerebras_api_key",
+                SecretStr("cerebras-secret"),
+            ),
+            patch.object(service, "_synthesize_with_groq", side_effect=rate_limit),
+            patch.object(
+                service,
+                "_synthesize_with_cerebras",
+                return_value="Cerebras grounded answer [Source 1]",
+            ) as cerebras,
+        ):
+            answer = asyncio.run(service.synthesize("Question?", [], []))
+
+        self.assertEqual(answer, "Cerebras grounded answer [Source 1]")
+        cerebras.assert_called_once()
+
     def test_graph_context_truncation_never_removes_source_identifier(self):
         excerpt = (
             "[Source chunk ID: upload-1:12:3 | PDF: Cyber.pdf | Page: 12 | Section: Identity]\n"
@@ -1403,6 +1555,38 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual({source.document_name for source in sources}, {"A.pdf", "B.pdf"})
         self.assertEqual(questions[0].sources[0].source_id, "exam-source-1")
         self.assertTrue(questions[0].sources[0].supporting_passage)
+
+    def test_exam_generation_uses_cerebras_when_groq_quota_is_exhausted(self):
+        rate_limit = RateLimitError(
+            "Daily token quota reached",
+            response=httpx.Response(
+                429,
+                request=httpx.Request(
+                    "POST", "https://api.groq.com/openai/v1/chat/completions"
+                ),
+            ),
+            body={"error": {"code": "rate_limit_exceeded"}},
+        )
+        service = ExamService(vector_client=SimpleNamespace())
+        expected = [Mock()]
+        with (
+            patch("app.services.exam_service.settings.llm_provider", "groq"),
+            patch("app.services.exam_service.settings.groq_api_key", "test-key"),
+            patch(
+                "app.services.cerebras_service.settings.cerebras_api_key",
+                SecretStr("cerebras-secret"),
+            ),
+            patch.object(service, "_generate_with_groq", side_effect=rate_limit),
+            patch.object(
+                service, "_generate_with_cerebras", return_value=expected
+            ) as cerebras,
+        ):
+            questions = asyncio.run(
+                service._generate_questions("context", 1, [])
+            )
+
+        self.assertIs(questions, expected)
+        cerebras.assert_called_once()
 
     def test_exam_question_without_valid_citation_is_rejected(self):
         source = ExamSource(
