@@ -8,7 +8,7 @@ The React SPA calls one FastAPI service. FastAPI owns both HTTP handling and a b
 
 External AI services are deliberately provider-configurable:
 
-- graph extraction, synthesis, and exams: Groq by default;
+- graph extraction, synthesis, and exams: Groq by default, with optional Cerebras failover;
 - embeddings: local MiniLM or Qdrant Cloud Inference;
 - reranking: local cross-encoder or Cohere;
 - Gemini is an optional LLM alternative.
@@ -100,11 +100,29 @@ At least one page and one chunk are mandatory. Every chunk must be accepted by t
 
 ## Graph quality and provenance
 
-Graph extraction remains one bounded LLM request rather than a multi-agent workflow. The request samples the beginning, middle, and end of every detected PDF section and supplies stable source chunk IDs. Provider output is schema-validated, limited to six relationship types, checked for valid endpoints, deduplicated using lowercase whitespace-free concept names, and rejected at node level when it cites an unknown source chunk.
+Graph extraction is a bounded section-batch workflow rather than a multi-agent system. Chunks are grouped by detected section, each section contributes beginning/middle/end evidence, and a fair selector distributes the configured request budget across the document. Production defaults allow four chunks per request and at most six graph requests per PDF. Each batch asks for at most eight concepts and ten relationships and supplies stable source chunk IDs.
+
+Provider output is schema-validated, limited to six relationship types (`PREREQUISITE_OF`, `PART_OF`, `EXPLAINS`, `RELATED_TO`, `CAUSES`, and `APPLIES_TO`), checked for valid endpoints, deduplicated using lowercase whitespace-free concept names, and rejected at node level when it cites an unknown source chunk. Strict JSON Schema is attempted first; a smaller JSON-object request is the compatibility fallback, and both responses still pass local Pydantic validation. Successful batches are merged deterministically, so one malformed or timed-out section does not discard completed graph work.
 
 Quality is reported separately from document readiness. Two or more concepts with at least one valid relationship are `GRAPH_READY`; a non-empty graph below that threshold is `GRAPH_PARTIAL`; zero retained concepts is `READY_WITHOUT_GRAPH`. All three documents remain vector-searchable, so an empty graph is visible without falsely turning successful PDF indexing into a processing failure.
 
 Each retained Neo4j concept stores upload ID, PDF filename, source chunk ID, page number, and detected section heading. Graph retrieval returns those properties to the dashboard, where a selected concept can open the original PDF at its source page.
+
+Text extraction currently uses PyMuPDF's native text layer. An image-only/scanned PDF is rejected with a safe OCR-required error before vector or graph writes. OCR is a documented future extension, not a currently claimed capability.
+
+## LLM resilience and failover
+
+`LLM_PROVIDER=groq` keeps Groq as the primary provider. When `CEREBRAS_API_KEY` is configured, graph extraction, answer synthesis, and exam generation can fail over to Cerebras `gpt-oss-120b` after a Groq quota response, timeout, connection failure, or provider-side server error. Graph extraction can also use Cerebras when Groq cannot produce a valid structured graph for a batch.
+
+A process-wide, thread-safe circuit breaker records a provider cooldown, defaulting to 300 seconds. Requests bypass a cooling provider instead of repeatedly spending latency and quota on a failure that is expected to recur. Provider SDK retries are disabled on the Groq calls covered by failover so routing happens promptly.
+
+Cerebras uses its OpenAI-compatible chat-completions endpoint. Strict structured output omits unsupported array-size schema keywords, while prompt limits and local validation still enforce the application's bounded graph contract. Provider response bodies and credentials are never copied into public errors.
+
+If both providers are unavailable:
+
+- graph processing preserves completed batches and may finish as `GRAPH_PARTIAL` or `READY_WITHOUT_GRAPH` because vector search remains useful;
+- answer synthesis returns retrieved, citation-labelled evidence instead of inventing an answer;
+- exam generation returns a safe temporary-unavailability response.
 
 ## Idempotency and compensation
 
@@ -138,6 +156,8 @@ Manual retry uses the same attempt cap and creates a new task token. Retry canno
 Query/exam flows first resolve canonical course context from READY documents only. Failed and active uploads cannot contribute vectors, graph metrics, questions, or answers.
 
 Graph retrieval uses parameterized, read-only Cypher scoped to canonical course IDs and READY document IDs. Native driver records preserve relationship direction. Only prerequisite relationships expand the semantic search query; all valid typed relationships remain visible in the concept map.
+
+The production retrieval path deliberately uses a deterministic Cypher template rather than executing LLM-generated database queries. A legacy provider-backed Cypher helper remains isolated from the request path, but every executed query is validated as read-only and parameterized. This reduces injection risk and makes course/document scoping explainable.
 
 Qdrant search filters by READY upload IDs. Hosted and local embeddings use the same 384-dimensional MiniLM space and normalized cosine collection contract. Startup rejects an incompatible collection and instructs the operator to choose a new collection name.
 
