@@ -4,7 +4,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from groq import BadRequestError, Groq
+from groq import APITimeoutError, BadRequestError, Groq, RateLimitError
 from neo4j import AsyncDriver
 from pydantic import ValidationError
 from qdrant_client import QdrantClient
@@ -45,6 +45,9 @@ class GraphSectionBatch:
 
 
 class IngestionService:
+    MAX_CONCEPTS_PER_BATCH = 8
+    MAX_RELATIONSHIPS_PER_BATCH = 10
+
     def __init__(
         self,
         graph_driver: AsyncDriver = neo4j_driver,
@@ -112,23 +115,57 @@ class IngestionService:
         if not chunks:
             return GraphExtractionResponse()
 
-        batches = self._graph_section_batches(chunks)
+        candidate_batches = self._graph_section_batches(
+            chunks,
+            batch_size=settings.graph_batch_size,
+        )
+        batches = self._select_graph_batches(
+            candidate_batches,
+            settings.graph_max_batches,
+        )
         section_labels = {
             batch.section_key: batch.section_label
-            for batch in batches
+            for batch in candidate_batches
         }
         represented_sections: set[str] = set()
         successful_batches = 0
         failed_batches = 0
+        skipped_batches = len(candidate_batches) - len(batches)
+        provider_limited = False
+        consecutive_timeouts = 0
         partials: list[GraphExtractionResponse] = []
 
-        for batch in batches:
+        for batch_index, batch in enumerate(batches):
             context = "\n\n".join(
                 self._format_graph_excerpt(chunk)
                 for chunk in batch.chunks
             )
             try:
                 extraction = await self.extract_graph_from_text(context)
+            except RateLimitError:
+                failed_batches += 1
+                provider_limited = True
+                skipped_batches += len(batches) - batch_index - 1
+                logger.warning(
+                    "Graph extraction stopped because the provider quota was reached; "
+                    "preserving completed graph batches"
+                )
+                break
+            except APITimeoutError:
+                failed_batches += 1
+                consecutive_timeouts += 1
+                logger.warning(
+                    "Skipped one timed-out graph batch for section %s",
+                    batch.section_label,
+                )
+                if consecutive_timeouts >= 2:
+                    skipped_batches += len(batches) - batch_index - 1
+                    logger.warning(
+                        "Graph extraction stopped after repeated provider timeouts; "
+                        "preserving completed graph batches"
+                    )
+                    break
+                continue
             except GraphStructureError:
                 failed_batches += 1
                 logger.warning(
@@ -137,6 +174,7 @@ class IngestionService:
                 )
                 continue
 
+            consecutive_timeouts = 0
             successful_batches += 1
             enriched = self._attach_provenance(extraction, batch.chunks)
             if enriched.nodes:
@@ -149,9 +187,12 @@ class IngestionService:
             sections_total=len(section_labels),
             sections_succeeded=len(represented_sections),
             sections_failed=len(section_labels) - len(represented_sections),
-            batches_total=len(batches),
+            batches_total=len(candidate_batches),
             batches_succeeded=successful_batches,
             batches_failed=failed_batches,
+            batches_skipped=skipped_batches,
+            provider_limited=provider_limited,
+            extraction_budget_applied=len(candidate_batches) > len(batches),
             failed_section_labels=sorted(
                 section_labels[key]
                 for key in failed_sections
@@ -392,39 +433,40 @@ class IngestionService:
         client = Groq(
             api_key=settings.groq_api_key,
             timeout=settings.provider_timeout_seconds,
+            max_retries=0,
         )
         contexts = self._graph_extraction_contexts(text)
-        for attempt, context in enumerate(contexts):
-            try:
-                completion = client.chat.completions.create(
-                    model=settings.groq_model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": self._extraction_system_prompt(),
-                        },
-                        {
-                            "role": "user",
-                            "content": context,
-                        },
-                    ],
-                    temperature=0,
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": "concept_graph_extraction",
-                            "strict": True,
-                            "schema": self._graph_extraction_schema(),
-                        },
+        try:
+            completion = client.chat.completions.create(
+                model=settings.groq_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._extraction_system_prompt(),
                     },
-                )
-                content = completion.choices[0].message.content or "{}"
-                return GraphExtractionResponse.model_validate_json(content)
-            except BadRequestError as exc:
-                if not self._is_json_validation_failure(exc):
-                    raise
-            except ValidationError:
-                pass
+                    {
+                        "role": "user",
+                        "content": contexts[0],
+                    },
+                ],
+                temperature=0,
+                max_completion_tokens=1000,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "concept_graph_extraction",
+                        "strict": True,
+                        "schema": self._graph_extraction_schema(),
+                    },
+                },
+            )
+            content = completion.choices[0].message.content or "{}"
+            return GraphExtractionResponse.model_validate_json(content)
+        except BadRequestError as exc:
+            if not self._is_json_validation_failure(exc):
+                raise
+        except ValidationError:
+            pass
 
         # Some compatible models reject strict JSON Schema even when they can
         # return valid JSON. Use the smallest context for one simpler fallback,
@@ -446,6 +488,7 @@ class IngestionService:
                     },
                 ],
                 temperature=0,
+                max_completion_tokens=1000,
                 response_format={"type": "json_object"},
             )
             content = completion.choices[0].message.content or "{}"
@@ -459,7 +502,7 @@ class IngestionService:
     def _graph_extraction_contexts(text: str) -> tuple[str, ...]:
         contexts: list[str] = []
         excerpts = [excerpt.strip() for excerpt in text.split("\n\n") if excerpt.strip()]
-        for limit in (16000, 8000, 4000):
+        for limit in (5000, 3000):
             per_excerpt = max(160, limit // max(1, len(excerpts)))
             shortened = "\n\n".join(
                 IngestionService._truncate_excerpt(excerpt, per_excerpt)
@@ -513,7 +556,9 @@ class IngestionService:
             "ids for nodes. Every concept must cite exactly one supplied Source chunk ID in "
             "source_chunk_id; never invent a source ID. Every relationship endpoint must "
             "reference an extracted node. The only permitted relationship types are: "
-            f"{relationship_types}."
+            f"{relationship_types}. Extract at most {IngestionService.MAX_CONCEPTS_PER_BATCH} "
+            "important concepts and at most "
+            f"{IngestionService.MAX_RELATIONSHIPS_PER_BATCH} relationships from this batch."
         )
 
     @staticmethod
@@ -548,8 +593,16 @@ class IngestionService:
         return {
             "type": "object",
             "properties": {
-                "nodes": {"type": "array", "items": concept},
-                "relationships": {"type": "array", "items": relationship},
+                "nodes": {
+                    "type": "array",
+                    "items": concept,
+                    "maxItems": IngestionService.MAX_CONCEPTS_PER_BATCH,
+                },
+                "relationships": {
+                    "type": "array",
+                    "items": relationship,
+                    "maxItems": IngestionService.MAX_RELATIONSHIPS_PER_BATCH,
+                },
             },
             "required": ["nodes", "relationships"],
             "additionalProperties": False,
@@ -634,6 +687,54 @@ class IngestionService:
         return batches
 
     @staticmethod
+    def _select_graph_batches(
+        batches: Sequence[GraphSectionBatch],
+        limit: int,
+    ) -> list[GraphSectionBatch]:
+        """Apply a fair free-tier budget across beginning, middle, and end sections."""
+
+        if len(batches) <= limit:
+            return list(batches)
+
+        first_batch_by_section: dict[str, GraphSectionBatch] = {}
+        for batch in batches:
+            first_batch_by_section.setdefault(batch.section_key, batch)
+        section_batches = list(first_batch_by_section.values())
+
+        if len(section_batches) >= limit:
+            positions = IngestionService._evenly_spaced_positions(
+                len(section_batches),
+                limit,
+            )
+            selected = [section_batches[position] for position in positions]
+        else:
+            selected = list(section_batches)
+            selected_ids = {id(batch) for batch in selected}
+            remaining = [batch for batch in batches if id(batch) not in selected_ids]
+            remaining_slots = limit - len(selected)
+            positions = IngestionService._evenly_spaced_positions(
+                len(remaining),
+                remaining_slots,
+            )
+            selected.extend(remaining[position] for position in positions)
+
+        original_order = {id(batch): index for index, batch in enumerate(batches)}
+        return sorted(selected, key=lambda batch: original_order[id(batch)])
+
+    @staticmethod
+    def _evenly_spaced_positions(item_count: int, sample_count: int) -> list[int]:
+        if item_count <= 0 or sample_count <= 0:
+            return []
+        if sample_count >= item_count:
+            return list(range(item_count))
+        return sorted(
+            {
+                round(index * (item_count - 1) / max(sample_count - 1, 1))
+                for index in range(sample_count)
+            }
+        )
+
+    @staticmethod
     def _format_graph_excerpt(chunk: DocumentChunk) -> str:
         metadata = chunk.metadata
         return (
@@ -708,6 +809,9 @@ class IngestionService:
         batches_total: int,
         batches_succeeded: int,
         batches_failed: int,
+        batches_skipped: int,
+        provider_limited: bool,
+        extraction_budget_applied: bool,
         failed_section_labels: list[str],
     ) -> GraphExtractionResponse:
         """Merge section graphs by normalized name with stable first-seen IDs."""
@@ -795,6 +899,9 @@ class IngestionService:
             batches_total=batches_total,
             batches_succeeded=batches_succeeded,
             batches_failed=batches_failed,
+            batches_skipped=batches_skipped,
+            provider_limited=provider_limited,
+            extraction_budget_applied=extraction_budget_applied,
             failed_section_labels=failed_section_labels,
         )
 

@@ -169,6 +169,18 @@ class Settings(BaseSettings):
         le=120.0,
         alias="PROVIDER_TIMEOUT_SECONDS",
     )
+    graph_batch_size: int = Field(
+        default=4,
+        ge=2,
+        le=4,
+        alias="GRAPH_BATCH_SIZE",
+    )
+    graph_max_batches: int = Field(
+        default=6,
+        ge=1,
+        le=24,
+        alias="GRAPH_MAX_BATCHES",
+    )
 
     llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")

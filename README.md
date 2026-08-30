@@ -43,7 +43,7 @@ UPLOADED -> EXTRACTING -> EXTRACTED -> CHUNKING -> CHUNKED
 -> EMBEDDING -> EMBEDDED -> BUILDING_GRAPH -> GRAPH_BUILT -> READY
 ```
 
-`READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Graph extraction runs in bounded section batches, retries strict-schema failures once with locally validated JSON, preserves successful batches, and deterministically merges concepts by normalized name. Incomplete coverage is reported as `GRAPH_PARTIAL`; zero validated concepts is reported as `READY_WITHOUT_GRAPH`. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
+`READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Graph extraction runs in bounded section batches under a configurable free-tier request budget, retries strict-schema failures once with locally validated JSON, preserves successful batches, and deterministically merges concepts by normalized name. Provider quota exhaustion stops graph calls without discarding searchable vectors or completed graph sections. Incomplete coverage is reported as `GRAPH_PARTIAL`; zero validated concepts is reported as `READY_WITHOUT_GRAPH`. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
 
 Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page.
 
@@ -117,6 +117,8 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `NEO4J_*` | Neo4j Aura credentials |
 | `S3_*` | Private R2 bucket endpoint and scoped credentials |
 | `GROQ_API_KEY` | Secret graph/synthesis provider key |
+| `GRAPH_BATCH_SIZE` | Chunks per graph request; default `4` |
+| `GRAPH_MAX_BATCHES` | Maximum graph requests planned per PDF; default `6` for free-tier control |
 | `ALLOWED_ORIGINS` | Exact deployed frontend origin; comma-separated if necessary |
 | `DEMO_ACCESS_TOKEN` | Secret reviewer code of at least 24 characters; configure it only in the hosting dashboard |
 | `REQUIRE_UPLOAD_AUTH` | `true` for public deployments |

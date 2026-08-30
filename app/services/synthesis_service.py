@@ -1,11 +1,15 @@
 import asyncio
 import json
+import logging
 from typing import Any
 
-from groq import Groq
+from groq import APITimeoutError, Groq, RateLimitError
 
 from app.core.config import settings
 from app.core.exceptions import LLMConfigurationError
+
+
+logger = logging.getLogger(__name__)
 
 
 class SynthesisService:
@@ -34,12 +38,18 @@ class SynthesisService:
                 sources,
             )
         if provider == "groq":
-            return await asyncio.to_thread(
-                self._synthesize_with_groq,
-                question,
-                graph_context,
-                sources,
-            )
+            try:
+                return await asyncio.to_thread(
+                    self._synthesize_with_groq,
+                    question,
+                    graph_context,
+                    sources,
+                )
+            except (RateLimitError, APITimeoutError):
+                logger.warning(
+                    "Answer synthesis provider was unavailable; returning retrieved evidence"
+                )
+                return self._grounded_evidence_fallback(sources)
         raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
 
     def _synthesize_with_groq(
@@ -61,6 +71,26 @@ class SynthesisService:
             temperature=0,
         )
         return completion.choices[0].message.content or ""
+
+    @staticmethod
+    def _grounded_evidence_fallback(sources: list[dict[str, Any]]) -> str:
+        passages: list[str] = []
+        for index, source in enumerate(sources[:2], start=1):
+            passage = " ".join(str(source.get("supporting_passage") or "").split())
+            if not passage:
+                continue
+            if len(passage) > 600:
+                passage = f"{passage[:597].rsplit(' ', 1)[0]}..."
+            page = source.get("page_number")
+            citation = f"[Source {index}{f', p. {page}' if page else ''}]"
+            passages.append(f"- {passage} {citation}")
+        if not passages:
+            return "I could not find enough reliable course content to answer this confidently."
+        return (
+            "AI synthesis is temporarily unavailable, so here are the most relevant "
+            "retrieved course passages:\n\n"
+            + "\n\n".join(passages)
+        )
 
     def _synthesize_with_gemini(
         self,

@@ -57,6 +57,9 @@ class GraphExtractionResponse(BaseModel):
     batches_total: int = Field(default=0, ge=0)
     batches_succeeded: int = Field(default=0, ge=0)
     batches_failed: int = Field(default=0, ge=0)
+    batches_skipped: int = Field(default=0, ge=0)
+    provider_limited: bool = False
+    extraction_budget_applied: bool = False
     failed_section_labels: list[StrictStr] = Field(default_factory=list)
 
     @model_validator(mode="after")

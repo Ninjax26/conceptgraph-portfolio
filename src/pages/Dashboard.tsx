@@ -695,6 +695,11 @@ export default function Dashboard(): JSX.Element {
                           {graphCoverageLabel(job.result_json)}
                         </span>
                       ) : null}
+                      {graphLimitLabel(job.result_json) ? (
+                        <span className="text-[10px] font-medium text-amber-700">
+                          {graphLimitLabel(job.result_json)}
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -893,6 +898,17 @@ function graphCoverageLabel(resultJson: Record<string, unknown> | null | undefin
     return null;
   }
   return `${represented} of ${total} sections represented`;
+}
+
+function graphLimitLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
+  if (!resultJson) return null;
+  if (resultJson.graph_provider_limited === true) {
+    return "Provider quota reached; completed graph data was preserved";
+  }
+  if (resultJson.graph_extraction_budget_applied === true) {
+    return "Free-demo extraction budget applied";
+  }
+  return null;
 }
 
 function statusClass(status: UploadStatusResponse["status"]): string {

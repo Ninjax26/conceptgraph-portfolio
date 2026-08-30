@@ -157,6 +157,7 @@ class DocumentProcessingService:
                     sections_total=graph.sections_total,
                     sections_succeeded=graph.sections_succeeded,
                     batches_failed=graph.batches_failed,
+                    batches_skipped=graph.batches_skipped,
                 ).value,
                 "graph_sections_total": graph.sections_total,
                 "graph_sections_succeeded": graph.sections_succeeded,
@@ -164,6 +165,9 @@ class DocumentProcessingService:
                 "graph_batches_total": graph.batches_total,
                 "graph_batches_succeeded": graph.batches_succeeded,
                 "graph_batches_failed": graph.batches_failed,
+                "graph_batches_skipped": graph.batches_skipped,
+                "graph_provider_limited": graph.provider_limited,
+                "graph_extraction_budget_applied": graph.extraction_budget_applied,
                 "graph_failed_sections": graph.failed_section_labels,
             }
             completed = await self._run_with_session(

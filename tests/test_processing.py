@@ -11,7 +11,7 @@ import pymupdf as fitz
 import httpx
 from botocore.exceptions import ClientError, EndpointConnectionError
 from fastapi import HTTPException, Request, UploadFile
-from groq import BadRequestError
+from groq import BadRequestError, RateLimitError
 from starlette.responses import JSONResponse
 from starlette.datastructures import Headers
 
@@ -638,6 +638,10 @@ class ProcessingRulesTests(unittest.TestCase):
             set(response_format["json_schema"]["schema"]["required"]),
             {"nodes", "relationships"},
         )
+        self.assertEqual(
+            response_format["json_schema"]["schema"]["properties"]["nodes"]["maxItems"],
+            IngestionService.MAX_CONCEPTS_PER_BATCH,
+        )
         self.assertEqual(result, GraphExtractionResponse())
 
     def test_json_schema_provider_failure_is_retryable(self):
@@ -701,7 +705,7 @@ class ProcessingRulesTests(unittest.TestCase):
                 )
             ]
         )
-        client.chat.completions.create.side_effect = [failure, failure, failure, fallback]
+        client.chat.completions.create.side_effect = [failure, fallback]
         service = IngestionService(
             graph_driver=SimpleNamespace(),
             vector_client=SimpleNamespace(),
@@ -713,7 +717,7 @@ class ProcessingRulesTests(unittest.TestCase):
         ):
             result = service._extract_with_groq("Course text\n" * 2000)
 
-        self.assertEqual(client.chat.completions.create.call_count, 4)
+        self.assertEqual(client.chat.completions.create.call_count, 2)
         self.assertEqual(
             client.chat.completions.create.call_args.kwargs["response_format"],
             {"type": "json_object"},
@@ -733,12 +737,7 @@ class ProcessingRulesTests(unittest.TestCase):
             choices=[SimpleNamespace(message=SimpleNamespace(content='{"nodes": "bad"}'))]
         )
         client = Mock()
-        client.chat.completions.create.side_effect = [
-            failure,
-            failure,
-            failure,
-            invalid_fallback,
-        ]
+        client.chat.completions.create.side_effect = [failure, invalid_fallback]
         service = IngestionService(
             graph_driver=SimpleNamespace(),
             vector_client=SimpleNamespace(),
@@ -921,6 +920,77 @@ class ProcessingRulesTests(unittest.TestCase):
         )
         self.assertGreater(len(sampled), 8)
 
+    def test_graph_batch_budget_samples_sections_across_the_document(self):
+        chunks = [
+            DocumentChunk(
+                id=f"section-{index}",
+                text=f"Section {index}",
+                metadata={
+                    "document_name": "course.pdf",
+                    "section_heading": f"Section {index}",
+                    "page_number": index + 1,
+                },
+            )
+            for index in range(10)
+        ]
+
+        candidates = IngestionService._graph_section_batches(chunks, batch_size=4)
+        selected = IngestionService._select_graph_batches(candidates, 6)
+
+        self.assertEqual(len(selected), 6)
+        self.assertEqual(selected[0].chunks[0].id, "section-0")
+        self.assertEqual(selected[-1].chunks[0].id, "section-9")
+        self.assertTrue(any(batch.chunks[0].id == "section-5" for batch in selected))
+
+    def test_provider_quota_preserves_completed_graph_batches(self):
+        chunks = [
+            DocumentChunk(
+                id=f"section-{index}",
+                text=f"Section {index}",
+                metadata={
+                    "document_name": "course.pdf",
+                    "section_heading": f"Section {index}",
+                    "page_number": index + 1,
+                    "upload_id": "upload-1",
+                },
+            )
+            for index in range(3)
+        ]
+        first_graph = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(
+                    id="first",
+                    name="First",
+                    type="topic",
+                    source_chunk_id="section-0",
+                )
+            ]
+        )
+        rate_limit = RateLimitError(
+            "Daily token quota reached",
+            response=httpx.Response(
+                429,
+                request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions"),
+            ),
+            body={"error": {"code": "rate_limit_exceeded"}},
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+        service.extract_graph_from_text = AsyncMock(
+            side_effect=[first_graph, rate_limit, AssertionError("must stop after quota")]
+        )
+
+        graph = asyncio.run(service.extract_graph_from_chunks(chunks))
+
+        self.assertEqual(len(graph.nodes), 1)
+        self.assertTrue(graph.provider_limited)
+        self.assertEqual(graph.batches_succeeded, 1)
+        self.assertEqual(graph.batches_failed, 1)
+        self.assertEqual(graph.batches_skipped, 1)
+        self.assertEqual(service.extract_graph_from_text.await_count, 2)
+
     def test_section_graphs_keep_successful_batches_and_merge_duplicate_concepts(self):
         chunks = [
             DocumentChunk(
@@ -1008,6 +1078,38 @@ class ProcessingRulesTests(unittest.TestCase):
             ),
             GraphStatus.GRAPH_PARTIAL,
         )
+        self.assertEqual(
+            assess_graph_status(4, 3, batches_skipped=1),
+            GraphStatus.GRAPH_PARTIAL,
+        )
+
+    def test_answer_synthesis_falls_back_to_retrieved_evidence_on_quota(self):
+        rate_limit = RateLimitError(
+            "Daily token quota reached",
+            response=httpx.Response(
+                429,
+                request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions"),
+            ),
+            body={"error": {"code": "rate_limit_exceeded"}},
+        )
+        service = SynthesisService()
+        sources = [
+            {
+                "supporting_passage": "Phishing is a social-engineering attack.",
+                "page_number": 4,
+            }
+        ]
+
+        with (
+            patch("app.services.synthesis_service.settings.llm_provider", "groq"),
+            patch("app.services.synthesis_service.settings.groq_api_key", "test-key"),
+            patch.object(service, "_synthesize_with_groq", side_effect=rate_limit),
+        ):
+            answer = asyncio.run(service.synthesize("What is phishing?", [], sources))
+
+        self.assertIn("AI synthesis is temporarily unavailable", answer)
+        self.assertIn("Phishing is a social-engineering attack.", answer)
+        self.assertIn("[Source 1, p. 4]", answer)
 
     def test_graph_context_truncation_never_removes_source_identifier(self):
         excerpt = (
