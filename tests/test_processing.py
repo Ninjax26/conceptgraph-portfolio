@@ -1494,8 +1494,99 @@ class ProcessingRulesTests(unittest.TestCase):
     def test_bidirectional_graph_query_preserves_native_edge_direction(self):
         generated = RetrievalService._fallback_cypher("zero trust")
 
-        self.assertIn("(concept)-[relationship]-(related:Concept)", generated.cypher)
+        self.assertIn(
+            "(concept)-[adjacent_relationship]-(adjacent:Concept)",
+            generated.cypher,
+        )
         self.assertIn("related_concepts", generated.cypher)
+
+    def test_graph_query_fetches_bounded_two_hop_prerequisites(self):
+        generated = RetrievalService._fallback_cypher("zero trust")
+
+        self.assertIn("[:PREREQUISITE_OF*1..2]", generated.cypher)
+        self.assertIn("path_node.upload_id IN $document_ids", generated.cypher)
+        self.assertIn("(course)-[:CONTAINS]->(path_node)", generated.cypher)
+
+    def test_prerequisite_hops_keep_one_and_two_hop_results_separate(self):
+        relationships = [
+            {"source": "direct", "target": "anchor", "type": "PREREQUISITE_OF"},
+            {"source": "foundation", "target": "direct", "type": "PREREQUISITE_OF"},
+            {"source": "too-far", "target": "foundation", "type": "PREREQUISITE_OF"},
+            {"source": "anchor", "target": "foundation", "type": "PREREQUISITE_OF"},
+            {"source": "related", "target": "anchor", "type": "RELATED_TO"},
+        ]
+
+        hops = RetrievalService._prerequisite_hops(
+            "anchor", relationships, max_hops=2
+        )
+
+        self.assertEqual(hops, {"direct": 1, "foundation": 2})
+        self.assertNotIn("too-far", hops)
+        self.assertNotIn("related", hops)
+
+    def test_graph_result_exposes_one_and_two_hop_metadata(self):
+        class FakeRelationship:
+            def __init__(self, source: str, target: str):
+                self.type = "PREREQUISITE_OF"
+                self.start_node = {"id": source}
+                self.end_node = {"id": target}
+
+            def items(self):
+                return []
+
+        service = RetrievalService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+        result = service._build_graph_result(
+            [
+                {
+                    "concept": {"id": "anchor", "name": "Application"},
+                    "related_concepts": [
+                        {"id": "direct", "name": "Framework"},
+                        {"id": "foundation", "name": "Programming"},
+                    ],
+                    "relationships": [
+                        FakeRelationship("direct", "anchor"),
+                        FakeRelationship("foundation", "direct"),
+                    ],
+                }
+            ],
+            {"total_nodes": 3, "total_edges": 2},
+            cypher="MATCH ...",
+            graph_status=GraphStatus.GRAPH_READY.value,
+            filter_reason="query_subgraph",
+            expand_prerequisites=True,
+        )
+
+        item = result.concepts[0]
+        self.assertEqual(result.one_hop_prerequisite_names, ["Framework"])
+        self.assertEqual(result.two_hop_prerequisite_names, ["Programming"])
+        self.assertEqual(result.prerequisite_names, ["Framework", "Programming"])
+        self.assertEqual(item["concept"]["retrieval_hop"], 0)
+        self.assertEqual(item["one_hop_prerequisites"][0]["retrieval_hop"], 1)
+        self.assertEqual(item["two_hop_prerequisites"][0]["retrieval_hop"], 2)
+        self.assertEqual(result.metadata["graph_expansion"]["one_hop_count"], 1)
+        self.assertEqual(result.metadata["graph_expansion"]["two_hop_count"], 1)
+
+    def test_query_expansion_labels_and_deduplicates_each_hop(self):
+        expanded = RetrievalService._build_expanded_query(
+            "How does deployment work?",
+            ["Framework", "Framework"],
+            ["Programming", "Framework"],
+        )
+
+        self.assertIn("Direct prerequisite concepts: Framework", expanded)
+        self.assertIn("Foundational background concepts: Programming", expanded)
+        self.assertEqual(expanded.count("Framework"), 1)
+
+    def test_query_expansion_preserves_vector_baseline_without_graph_terms(self):
+        question = "Explain a term that is not in the concept graph."
+
+        self.assertEqual(
+            RetrievalService._build_expanded_query(question, [], []),
+            question,
+        )
 
     def test_evidence_threshold_removes_irrelevant_passages(self):
         relevant = {

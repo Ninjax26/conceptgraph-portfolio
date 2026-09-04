@@ -155,11 +155,13 @@ Manual retry uses the same attempt cap and creates a new task token. Retry canno
 
 Query/exam flows first resolve canonical course context from READY documents only. Failed and active uploads cannot contribute vectors, graph metrics, questions, or answers.
 
-Graph retrieval uses parameterized, read-only Cypher scoped to canonical course IDs and READY document IDs. Native driver records preserve relationship direction. Only prerequisite relationships expand the semantic search query; all valid typed relationships remain visible in the concept map.
+Graph retrieval uses parameterized, read-only Cypher scoped to canonical course IDs and READY document IDs. Native driver records preserve relationship direction. Each matched concept is an anchor for an inbound `PREREQUISITE_OF` traversal with a hard maximum of two hops. Direct and foundational prerequisite names are deduplicated separately before they expand the semantic query; all valid typed relationships remain visible in the concept map. Breadth is bounded by five anchors and depth is bounded by two, preventing an uncontrolled whole-graph expansion.
+
+When no term-matched anchor exists, the service may return a bounded course graph for visualization, but it does not use that broad graph to expand the semantic query. Qdrant receives the original question unchanged. This keeps graph absence or vocabulary mismatch from reducing the vector-search baseline.
 
 The production retrieval path deliberately uses a deterministic Cypher template rather than executing LLM-generated database queries. A legacy provider-backed Cypher helper remains isolated from the request path, but every executed query is validated as read-only and parameterized. This reduces injection risk and makes course/document scoping explainable.
 
-Qdrant search filters by READY upload IDs. Hosted and local embeddings use the same 384-dimensional MiniLM space and normalized cosine collection contract. Startup rejects an incompatible collection and instructs the operator to choose a new collection name.
+Qdrant search filters by READY upload IDs. Its query text contains the original question plus separately labelled direct and foundational prerequisite terms only when an anchor was found. Hosted and local embeddings use the same 384-dimensional MiniLM space and normalized cosine collection contract. Startup rejects an incompatible collection and instructs the operator to choose a new collection name.
 
 Reranking returns a provider-neutral logit. Cohere probabilities are converted to logits so the existing sigmoid-based evidence gate behaves identically. Low evidence returns a grounded fallback without asking the synthesis LLM to invent an answer. User-facing sources expose document, page, section, and supporting passage but not internal vector IDs or file keys.
 

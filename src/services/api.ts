@@ -12,6 +12,7 @@ export interface ConceptNode {
   source_chunk_ids?: string[];
   page_numbers?: number[];
   section_headings?: string[];
+  retrieval_hop?: 0 | 1 | 2;
 }
 
 export type GraphStatus = "GRAPH_READY" | "GRAPH_PARTIAL" | "READY_WITHOUT_GRAPH";
@@ -47,6 +48,8 @@ export interface GraphContextItem {
   concept: Partial<ConceptNode>;
   related_concepts: Array<Partial<ConceptNode>>;
   prerequisites: Array<Partial<ConceptNode>>;
+  one_hop_prerequisites?: Array<Partial<ConceptNode>>;
+  two_hop_prerequisites?: Array<Partial<ConceptNode>>;
   relationships: GraphRelationship[];
 }
 
@@ -61,6 +64,12 @@ export interface QueryResponse {
     displayed_edges: number;
     filter_reason: string;
     graph_status: GraphStatus;
+    graph_expansion?: {
+      anchor_match_found: boolean;
+      maximum_hops: number;
+      one_hop_count: number;
+      two_hop_count: number;
+    };
   };
   confidence: {
     level: "high" | "medium" | "low" | "insufficient";

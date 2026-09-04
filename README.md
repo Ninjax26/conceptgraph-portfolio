@@ -148,7 +148,7 @@ Graph status is separate from document readiness:
 flowchart LR
   Question --> Ready[Resolve READY course documents]
   Ready --> Graph[Read scoped Neo4j subgraph]
-  Graph --> Expand[Expand query with prerequisites]
+  Graph --> Expand[Expand query with 1-hop and 2-hop prerequisites]
   Expand --> Vector[Qdrant top-k search]
   Vector --> Rerank[Cohere or local reranker]
   Rerank --> Evidence{Evidence threshold met?}
@@ -159,7 +159,9 @@ flowchart LR
   Secondary -. unavailable .-> Passages[Return retrieved evidence]
 ```
 
-Only READY upload IDs can contribute results. Retrieval uses deterministic, parameterized, read-only Cypher; it does not execute an LLM-generated database query. Qdrant then performs metadata-filtered semantic search, and reranking produces a provider-neutral score. Evidence confidence combines `70%` reranker probability with `30%` vector similarity. If nothing passes the minimum threshold, the API refuses before calling an LLM.
+Only READY upload IDs can contribute results. Retrieval uses deterministic, parameterized, read-only Cypher; it does not execute an LLM-generated database query. A matched concept is the anchor: inbound `PREREQUISITE_OF` paths are traversed to a maximum depth of two, direct and foundational prerequisites are kept separate, and both groups expand the semantic query. The traversal is course- and upload-scoped, cycle-safe, and bounded to five anchors. If no concept name matches, Qdrant receives the original question unchanged so a broad graph fallback cannot dilute vector retrieval. Qdrant then performs metadata-filtered semantic search, and reranking produces a provider-neutral score. Evidence confidence combines `70%` reranker probability with `30%` vector similarity. If nothing passes the minimum threshold, the API refuses before calling an LLM.
+
+The dashboard distinguishes query anchors, direct prerequisites, and two-hop foundational prerequisites. The API also reports both hop counts in `graph_metadata.graph_expansion`; two-hop prerequisite edges use a dashed style so retrieval depth remains visible rather than being implied.
 
 The answer prompt contains only bounded graph context and retrieved course passages. Citations expose readable PDF/page/section information and preview links, never internal vector IDs, storage keys, or database identifiers.
 
@@ -213,7 +215,7 @@ UPLOADED -> EXTRACTING -> EXTRACTED -> CHUNKING -> CHUNKED
 
 `READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Graph extraction runs in bounded section batches under a configurable free-tier request budget, retries strict-schema failures once with locally validated JSON, preserves successful batches, and deterministically merges concepts by normalized name. Provider quota exhaustion stops graph calls without discarding searchable vectors or completed graph sections. Incomplete coverage is reported as `GRAPH_PARTIAL`; zero validated concepts is reported as `READY_WITHOUT_GRAPH`. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
 
-Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page. Groq is the primary LLM, while an optional Cerebras key enables automatic failover for graph extraction, answers, and exams. A shared cooldown temporarily bypasses a provider after a quota response or timeout instead of repeating requests that are expected to fail.
+Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page. At query time, Neo4j contributes separate bounded one-hop and two-hop prerequisite sets to semantic retrieval while retaining all valid relationship types for visualization. Groq is the primary LLM, while an optional Cerebras key enables automatic failover for graph extraction, answers, and exams. A shared cooldown temporarily bypasses a provider after a quota response or timeout instead of repeating requests that are expected to fail.
 
 Every worker-owned transition is fenced by both the current task token and lease owner. A stale task cannot advance or complete a newer attempt. The coordinator:
 
@@ -473,7 +475,7 @@ Recommended next phases, in order:
 3. **Document representation:** extract the native text layer, detect headings, create overlapping page-aware chunks, and embed every chunk in Qdrant.
 4. **Graph construction:** sample each section across its beginning/middle/end, run a bounded number of structured LLM calls, validate locally, and store only permitted nodes/edges with provenance in Neo4j.
 5. **Quality state:** mark the document `GRAPH_READY`, `GRAPH_PARTIAL`, or `READY_WITHOUT_GRAPH` instead of pretending every LLM output is complete.
-6. **Retrieval:** scope to READY uploads, read a safe graph subgraph, expand with prerequisites, retrieve vectors, rerank, and reject weak evidence.
+6. **Retrieval:** scope to READY uploads, match graph anchors, traverse bounded one-hop and two-hop prerequisites, expand the vector query with separately labelled terms, rerank, and reject weak evidence. If no anchor matches, preserve vector-only retrieval by searching the original question.
 7. **Answer:** synthesize only from selected evidence, attach PDF/page citations, fail over from Groq to Cerebras, and return evidence directly if both LLMs are unavailable.
 8. **Lifecycle:** support retry, crash recovery, timed demo retention, and complete deletion across every datastore.
 
@@ -495,7 +497,7 @@ Students often have long course PDFs but no structured view of how topics relate
 
 #### 2. Why use both Qdrant and Neo4j?
 
-Qdrant answers “which passages are semantically similar to this question?” Neo4j answers “which concepts are connected and how?” Vector search finds evidence; the graph adds explicit structure such as prerequisites and part-of relationships. PostgreSQL still owns workflow state, so neither derived store is treated as authoritative.
+Qdrant answers “which passages are semantically similar to this question?” Neo4j answers “which concepts are connected and how?” Vector search finds evidence; the graph adds explicit structure such as prerequisites and part-of relationships. Query retrieval follows inbound prerequisites for at most two hops, while the dashboard visually separates the matched concept, direct prerequisites, and foundational prerequisites. PostgreSQL still owns workflow state, so neither derived store is treated as authoritative.
 
 #### 3. Why not store everything in one database?
 

@@ -751,6 +751,13 @@ export default function Dashboard(): JSX.Element {
                 ? `Showing ${response.graph_metadata.displayed_nodes} of ${response.graph_metadata.total_nodes} concepts and ${response.graph_metadata.displayed_edges} of ${response.graph_metadata.total_edges} relationships.`
                 : "Ask a question to retrieve the most relevant concepts and prerequisite links."}
             </p>
+            {response?.graph_metadata.graph_expansion?.anchor_match_found ? (
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] font-medium text-slate-500" aria-label="Graph retrieval legend">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2 border-teal-700 bg-cyan-50" />Query match</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2 border-emerald-500 bg-emerald-50" />1-hop ({response.graph_metadata.graph_expansion.one_hop_count})</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2 border-blue-400 bg-blue-50" />2-hop ({response.graph_metadata.graph_expansion.two_hop_count})</span>
+              </div>
+            ) : null}
           </div>
           <button
             onClick={() => setIsUploadModalOpen(true)}
@@ -813,9 +820,25 @@ function buildGraphElements(graphContext: GraphContextItem[]): {
   const nodes = new Map<string, GraphCanvasNode>();
   const edges = new Map<string, GraphCanvasEdge>();
 
+  const upsertNode = (node: GraphCanvasNode): void => {
+    const existing = nodes.get(node.id);
+    if (!existing) {
+      nodes.set(node.id, node);
+      return;
+    }
+    const hops = [existing.retrievalHop, node.retrievalHop].filter(
+      (hop): hop is 0 | 1 | 2 => hop !== undefined,
+    );
+    nodes.set(node.id, {
+      ...existing,
+      ...node,
+      retrievalHop: hops.length > 0 ? Math.min(...hops) as 0 | 1 | 2 : undefined,
+    });
+  };
+
   graphContext.forEach((item, itemIndex) => {
     const conceptId = item.concept.id ?? `concept-${itemIndex}`;
-    nodes.set(conceptId, {
+    upsertNode({
       id: conceptId,
       label: item.concept.name ?? conceptId,
       type: item.concept.type,
@@ -824,12 +847,13 @@ function buildGraphElements(graphContext: GraphContextItem[]): {
       pageNumber: item.concept.page_number,
       sectionHeading: item.concept.section_heading,
       uploadId: item.concept.upload_id,
+      retrievalHop: item.concept.retrieval_hop,
     });
 
     (item.related_concepts ?? item.prerequisites).forEach((relatedConcept, relatedIndex) => {
       const relatedId =
         relatedConcept.id ?? `${conceptId}-related-${relatedIndex}`;
-      nodes.set(relatedId, {
+      upsertNode({
         id: relatedId,
         label: relatedConcept.name ?? relatedId,
         type: relatedConcept.type,
@@ -838,6 +862,7 @@ function buildGraphElements(graphContext: GraphContextItem[]): {
         pageNumber: relatedConcept.page_number,
         sectionHeading: relatedConcept.section_heading,
         uploadId: relatedConcept.upload_id,
+        retrievalHop: relatedConcept.retrieval_hop,
       });
 
     });
@@ -845,11 +870,17 @@ function buildGraphElements(graphContext: GraphContextItem[]): {
     item.relationships.forEach((relationship) => {
       if (!nodes.has(relationship.source) || !nodes.has(relationship.target)) return;
       const edgeId = `${relationship.source}->${relationship.target}:${relationship.type}`;
+      const sourceHop = nodes.get(relationship.source)?.retrievalHop;
+      const targetHop = nodes.get(relationship.target)?.retrievalHop;
+      const edgeHop = relationship.type === "PREREQUISITE_OF"
+        ? Math.max(sourceHop ?? 0, targetHop ?? 0)
+        : 0;
       edges.set(edgeId, {
         id: edgeId,
         source: relationship.source,
         target: relationship.target,
         label: relationship.type,
+        retrievalHop: edgeHop === 1 || edgeHop === 2 ? edgeHop : undefined,
       });
     });
   });

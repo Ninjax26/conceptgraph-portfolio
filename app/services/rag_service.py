@@ -29,9 +29,19 @@ class CypherGenerationResponse(BaseModel):
 @dataclass(frozen=True, slots=True)
 class GraphRetrievalResult:
     concepts: list[dict[str, Any]]
-    prerequisite_names: list[str]
+    one_hop_prerequisite_names: list[str]
+    two_hop_prerequisite_names: list[str]
     cypher: str
     metadata: dict[str, Any]
+
+    @property
+    def prerequisite_names(self) -> list[str]:
+        """Backward-compatible combined view, ordered by retrieval importance."""
+
+        return [
+            *self.one_hop_prerequisite_names,
+            *self.two_hop_prerequisite_names,
+        ]
 
 
 class RetrievalService:
@@ -58,7 +68,8 @@ class RetrievalService:
         chunks = await asyncio.to_thread(
             self.search_qdrant,
             question,
-            graph_result.prerequisite_names,
+            graph_result.one_hop_prerequisite_names,
+            graph_result.two_hop_prerequisite_names,
             context.document_ids,
             top_k,
         )
@@ -89,7 +100,8 @@ class RetrievalService:
             # native Record values so relationship endpoints and properties survive.
             records = [record async for record in result]
 
-            if not records:
+            matched_query_anchor = bool(records)
+            if not matched_query_anchor:
                 records = await self._fetch_course_graph(
                     session, context.graph_course_ids, context.document_ids
                 )
@@ -103,7 +115,12 @@ class RetrievalService:
             totals,
             cypher=cypher,
             graph_status=context.graph_status,
-            filter_reason="query_subgraph",
+            filter_reason=(
+                "query_subgraph"
+                if matched_query_anchor
+                else "course_graph_visualization_fallback"
+            ),
+            expand_prerequisites=matched_query_anchor,
         )
 
     async def fetch_course_graph(
@@ -129,6 +146,7 @@ class RetrievalService:
             cypher="public_sample_course_graph",
             graph_status=context.graph_status,
             filter_reason="public_sample",
+            expand_prerequisites=False,
         )
 
     def _build_graph_result(
@@ -139,42 +157,76 @@ class RetrievalService:
         cypher: str,
         graph_status: str,
         filter_reason: str,
+        expand_prerequisites: bool,
     ) -> GraphRetrievalResult:
         concepts: list[dict[str, Any]] = []
-        prerequisite_names: list[str] = []
+        one_hop_names: set[str] = set()
+        two_hop_names: set[str] = set()
         displayed_edge_ids: set[tuple[str, str, str]] = set()
         for record in records:
             concept = self._node_to_dict(record.get("concept"))
-            related_concepts = [
+            raw_related_concepts = [
                 self._node_to_dict(node)
                 for node in record.get("related_concepts", [])
                 if node is not None
             ]
-            relationships = [
+            relationships = self._dedupe_relationships([
                 self._relationship_to_dict(rel)
                 for rel in record.get("relationships", [])
                 if rel is not None
+            ])
+            related_concepts = self._dedupe_nodes(raw_related_concepts)
+            prerequisite_hops = (
+                self._prerequisite_hops(
+                    str(concept.get("id", "")),
+                    relationships,
+                    max_hops=2,
+                )
+                if expand_prerequisites
+                else {}
+            )
+            if expand_prerequisites:
+                concept = {**concept, "retrieval_hop": 0}
+                related_concepts = [
+                    {
+                        **node,
+                        **(
+                            {"retrieval_hop": prerequisite_hops[str(node.get("id"))]}
+                            if str(node.get("id")) in prerequisite_hops
+                            else {}
+                        ),
+                    }
+                    for node in related_concepts
+                ]
+            one_hop_prerequisites = [
+                node
+                for node in related_concepts
+                if prerequisite_hops.get(str(node.get("id"))) == 1
+            ]
+            two_hop_prerequisites = [
+                node
+                for node in related_concepts
+                if prerequisite_hops.get(str(node.get("id"))) == 2
             ]
             concepts.append({
                 "concept": concept,
                 "related_concepts": related_concepts,
-                "prerequisites": [
-                    node
-                    for node in related_concepts
-                    if any(
-                        relationship.get("type") == "PREREQUISITE_OF"
-                        and relationship.get("source") == node.get("id")
-                        and relationship.get("target") == concept.get("id")
-                        for relationship in relationships
-                    )
-                ],
+                # Keep `prerequisites` as the direct-hop field for existing clients.
+                "prerequisites": one_hop_prerequisites,
+                "one_hop_prerequisites": one_hop_prerequisites,
+                "two_hop_prerequisites": two_hop_prerequisites,
                 "relationships": relationships,
             })
-            names_by_id = {
-                str(node.get("id")): str(node.get("name"))
-                for node in related_concepts
-                if node.get("id") and node.get("name")
-            }
+            one_hop_names.update(
+                str(node["name"])
+                for node in one_hop_prerequisites
+                if node.get("name")
+            )
+            two_hop_names.update(
+                str(node["name"])
+                for node in two_hop_prerequisites
+                if node.get("name")
+            )
             for relationship in relationships:
                 edge_id = (
                     str(relationship.get("source", "")),
@@ -182,17 +234,14 @@ class RetrievalService:
                     str(relationship.get("type", "")),
                 )
                 displayed_edge_ids.add(edge_id)
-                if (
-                    relationship.get("type") == "PREREQUISITE_OF"
-                    and relationship.get("target") == concept.get("id")
-                ):
-                    prerequisite_name = names_by_id.get(str(relationship.get("source", "")))
-                    if prerequisite_name:
-                        prerequisite_names.append(prerequisite_name)
+
+        # A concept reachable at both distances is kept in the stronger direct set.
+        two_hop_names.difference_update(one_hop_names)
 
         return GraphRetrievalResult(
             concepts=concepts,
-            prerequisite_names=sorted(set(prerequisite_names)),
+            one_hop_prerequisite_names=sorted(one_hop_names),
+            two_hop_prerequisite_names=sorted(two_hop_names),
             cypher=cypher,
             metadata={
                 **totals,
@@ -205,6 +254,12 @@ class RetrievalService:
                 "displayed_edges": len(displayed_edge_ids),
                 "filter_reason": filter_reason,
                 "graph_status": graph_status,
+                "graph_expansion": {
+                    "anchor_match_found": expand_prerequisites,
+                    "maximum_hops": 2,
+                    "one_hop_count": len(one_hop_names),
+                    "two_hop_count": len(two_hop_names),
+                },
             },
         )
 
@@ -225,7 +280,8 @@ class RetrievalService:
     def search_qdrant(
         self,
         question: str,
-        prerequisite_names: list[str],
+        one_hop_prerequisite_names: list[str],
+        two_hop_prerequisite_names: list[str],
         document_ids: list[str],
         top_k: int = 10,
     ) -> list[Any]:
@@ -233,7 +289,11 @@ class RetrievalService:
             logger.info("Qdrant collection %s does not exist yet.", self.collection_name)
             return []
 
-        expanded_query = self._build_expanded_query(question, prerequisite_names)
+        expanded_query = self._build_expanded_query(
+            question,
+            one_hop_prerequisite_names,
+            two_hop_prerequisite_names,
+        )
         if settings.embedding_provider == "qdrant_cloud":
             query_vector = Document(
                 text=expanded_query,
@@ -413,10 +473,26 @@ class RetrievalService:
             WHERE course.id IN $course_ids
               AND concept.upload_id IN $document_ids
               AND any(term IN $terms WHERE toLower(concept.name) CONTAINS term)
-            OPTIONAL MATCH (concept)-[relationship]-(related:Concept)
-            WHERE related IS NULL OR ((course)-[:CONTAINS]->(related) AND related.upload_id IN $document_ids)
-            RETURN concept, collect(DISTINCT related) AS related_concepts,
-                   collect(DISTINCT relationship) AS relationships
+            OPTIONAL MATCH prerequisite_path =
+              (prerequisite:Concept)-[:PREREQUISITE_OF*1..2]->(concept)
+            WHERE all(
+              path_node IN nodes(prerequisite_path)
+              WHERE path_node.upload_id IN $document_ids
+                AND (course)-[:CONTAINS]->(path_node)
+            )
+            WITH course, concept, collect(DISTINCT prerequisite_path) AS prerequisite_paths
+            OPTIONAL MATCH (concept)-[adjacent_relationship]-(adjacent:Concept)
+            WHERE adjacent IS NULL OR (
+              (course)-[:CONTAINS]->(adjacent)
+              AND adjacent.upload_id IN $document_ids
+            )
+            RETURN concept,
+                   collect(DISTINCT adjacent) +
+                     reduce(node_acc = [], path IN prerequisite_paths |
+                       node_acc + nodes(path)[0..-1]) AS related_concepts,
+                   collect(DISTINCT adjacent_relationship) +
+                     reduce(edge_acc = [], path IN prerequisite_paths |
+                       edge_acc + relationships(path)) AS relationships
             LIMIT 5
             """,
             parameters={"terms": terms or [question.lower()]},
@@ -453,11 +529,85 @@ class RetrievalService:
         }
 
     @staticmethod
-    def _build_expanded_query(question: str, prerequisite_names: list[str]) -> str:
-        if not prerequisite_names:
+    def _build_expanded_query(
+        question: str,
+        one_hop_prerequisite_names: list[str],
+        two_hop_prerequisite_names: list[str],
+    ) -> str:
+        one_hop = list(dict.fromkeys(one_hop_prerequisite_names))[:6]
+        one_hop_set = set(one_hop)
+        two_hop = [
+            name
+            for name in dict.fromkeys(two_hop_prerequisite_names)
+            if name not in one_hop_set
+        ][:6]
+        if not one_hop and not two_hop:
             return question
-        graph_terms = " ".join(prerequisite_names)
-        return f"{question}\nRelevant prerequisite concepts: {graph_terms}"
+        parts = [question]
+        if one_hop:
+            parts.append("Direct prerequisite concepts: " + ", ".join(one_hop))
+        if two_hop:
+            parts.append("Foundational background concepts: " + ", ".join(two_hop))
+        return "\n".join(parts)
+
+    @staticmethod
+    def _dedupe_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        unique: dict[str, dict[str, Any]] = {}
+        for node in nodes:
+            node_id = str(node.get("id", ""))
+            if node_id:
+                unique.setdefault(node_id, node)
+        return list(unique.values())
+
+    @staticmethod
+    def _dedupe_relationships(
+        relationships: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        unique: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for relationship in relationships:
+            key = (
+                str(relationship.get("source", "")),
+                str(relationship.get("target", "")),
+                str(relationship.get("type", "")),
+            )
+            if all(key):
+                unique.setdefault(key, relationship)
+        return list(unique.values())
+
+    @staticmethod
+    def _prerequisite_hops(
+        anchor_id: str,
+        relationships: list[dict[str, Any]],
+        *,
+        max_hops: int,
+    ) -> dict[str, int]:
+        """Return shortest inbound prerequisite distance from an anchor concept."""
+
+        if not anchor_id or max_hops < 1:
+            return {}
+        inbound: dict[str, set[str]] = {}
+        for relationship in relationships:
+            if relationship.get("type") != "PREREQUISITE_OF":
+                continue
+            source = str(relationship.get("source", ""))
+            target = str(relationship.get("target", ""))
+            if source and target and source != target:
+                inbound.setdefault(target, set()).add(source)
+
+        distances: dict[str, int] = {}
+        frontier = {anchor_id}
+        for distance in range(1, max_hops + 1):
+            next_frontier: set[str] = set()
+            for target in frontier:
+                for source in inbound.get(target, set()):
+                    if source == anchor_id or source in distances:
+                        continue
+                    distances[source] = distance
+                    next_frontier.add(source)
+            frontier = next_frontier
+            if not frontier:
+                break
+        return distances
 
     async def _fetch_course_graph(
         self,

@@ -17,6 +17,7 @@ export interface GraphCanvasNode {
   pageNumber?: number | null;
   sectionHeading?: string;
   uploadId?: string;
+  retrievalHop?: 0 | 1 | 2;
 }
 
 export interface GraphCanvasEdge {
@@ -24,6 +25,7 @@ export interface GraphCanvasEdge {
   source: string;
   target: string;
   label?: string;
+  retrievalHop?: 1 | 2;
 }
 
 interface ConceptGraphCanvasProps {
@@ -97,6 +99,38 @@ export default function ConceptGraphCanvas({
           },
         },
         {
+          selector: "node[retrievalHop = 0]",
+          style: {
+            "background-color": "#ecfeff",
+            "border-color": "#0f766e",
+            "border-width": 4,
+          },
+        },
+        {
+          selector: "node[retrievalHop = 1]",
+          style: {
+            "background-color": "#ecfdf5",
+            "border-color": "#10b981",
+            "border-width": 3,
+          },
+        },
+        {
+          selector: "node[retrievalHop = 2]",
+          style: {
+            "background-color": "#eff6ff",
+            "border-color": "#60a5fa",
+            "border-width": 2,
+          },
+        },
+        {
+          selector: "edge[retrievalHop = 2]",
+          style: {
+            "line-style": "dashed",
+            "line-color": "#93c5fd",
+            "target-arrow-color": "#93c5fd",
+          },
+        },
+        {
           selector: "node.selectedPath",
           style: {
             "background-color": "#dbf7f2",
@@ -147,6 +181,9 @@ export default function ConceptGraphCanvas({
           : undefined,
         uploadId: selected.data("uploadId")
           ? String(selected.data("uploadId"))
+          : undefined,
+        retrievalHop: [0, 1, 2].includes(Number(selected.data("retrievalHop")))
+          ? Number(selected.data("retrievalHop")) as 0 | 1 | 2
           : undefined,
       });
 
@@ -248,6 +285,7 @@ export default function ConceptGraphCanvas({
           pageNumber: node.pageNumber ?? null,
           sectionHeading: node.sectionHeading ?? "",
           uploadId: node.uploadId ?? "",
+          retrievalHop: node.retrievalHop,
         },
       })),
       ...edges.map((edge) => ({
@@ -256,6 +294,7 @@ export default function ConceptGraphCanvas({
           source: edge.source,
           target: edge.target,
           label: edge.label ?? "",
+          retrievalHop: edge.retrievalHop,
         },
       })),
     ];
@@ -300,6 +339,15 @@ export default function ConceptGraphCanvas({
             <div>
               <p className="text-sm font-semibold text-ink">{selectedNode.label}</p>
               <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700">{selectedNode.type || "concept"}</p>
+              {selectedNode.retrievalHop !== undefined ? (
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  {selectedNode.retrievalHop === 0
+                    ? "Query concept"
+                    : selectedNode.retrievalHop === 1
+                      ? "Direct prerequisite · 1 hop"
+                      : "Foundational prerequisite · 2 hops"}
+                </p>
+              ) : null}
             </div>
             <button aria-label="Close concept details" className="rounded p-1 text-slate-400 hover:bg-slate-100" onClick={() => {
               setSelectedNode(null);
