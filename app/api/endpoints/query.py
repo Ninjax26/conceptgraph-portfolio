@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.exceptions import LLMConfigurationError
-from app.services.rag_service import RetrievalService
+from app.services.rag_service import RetrievalMode, RetrievalService
 from app.services.rerank_service import RerankService
 from app.services.synthesis_service import SynthesisService
 from app.services.citation_service import assess_evidence, build_sources
@@ -24,6 +24,7 @@ class QueryRequest(BaseModel):
 
     question: str = Field(..., min_length=1)
     course_id: str = Field(..., min_length=1)
+    retrieval_mode: RetrievalMode = RetrievalMode.TWO_HOP
 
 
 class AnswerConfidence(BaseModel):
@@ -73,6 +74,7 @@ async def query_conceptgraph(
         retrieval_result = await retrieval_service.retrieve(
             question=request.question,
             context=course_context,
+            retrieval_mode=request.retrieval_mode,
         )
     except Exception as exc:
         logger.exception("Retrieval pipeline failed")
@@ -115,7 +117,8 @@ async def query_conceptgraph(
     try:
         answer = await synthesis_service.synthesize(
             question=request.question,
-            graph_context=retrieval_result["graph_context"],
+            graph_context=(retrieval_result["graph_context"]
+                if retrieval_result["graph_metadata"].get("filter_reason") == "query_subgraph" else []),
             sources=sources,
         )
     except LLMConfigurationError as exc:

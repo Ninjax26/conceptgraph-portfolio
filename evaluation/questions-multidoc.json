@@ -1,0 +1,346 @@
+{
+  "name": "Authored multi-document computing retrieval v1",
+  "course_id": "EVAL_COMPUTING_V1",
+  "annotation_note": "Source labels checked against the authored evaluation/course.json pages. Synthetic educational fixture, not an independently human-annotated production benchmark. All listed document/page pairs are required for multi-source questions.",
+  "questions": [
+    {
+      "id": "q01",
+      "question": "What fields make up an HTTP request and response?",
+      "category": "factual",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 1,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 1
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q02",
+      "question": "What does a browser verify in a TLS certificate?",
+      "category": "factual",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 2,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 2
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q03",
+      "question": "What should I learn before HTTPS, including its foundational prerequisite?",
+      "category": "two_hop",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 1,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 2
+        },
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 3
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q04",
+      "question": "How do DNS caching and HTTP caching differ?",
+      "category": "multi_page",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 4,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 4
+        },
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 5
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q05",
+      "question": "How do HTTP 401 and HTTP 403 differ?",
+      "category": "factual",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 6,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 6
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q06",
+      "question": "What must I understand directly before HTTPS?",
+      "category": "one_hop",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 2,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 2
+        },
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 3
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q07",
+      "question": "How are authentication and authorization different?",
+      "category": "multi_page",
+      "expected_document": "identity-security.pdf",
+      "expected_page": 1,
+      "expected_sources": [
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 2
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q08",
+      "question": "What should I learn before document access control, including its foundational prerequisite?",
+      "category": "two_hop",
+      "expected_document": "identity-security.pdf",
+      "expected_page": 1,
+      "expected_sources": [
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 2
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 3
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q09",
+      "question": "What do HttpOnly and Secure do for signed sessions?",
+      "category": "factual",
+      "expected_document": "identity-security.pdf",
+      "expected_page": 4,
+      "expected_sources": [
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 4
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q10",
+      "question": "Can HTTPS prevent phishing or prove a site is honest?",
+      "category": "multi_document",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 3,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 3
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 5
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q11",
+      "question": "Does a rate limit establish identity or document ownership?",
+      "category": "factual",
+      "expected_document": "identity-security.pdf",
+      "expected_page": 6,
+      "expected_sources": [
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 6
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q12",
+      "question": "Why is authorization needed even when HTTPS protects PDF traffic?",
+      "category": "multi_document",
+      "expected_document": "web-foundations.pdf",
+      "expected_page": 3,
+      "expected_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 3
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 3
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q13",
+      "question": "Why cannot a PostgreSQL rollback remove partial Qdrant writes?",
+      "category": "multi_page",
+      "expected_document": "data-reliability.pdf",
+      "expected_page": 1,
+      "expected_sources": [
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 4
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q14",
+      "question": "What should I learn before safe retries, including its foundational prerequisite?",
+      "category": "two_hop",
+      "expected_document": "data-reliability.pdf",
+      "expected_page": 1,
+      "expected_sources": [
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 2
+        },
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 3
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q15",
+      "question": "How do deterministic chunk IDs help idempotency?",
+      "category": "factual",
+      "expected_document": "data-reliability.pdf",
+      "expected_page": 2,
+      "expected_sources": [
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 2
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q16",
+      "question": "Why must vector retrieval use the same document scope as access control?",
+      "category": "multi_document",
+      "expected_document": "identity-security.pdf",
+      "expected_page": 3,
+      "expected_sources": [
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 3
+        },
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 5
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q17",
+      "question": "How is readiness different from HTTP 429 rate limiting?",
+      "category": "multi_document",
+      "expected_document": "data-reliability.pdf",
+      "expected_page": 6,
+      "expected_sources": [
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 6
+        },
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 6
+        }
+      ],
+      "should_refuse": false
+    },
+    {
+      "id": "q18",
+      "question": "How do I calculate the orbital period of Mars?",
+      "category": "unsupported",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_sources": [],
+      "should_refuse": true
+    },
+    {
+      "id": "q19",
+      "question": "What antibiotic dose treats pneumonia?",
+      "category": "unsupported",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_sources": [],
+      "should_refuse": true
+    },
+    {
+      "id": "q20",
+      "question": "Which compression algorithm and block size does this course recommend for backups?",
+      "category": "unsupported",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_sources": [],
+      "should_refuse": true
+    },
+    {
+      "id": "q21",
+      "question": "What exact JWT signing algorithm and key rotation interval does this course prescribe?",
+      "category": "unsupported",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_sources": [],
+      "should_refuse": true
+    },
+    {
+      "id": "q22",
+      "question": "What is the optimal Qdrant HNSW ef_construct value for ten million vectors?",
+      "category": "unsupported",
+      "expected_document": null,
+      "expected_page": null,
+      "expected_sources": [],
+      "should_refuse": true
+    }
+  ]
+}

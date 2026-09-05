@@ -165,6 +165,14 @@ Qdrant search filters by READY upload IDs. Its query text contains the original 
 
 Reranking returns a provider-neutral logit. Cohere probabilities are converted to logits so the existing sigmoid-based evidence gate behaves identically. Low evidence returns a grounded fallback without asking the synthesis LLM to invent an answer. User-facing sources expose document, page, section, and supporting passage but not internal vector IDs or file keys.
 
+### Retrieval ablation contract
+
+`RetrievalService` exposes three explicit modes while keeping `two_hop` as the product default. `vector_only` never opens a Neo4j session and supplies no graph terms. `one_hop` executes a `PREREQUISITE_OF*1..1` traversal. `two_hop` executes the bounded `PREREQUISITE_OF*1..2` traversal described above. Each result records its mode, maximum depth, anchor-match flag, and expansion counts in graph metadata.
+
+Graph enrichment is optional at query time. A Neo4j exception or five-second timeout is caught at the retrieval boundary, the original question is sent through the same READY-scoped vector path, and metadata records `requested_mode`, `retrieval_mode: vector_only`, and `fallback_reason: graph_unavailable`. Vector-store failures are not hidden by this fallback. The dashboard surfaces the degraded mode so a reviewer can distinguish a graph answer from a safe vector answer.
+
+The ablation runner compares these modes without answer synthesis. This holds document scope, vector index, top-k, reranking, and evidence thresholds constant, making graph depth the intended independent variable. It records top-five document/page hits, evidence availability, unsupported-question refusal, average/p95 retrieval latency, and errors. Deltas are calculated against `vector_only`; no graph mode is declared better unless the labelled metrics support it.
+
 ## Security model
 
 This is a shared-secret portfolio demo, not multi-user authentication. Public deployments require an access token of at least 24 characters. Login compares secrets in constant time and issues a signed, expiring, HttpOnly cookie. Secure cookies and exact CORS origins are required in production.
@@ -172,6 +180,8 @@ This is a shared-secret portfolio demo, not multi-user authentication. Public de
 The frontend does not trust the login response alone. It performs a separate session-status request and unlocks protected controls only when the API validates the signed cookie. The reviewer code exists only in deployment secrets and is never compiled into the SPA or published in documentation.
 
 Unauthenticated visitors receive one configured, pre-uploaded READY course through a dedicated read-only endpoint. That endpoint returns the bounded concept graph and permits PDF previews only for documents already belonging to that course; it cannot invoke LLM, upload, query, exam, retry, or deletion operations. Public sample reads have their own IP-fingerprinted process-local rate limit.
+
+The frontend `/sample` route is additionally backed by committed, generated fixture PDFs and editorial answer cards. It remains useful when the API is sleeping, databases are unavailable, or provider quota is exhausted; its graph is explicitly labelled as an illustrated reference, not a live LLM extraction.
 
 Standard, expensive, and login routes have separate fixed-window budgets. Limits live in one process and reset during restart, matching the single-instance deployment boundary. Horizontal scaling requires an external shared limiter before it is safe.
 

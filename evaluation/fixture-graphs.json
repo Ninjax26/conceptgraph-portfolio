@@ -1,0 +1,74 @@
+{
+  "web-foundations.pdf": {
+    "pdf_sha256": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+    "extraction": {
+      "nodes": [],
+      "relationships": [],
+      "sections_total": 6,
+      "sections_succeeded": 0,
+      "sections_failed": 6,
+      "batches_total": 6,
+      "batches_succeeded": 0,
+      "batches_failed": 5,
+      "batches_skipped": 1,
+      "provider_limited": true,
+      "extraction_budget_applied": false,
+      "failed_section_labels": [
+        "CONCEPTGRAPH / COMPUTING FOUNDATIONS",
+        "DNS",
+        "HTTP",
+        "HTTPS",
+        "Status Codes",
+        "TLS"
+      ]
+    }
+  },
+  "identity-security.pdf": {
+    "pdf_sha256": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+    "extraction": {
+      "nodes": [],
+      "relationships": [],
+      "sections_total": 6,
+      "sections_succeeded": 0,
+      "sections_failed": 6,
+      "batches_total": 6,
+      "batches_succeeded": 0,
+      "batches_failed": 1,
+      "batches_skipped": 5,
+      "provider_limited": true,
+      "extraction_budget_applied": false,
+      "failed_section_labels": [
+        "Authentication",
+        "Authorization",
+        "Document Access Control",
+        "Phishing",
+        "Rate Limits",
+        "Signed Sessions"
+      ]
+    }
+  },
+  "data-reliability.pdf": {
+    "pdf_sha256": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+    "extraction": {
+      "nodes": [],
+      "relationships": [],
+      "sections_total": 6,
+      "sections_succeeded": 0,
+      "sections_failed": 6,
+      "batches_total": 6,
+      "batches_succeeded": 0,
+      "batches_failed": 1,
+      "batches_skipped": 5,
+      "provider_limited": true,
+      "extraction_budget_applied": false,
+      "failed_section_labels": [
+        "Compensating Cleanup",
+        "Idempotency",
+        "Readiness",
+        "Safe Retries",
+        "Transactions",
+        "Vector Search"
+      ]
+    }
+  }
+}

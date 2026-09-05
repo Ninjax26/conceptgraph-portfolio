@@ -78,8 +78,9 @@ async def health_check() -> dict[str, str]:
 
 
 @app.get("/api/v1/ready", tags=["system"])
-async def readiness_check() -> dict[str, str | int]:
+async def readiness_check() -> dict:
     unavailable: list[str] = []
+    degraded: list[str] = []
     try:
         async with postgres_engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
@@ -90,9 +91,9 @@ async def readiness_check() -> dict[str, str | int]:
     except Exception:
         unavailable.append("qdrant")
     try:
-        await neo4j_driver.verify_connectivity()
+        await asyncio.wait_for(neo4j_driver.verify_connectivity(), timeout=5.0)
     except Exception:
-        unavailable.append("neo4j")
+        degraded.append("neo4j")
     try:
         await asyncio.to_thread(storage_service.check_ready)
     except Exception:
@@ -107,4 +108,6 @@ async def readiness_check() -> dict[str, str | int]:
     return {
         "status": "ready",
         "processing_queue_depth": processing_coordinator.queue_depth,
+        "degraded_services": degraded,
+        "graph_available": not degraded,
     }

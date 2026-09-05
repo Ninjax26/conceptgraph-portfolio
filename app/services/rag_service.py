@@ -3,6 +3,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 from groq import Groq
@@ -17,6 +18,22 @@ from app.core.database import neo4j_driver, qdrant_client
 from app.services.course_service import ReadyCourseContext
 
 logger = logging.getLogger(__name__)
+
+
+class RetrievalMode(StrEnum):
+    """Controlled retrieval variants used by the product and ablation runner."""
+
+    VECTOR_ONLY = "vector_only"
+    ONE_HOP = "one_hop"
+    TWO_HOP = "two_hop"
+
+    @property
+    def maximum_hops(self) -> int:
+        return {
+            RetrievalMode.VECTOR_ONLY: 0,
+            RetrievalMode.ONE_HOP: 1,
+            RetrievalMode.TWO_HOP: 2,
+        }[self]
 
 
 class CypherGenerationResponse(BaseModel):
@@ -60,11 +77,48 @@ class RetrievalService:
         question: str,
         context: ReadyCourseContext,
         top_k: int = 10,
+        retrieval_mode: RetrievalMode | str = RetrievalMode.TWO_HOP,
     ) -> dict[str, Any]:
-        graph_result = await self.execute_graph_retrieval(
-            question=question,
-            context=context,
-        )
+        mode = RetrievalMode(retrieval_mode)
+        if mode is RetrievalMode.VECTOR_ONLY:
+            graph_result = GraphRetrievalResult(
+                concepts=[],
+                one_hop_prerequisite_names=[],
+                two_hop_prerequisite_names=[],
+                cypher="vector_only_ablation",
+                metadata={
+                    "total_nodes": 0,
+                    "total_edges": 0,
+                    "displayed_nodes": 0,
+                    "displayed_edges": 0,
+                    "filter_reason": "vector_only_ablation",
+                    "graph_status": context.graph_status,
+                    "retrieval_mode": mode.value,
+                    "graph_expansion": {
+                        "anchor_match_found": False,
+                        "maximum_hops": 0,
+                        "one_hop_count": 0,
+                        "two_hop_count": 0,
+                    },
+                },
+            )
+        else:
+            try:
+                graph_result = await asyncio.wait_for(
+                    self.execute_graph_retrieval(
+                        question=question, context=context,
+                        max_hops=mode.maximum_hops, retrieval_mode=mode,
+                    ), timeout=5.0,
+                )
+            except Exception:
+                logger.warning("Graph retrieval unavailable; using vector retrieval", exc_info=True)
+                result = await self.retrieve(question, context, top_k, RetrievalMode.VECTOR_ONLY)
+                result["graph_metadata"].update({
+                    "requested_mode": mode.value,
+                    "fallback_reason": "graph_unavailable",
+                    "filter_reason": "graph_unavailable",
+                })
+                return result
         chunks = await asyncio.to_thread(
             self.search_qdrant,
             question,
@@ -84,8 +138,16 @@ class RetrievalService:
         self,
         question: str,
         context: ReadyCourseContext,
+        *,
+        max_hops: int = 2,
+        retrieval_mode: RetrievalMode | str = RetrievalMode.TWO_HOP,
     ) -> GraphRetrievalResult:
-        generated = self._fallback_cypher(question)
+        if max_hops not in {1, 2}:
+            raise ValueError("Graph retrieval supports only one-hop or two-hop expansion.")
+        mode = RetrievalMode(retrieval_mode)
+        if mode.maximum_hops != max_hops:
+            raise ValueError("Retrieval mode and graph expansion depth do not match.")
+        generated = self._fallback_cypher(question, max_hops=max_hops)
         cypher = self._validate_read_only_cypher(generated.cypher)
         parameters = {
             **generated.parameters,
@@ -121,6 +183,8 @@ class RetrievalService:
                 else "course_graph_visualization_fallback"
             ),
             expand_prerequisites=matched_query_anchor,
+            max_hops=max_hops,
+            retrieval_mode=mode.value,
         )
 
     async def fetch_course_graph(
@@ -147,6 +211,8 @@ class RetrievalService:
             graph_status=context.graph_status,
             filter_reason="public_sample",
             expand_prerequisites=False,
+            max_hops=0,
+            retrieval_mode="visualization_only",
         )
 
     def _build_graph_result(
@@ -158,6 +224,8 @@ class RetrievalService:
         graph_status: str,
         filter_reason: str,
         expand_prerequisites: bool,
+        max_hops: int = 2,
+        retrieval_mode: str = RetrievalMode.TWO_HOP.value,
     ) -> GraphRetrievalResult:
         concepts: list[dict[str, Any]] = []
         one_hop_names: set[str] = set()
@@ -180,7 +248,7 @@ class RetrievalService:
                 self._prerequisite_hops(
                     str(concept.get("id", "")),
                     relationships,
-                    max_hops=2,
+                    max_hops=max_hops,
                 )
                 if expand_prerequisites
                 else {}
@@ -254,9 +322,10 @@ class RetrievalService:
                 "displayed_edges": len(displayed_edge_ids),
                 "filter_reason": filter_reason,
                 "graph_status": graph_status,
+                "retrieval_mode": retrieval_mode,
                 "graph_expansion": {
                     "anchor_match_found": expand_prerequisites,
-                    "maximum_hops": 2,
+                    "maximum_hops": max_hops,
                     "one_hop_count": len(one_hop_names),
                     "two_hop_count": len(two_hop_names),
                 },
@@ -461,20 +530,26 @@ class RetrievalService:
         )
 
     @staticmethod
-    def _fallback_cypher(question: str) -> CypherGenerationResponse:
+    def _fallback_cypher(
+        question: str,
+        *,
+        max_hops: int = 2,
+    ) -> CypherGenerationResponse:
+        if max_hops not in {1, 2}:
+            raise ValueError("Graph retrieval supports only one-hop or two-hop expansion.")
         terms = [
             term.lower()
             for term in re.findall(r"[A-Za-z][A-Za-z0-9_+-]{2,}", question)
             if len(term) > 2
         ][:12]
         return CypherGenerationResponse(
-            cypher="""
+            cypher=f"""
             MATCH (course:Course)-[:CONTAINS]->(concept:Concept)
             WHERE course.id IN $course_ids
               AND concept.upload_id IN $document_ids
               AND any(term IN $terms WHERE toLower(concept.name) CONTAINS term)
             OPTIONAL MATCH prerequisite_path =
-              (prerequisite:Concept)-[:PREREQUISITE_OF*1..2]->(concept)
+              (prerequisite:Concept)-[:PREREQUISITE_OF*1..{max_hops}]->(concept)
             WHERE all(
               path_node IN nodes(prerequisite_path)
               WHERE path_node.upload_id IN $document_ids
@@ -486,11 +561,14 @@ class RetrievalService:
               (course)-[:CONTAINS]->(adjacent)
               AND adjacent.upload_id IN $document_ids
             )
+            WITH concept, prerequisite_paths,
+                 collect(DISTINCT adjacent) AS adjacent_nodes,
+                 collect(DISTINCT adjacent_relationship) AS adjacent_edges
             RETURN concept,
-                   collect(DISTINCT adjacent) +
+                   adjacent_nodes +
                      reduce(node_acc = [], path IN prerequisite_paths |
                        node_acc + nodes(path)[0..-1]) AS related_concepts,
-                   collect(DISTINCT adjacent_relationship) +
+                   adjacent_edges +
                      reduce(edge_acc = [], path IN prerequisite_paths |
                        edge_acc + relationships(path)) AS relationships
             LIMIT 5

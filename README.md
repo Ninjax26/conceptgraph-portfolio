@@ -14,7 +14,6 @@ ConceptGraph turns course PDFs into a searchable concept graph, grounded answers
 - Read [End-to-end processes](#end-to-end-processes) for the complete upload, GraphRAG, exam, recovery, authentication, and cleanup flows.
 - Use [Local development](#local-development), [Configuration](#configuration), and [Deployment](#deployment) to run or host it.
 - Review [Small retrieval evaluation](#small-retrieval-evaluation) and [Verification](#verification) for evidence that the system works.
-- Prepare with the [Interview guide](#interview-guide), then use the [Engineering handbook](ENGINEERING_HANDBOOK.md) for deeper invariants.
 
 ## What the project demonstrates
 
@@ -41,7 +40,7 @@ ConceptGraph turns course PDFs into a searchable concept graph, grounded answers
 | Public access | One pre-uploaded read-only sample course and source previews without exposing upload/query/exam controls |
 | Data cleanup | Manual deletion across PostgreSQL, Qdrant, Neo4j, and R2; automatic demo retention; sample-course exclusion; shared-object protection |
 | Evaluation | Fifteen manually annotated questions, committed baseline results, top-five document/page checks, citation/refusal checks, latency measurement |
-| Verification | 100 backend tests plus Python compilation, TypeScript checking, Vite production build, Docker Compose validation, and GitHub Actions |
+| Verification | 120 focused backend tests plus Python compilation, TypeScript checking, Vite production build, and Docker Compose validation |
 | Scanned PDFs | Detected and rejected with an OCR-required message; OCR itself is intentionally listed as future work |
 
 The commit history records these improvements as separate, explainable phases: dashboard polish, answer formatting, cross-site sessions, complete deletion, demo hardening/public sample/retention, evaluation, graph quality and provenance, complex-PDF batching, quota-safe degradation, and Cerebras failover.
@@ -417,6 +416,51 @@ EVAL_API_BASE_URL=https://your-api.example/api/v1 \
 
 This baseline measures only document/page retrieval in the top five citation sources, inline citation presence, evidence-based refusal, and end-to-end query latency. Expected concepts remain annotation notes and are not turned into a subjective answer-quality score.
 
+### GraphRAG retrieval ablation
+
+The evaluation runner can also compare three controlled retrieval variants over the same labelled questions:
+
+- `vector_only` skips Neo4j completely and sends the original question to Qdrant;
+- `one_hop` adds only direct prerequisite concept names;
+- `two_hop` adds direct and foundational prerequisite concept names.
+
+All three variants reuse the same READY-document scope, Qdrant collection, result count, reranker, and evidence threshold. Answer synthesis is intentionally skipped so LLM wording, quota, and generation latency do not obscure whether graph expansion improved retrieval.
+
+```bash
+python scripts/run_evaluation.py \
+  --direct \
+  --ablation \
+  --output evaluation/ablation-local.json
+```
+
+The JSON report contains per-question sources, graph-anchor/expansion counts, per-mode summaries, and deltas from the vector-only baseline. The console prints a compact comparison of top-five document/page hits, supported evidence coverage, unsupported-question refusals, average latency, and p95 latency.
+
+For a repeatable local multi-document run that avoids PostgreSQL, use the isolated fixture runner:
+
+```bash
+python scripts/run_fixture_ablation.py --reference-graph --repeats 3 \
+  --output evaluation/ablation-reference.json
+```
+
+The reference graph is intentionally authored and labelled as such. A normal provider-backed attempt writes [`evaluation/fixture-graphs.json`](evaluation/fixture-graphs.json); if Neo4j or the provider cannot be reached, the runner writes a [`status: blocked`](evaluation/ablation-provider-limited.md) report instead of treating missing graph data as a successful comparison.
+
+Interpret the result conservatively: one-hop or two-hop is useful only when it improves labelled retrieval enough to justify its latency. Equal scores are also meaningful—they show that the graph adds explainability for those questions but not retrieval accuracy. This small single-course set is portfolio evidence, not a claim of statistical significance.
+
+#### Multi-document fixture result
+
+[`evaluation/questions-multidoc.json`](evaluation/questions-multidoc.json) expands the fixture to 22 questions across three authored PDFs (17 answerable and 5 intentionally unsupported). [`evaluation/ablation-reference.md`](evaluation/ablation-reference.md) is an actual three-repeat run using the PDF parser, local MiniLM embeddings, in-memory Qdrant, a temporary Neo4j graph, the cross-encoder, and the evidence gate. It uses an explicitly authored prerequisite chain so retrieval depth can be measured independently from LLM extraction quality; it is not presented as an LLM-quality score.
+
+| Metric (51 answerable runs: 17 questions × 3 repeats) | Vector only | One hop | Two hop |
+| --- | ---: | ---: | ---: |
+| Primary expected page in top 5 | 45/51 | 45/51 | 45/51 |
+| All required source pages in raw top 5 | 48/51 | 51/51 | 51/51 |
+| All required source pages after reranking | 51/51 | 51/51 | 51/51 |
+| All required sources after evidence gate | 39/51 | 39/51 | 39/51 |
+| Unsupported questions refused | 15/15 | 15/15 | 15/15 |
+| Average retrieval time | 0.05s | 0.26s | 0.28s |
+
+The graph improved raw multi-source recall on this small fixture (48→51) but did not improve the final evidence-gated score, and added about 0.2 seconds per query. Repeated runs are stability measurements, not 51 independent questions. The provider-backed extraction attempt is preserved in [`evaluation/fixture-graphs.json`](evaluation/fixture-graphs.json); when the provider quota/network is unavailable, the app marks the graph partial and query retrieval falls back to vector search.
+
 ## Repository map
 
 | Path | Purpose |
@@ -425,6 +469,7 @@ This baseline measures only document/page retrieval in the top five citation sou
 | `src/components/ConceptGraphCanvas.tsx` | Cytoscape graph rendering and source-node interaction |
 | `src/components/DemoAccessGate.tsx` | Reviewer-code exchange and server-verified session gate |
 | `src/components/PublicSampleCourse.tsx` | Read-only public graph and PDF source preview |
+| `src/components/SavedSampleCourse.tsx` | Static sample answers, citations, source-page links, and illustrated graph for quota-free demos |
 | `app/api/endpoints/` | FastAPI auth, upload/status, public sample, query, and exam boundaries |
 | `app/core/processing_coordinator.py` | Bounded queue, dispatcher, lease claims, worker lifecycle, restart recovery |
 | `app/services/document_processing_service.py` | Durable stage orchestration and failure compensation |
@@ -462,24 +507,9 @@ Recommended next phases, in order:
 4. Add real authentication and tenant-scoped storage only if the project becomes a shared product.
 5. Move workers/rate limits to shared infrastructure only when traffic justifies the extra operational complexity.
 
-## Interview guide
+## Engineering notes
 
-### 30-second introduction
-
-> “ConceptGraph is a full-stack GraphRAG portfolio project. A reviewer uploads a course PDF, and a durable FastAPI pipeline extracts page-aware chunks, stores vectors in Qdrant, builds a validated concept graph in Neo4j, and keeps processing state in PostgreSQL. Questions combine graph context with semantic retrieval, reranking, evidence thresholds, and source-page citations. I focused on reliability and explainability: partial graphs are reported honestly, failed writes are cleaned up, processing recovers after restarts, and Cerebras automatically handles Groq quota or timeout failures.”
-
-### Two-minute walkthrough
-
-1. **Admission:** validate the PDF, hash it, deduplicate it, store it privately, and commit an `UPLOADED` PostgreSQL row.
-2. **Durability:** submit to a bounded queue, but treat PostgreSQL—not memory—as the job authority. A worker must acquire a lease and use the current task token.
-3. **Document representation:** extract the native text layer, detect headings, create overlapping page-aware chunks, and embed every chunk in Qdrant.
-4. **Graph construction:** sample each section across its beginning/middle/end, run a bounded number of structured LLM calls, validate locally, and store only permitted nodes/edges with provenance in Neo4j.
-5. **Quality state:** mark the document `GRAPH_READY`, `GRAPH_PARTIAL`, or `READY_WITHOUT_GRAPH` instead of pretending every LLM output is complete.
-6. **Retrieval:** scope to READY uploads, match graph anchors, traverse bounded one-hop and two-hop prerequisites, expand the vector query with separately labelled terms, rerank, and reject weak evidence. If no anchor matches, preserve vector-only retrieval by searching the original question.
-7. **Answer:** synthesize only from selected evidence, attach PDF/page citations, fail over from Groq to Cerebras, and return evidence directly if both LLMs are unavailable.
-8. **Lifecycle:** support retry, crash recovery, timed demo retention, and complete deletion across every datastore.
-
-### Design decisions to emphasize
+### Design decisions
 
 - **PostgreSQL is the source of truth.** The queue can disappear without losing the job.
 - **Derived data is provenance-scoped.** Qdrant and Neo4j artifacts can be deleted or rebuilt by upload.
@@ -489,91 +519,9 @@ Recommended next phases, in order:
 - **Security claims match the deployment.** It is called a shared portfolio demo, not incomplete multi-user authentication.
 - **Results are measured honestly.** The baseline includes misses and refusals instead of manually improving the reported numbers.
 
-### Common interview questions and model answers
-
-#### 1. What problem does this solve?
-
-Students often have long course PDFs but no structured view of how topics relate. The project converts those PDFs into searchable evidence and a concept map, then answers questions and creates exams only from the uploaded material.
-
-#### 2. Why use both Qdrant and Neo4j?
-
-Qdrant answers “which passages are semantically similar to this question?” Neo4j answers “which concepts are connected and how?” Vector search finds evidence; the graph adds explicit structure such as prerequisites and part-of relationships. Query retrieval follows inbound prerequisites for at most two hops, while the dashboard visually separates the matched concept, direct prerequisites, and foundational prerequisites. PostgreSQL still owns workflow state, so neither derived store is treated as authoritative.
-
-#### 3. Why not store everything in one database?
-
-It is possible, but each selected store has a clear strength. The important design choice is not the number of databases—it is defining ownership, provenance, cleanup, and rebuild behavior. For a smaller product I would reconsider this complexity based on measured needs.
-
-#### 4. Why remove Celery and Redis?
-
-The target was a free, single-instance portfolio deployment. Running more services increased cost and operational failure modes. I replaced them with a bounded `asyncio` coordinator, while PostgreSQL leases and attempts preserve the properties that matter: durability, exclusive ownership, retries, and restart recovery.
-
-#### 5. What happens if the API crashes during processing?
-
-The in-memory item disappears, but its PostgreSQL record remains. The lease eventually expires; startup/periodic recovery marks the interrupted attempt, creates a new task token when retries remain, resets the document to `UPLOADED`, and queues it again. Provenance-scoped cleanup makes re-execution idempotent.
-
-#### 6. How do you prevent two workers from processing the same PDF?
-
-Claiming uses a PostgreSQL row lock plus lease ownership. Every later transition includes upload ID, task token, and lease owner. If a stale worker continues after a retry, its update no longer matches and is rejected.
-
-#### 7. How do you prevent duplicate uploads?
-
-The API computes SHA-256, normalizes the course identity, takes an advisory transaction lock, and rejects an existing `(course, content hash)` record before admission. Content-addressed storage also avoids arbitrary duplicate object names.
-
-#### 8. How do you handle complicated PDFs?
-
-I do not send an entire PDF in one prompt. I preserve page/section metadata, sample the beginning, middle, and end of sections, distribute a six-batch default budget fairly, validate each response, and merge successful batches. That improves coverage while keeping quota and context bounded.
-
-#### 9. Why can graph generation still be partial?
-
-Some sections may contain tables, weak headings, very little conceptual text, malformed provider output, or provider failures. Reporting `GRAPH_PARTIAL` is more responsible than claiming success. The document remains searchable through its committed vectors.
-
-#### 10. How do you reduce hallucinations?
-
-Retrieval is restricted to READY documents in the chosen course. Reranked evidence must pass a configured threshold before synthesis. The prompt forbids outside knowledge, citations are built from retrieved metadata, insufficient evidence is refused, and graph output is validated before storage. This reduces hallucination risk but does not claim to eliminate it.
-
-#### 11. How are citations explainable?
-
-Every chunk keeps filename, page, section, upload ID, and source chunk ID. Graph concepts inherit provenance from real sampled chunks. Answers expose up to five readable source cards, and both citations and graph nodes can open the PDF at the relevant page.
-
-#### 12. What caused the “AI provider is busy” bug, and how did you fix it?
-
-The logs showed a Groq daily-token 429. Retrying the same provider could not create quota, so I first bounded graph prompts/batches and preserved partial work. Then I added Cerebras failover with a shared five-minute cooldown. Graphs, answers, and exams switch provider after quota, timeout, connection, or server failures; answers still degrade to retrieved evidence if both providers are unavailable.
-
-#### 13. Why a circuit breaker instead of retrying immediately?
-
-A quota or outage is likely to affect the next request too. The cooldown avoids repeated latency and token-limit failures across later batches and user requests. After the cooldown, the primary is tried again automatically.
-
-#### 14. How is multi-user access handled?
-
-It is not a multi-tenant system. The reviewer code produces signed stateless sessions, but all reviewers share the same workspace and data. Public users only see one read-only sample. For real users I would introduce identity and tenant ownership consistently across all four stores—not only add a login screen.
-
-#### 15. How do you delete a PDF safely?
-
-Only READY or FAILED documents are eligible. I delete upload-scoped Qdrant and Neo4j artifacts first, then the source object when it is not shared, then PostgreSQL metadata. Active documents are protected, and orphaned course records/nodes are removed only after the final document disappears.
-
-#### 16. What tests were most valuable?
-
-Boundary and failure tests: stale-worker fencing, expired lease recovery, queue saturation, partial-write cleanup, provider rate limits/timeouts, invalid graph endpoints/types, empty graphs, scanned PDFs, auth session verification, citation links, public sample isolation, full deletion, and retention. These protect behavior, not internal implementation details.
-
-#### 17. How did you evaluate the RAG system?
-
-I created fifteen manually checked questions with expected documents/pages and unsupported cases. The runner measures top-five document/page retrieval, inline citations, refusal behavior, and latency. The committed baseline is small and imperfect, which makes it credible and gives a concrete improvement target.
-
-#### 18. What would you improve next?
-
-OCR with provenance is first because it unlocks scanned course material. Then I would expand evaluation and add provider/latency observability. Multi-user auth and distributed workers come later, only if usage requires them.
-
-#### 19. What is the main bottleneck?
-
-On the free deployment, external provider quota and cold-start latency are more limiting than local CPU. Graph extraction makes several structured LLM calls, while Qdrant, Neo4j, PostgreSQL, R2, Cohere, and the LLM providers all add network latency. Bounded concurrency prevents one PDF burst from exhausting memory or quotas.
-
-#### 20. What trade-off are you most comfortable defending?
-
-Keeping graph enrichment non-blocking for document usefulness. A PDF with valid chunks should remain searchable even if no trustworthy graph can be built. That choice makes the product more available while exposing graph quality honestly.
-
 ## Verification
 
-Latest repository verification: **100 backend tests passing**, production frontend build passing, and GitHub Actions passing.
+Latest local verification: **120 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
 
 ```bash
 source .venv/bin/activate
@@ -602,6 +550,8 @@ Tests focus on system boundaries and failure behavior: durable stage transitions
 - `DELETE /api/v1/ingest/uploads/{upload_id}` (READY or FAILED documents only)
 - `POST /api/v1/query`
 - `POST /api/v1/exam/generate`
+
+The frontend also exposes `/sample`, a fully static recruiter path with prepared answers, citations, and an illustrated prerequisite graph. The protected dashboard adds a retrieval-mode selector (`vector_only`, `one_hop`, or `two_hop`) so reviewers can compare the same question across strategies. If Neo4j is unavailable or times out during a graph-mode query, the API keeps the request useful by returning vector evidence and records the fallback in `graph_metadata`.
 
 ## Repository safety
 

@@ -14,9 +14,10 @@ const rotatingWords = [
 
 interface HeroProps {
   onTryDemo?: () => void;
+  onViewSample?: () => void;
 }
 
-function Hero({ onTryDemo }: HeroProps): JSX.Element {
+function Hero({ onTryDemo, onViewSample }: HeroProps): JSX.Element {
   const [titleNumber, setTitleNumber] = useState(0);
   const titles = useMemo(() => rotatingWords, []);
 
@@ -74,7 +75,7 @@ function Hero({ onTryDemo }: HeroProps): JSX.Element {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button size="lg" className="gap-3" variant="outline">
+            <Button size="lg" className="gap-3" variant="outline" onClick={onViewSample}>
               View Architecture
               <Network className="h-4 w-4" aria-hidden="true" />
             </Button>

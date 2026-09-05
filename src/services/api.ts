@@ -64,6 +64,9 @@ export interface QueryResponse {
     displayed_edges: number;
     filter_reason: string;
     graph_status: GraphStatus;
+    retrieval_mode?: "vector_only" | "one_hop" | "two_hop" | "visualization_only";
+    requested_mode?: RetrievalMode;
+    fallback_reason?: string;
     graph_expansion?: {
       anchor_match_found: boolean;
       maximum_hops: number;
@@ -184,9 +187,12 @@ export async function getPublicSample(): Promise<PublicSampleResponse> {
   return response.json() as Promise<PublicSampleResponse>;
 }
 
+export type RetrievalMode = "vector_only" | "one_hop" | "two_hop";
+
 export async function sendQuery(
   question: string,
   courseId: string,
+  retrievalMode: RetrievalMode = "two_hop",
 ): Promise<QueryResponse> {
   const response = await fetchWithTimeout(`${API_BASE_URL}/query`, {
     method: "POST",
@@ -196,6 +202,7 @@ export async function sendQuery(
     body: JSON.stringify({
       question,
       course_id: courseId,
+      retrieval_mode: retrievalMode,
     }),
     timeout: 60000, // 60s timeout for LLM synthesis
   });

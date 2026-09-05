@@ -6,6 +6,7 @@ import type {
   GraphCanvasNode,
 } from "@/components/ConceptGraphCanvas";
 import PdfPreviewModal from "@/components/PdfPreviewModal";
+import SavedSampleCourse from "./SavedSampleCourse";
 import {
   API_BASE_URL,
   getPublicSample,
@@ -16,6 +17,18 @@ import {
 const ConceptGraphCanvas = lazy(() => import("@/components/ConceptGraphCanvas"));
 
 export default function PublicSampleCourse(): JSX.Element {
+  const [showLive, setShowLive] = useState(false);
+  return <div className="space-y-4">
+    <SavedSampleCourse />
+    <button type="button" aria-expanded={showLive} onClick={() => setShowLive(!showLive)}
+      className="text-sm text-teal-700 underline underline-offset-4">
+      {showLive ? "Hide live sample" : "Explore the live uploaded course (requires server connection)"}
+    </button>
+    {showLive ? <LiveSampleCourse /> : null}
+  </div>;
+}
+
+function LiveSampleCourse(): JSX.Element {
   const [sample, setSample] = useState<PublicSampleResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ title: string; url: string } | null>(null);

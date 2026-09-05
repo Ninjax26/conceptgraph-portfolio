@@ -1,0 +1,14 @@
+{
+  "status": "blocked",
+  "dataset": "Authored multi-document computing retrieval v1",
+  "generated_at": "2026-09-05T18:30:29.295460+00:00",
+  "blocking_dependency": "neo4j",
+  "error_type": "ServiceUnavailable",
+  "error": "Failed to DNS resolve address ae0e107d.databases.neo4j.io:7687: [Errno 8] nodename nor servname provided, or not known",
+  "methodology": {
+    "scope": "Authored multi-document fixture; benchmark did not start",
+    "reason": "The isolated graph store could not be reached, so no retrieval score is reported.",
+    "next_step": "Run with network access and the configured NEO4J_URI, or use the committed reference report for the last successful run.",
+    "working_tree_changes": true
+  }
+}

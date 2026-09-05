@@ -73,11 +73,12 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
 
   if (state === "checking") {
     return (
-      <div className="grid min-h-[calc(100vh-64px)] place-items-center text-sm text-slate-500">
-        <span className="inline-flex items-center gap-2">
+      <div className="mx-auto max-w-5xl space-y-4 p-4 text-sm text-slate-500">
+        <span role="status" className="inline-flex items-center gap-2">
           <LoaderCircle className="h-4 w-4 animate-spin" />
           Verifying dashboard access...
         </span>
+        <PublicSampleCourse />
       </div>
     );
   }

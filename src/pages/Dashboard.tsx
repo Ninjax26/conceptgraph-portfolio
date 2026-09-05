@@ -27,6 +27,7 @@ import {
   GraphStatus,
   IngestResponse,
   QueryResponse,
+  RetrievalMode,
   UploadStatusResponse,
   getUploadStatus,
   listCourses,
@@ -50,6 +51,7 @@ type UploadJob = UploadStatusResponse & {
 
 export default function Dashboard(): JSX.Element {
   const [question, setQuestion] = useState("");
+  const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>("two_hop");
   const [courseId, setCourseId] = useState("");
   const [response, setResponse] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -324,7 +326,7 @@ export default function Dashboard(): JSX.Element {
     setError(null);
 
     try {
-      const result = await sendQuery(question.trim(), courseId.trim());
+      const result = await sendQuery(question.trim(), courseId.trim(), retrievalMode);
       setResponse(result);
     } catch (requestError) {
       setError(
@@ -446,6 +448,17 @@ export default function Dashboard(): JSX.Element {
                 placeholder="Ask anything grounded in your uploaded PDFs..."
               />
             </label>
+            <label className="block text-xs font-semibold text-slate-600">
+              Retrieval mode
+              <select aria-label="Retrieval mode" value={retrievalMode} disabled={isLoading}
+                onChange={(event) => setRetrievalMode(event.target.value as RetrievalMode)}
+                className="mt-1 block w-full rounded-md border border-slate-300 bg-white p-2 text-sm">
+                <option value="vector_only">Vector — similar PDF passages</option>
+                <option value="one_hop">One hop — include direct prerequisites</option>
+                <option value="two_hop">Two hops — include foundational prerequisites</option>
+              </select>
+              <span className="mt-1 block font-normal">Run the same question in each mode to compare its evidence.</span>
+            </label>
             <div className="flex flex-wrap gap-2">
               {QUESTION_STARTERS.map((starter) => (
                 <button
@@ -500,6 +513,13 @@ export default function Dashboard(): JSX.Element {
             ) : null}
           </div>
 
+          {response ? (
+            <p className="mb-3 rounded-md bg-slate-100 p-2 text-xs text-slate-600" role="status">
+              {response.graph_metadata.fallback_reason
+                ? "Graph unavailable; answering from PDF evidence using vector retrieval."
+                : `Answer retrieved with ${(response.graph_metadata.retrieval_mode ?? "two_hop").split("_").join(" ")}.`}
+            </p>
+          ) : null}
           {error ? (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}

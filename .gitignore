@@ -17,8 +17,12 @@ data/
 *.log
 
 *.pdf
+!public/sample/*.pdf
 
 node_modules/
 dist/
 .vite/
 .aider*
+
+# Personal interview preparation stays local and is never published.
+local-notes/

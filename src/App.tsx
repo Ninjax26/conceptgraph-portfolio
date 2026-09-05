@@ -3,17 +3,18 @@ import { Network, ArrowLeft } from "lucide-react";
 
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import DemoAccessGate from "@/components/DemoAccessGate";
+import PublicSampleCourse from "@/components/PublicSampleCourse";
 
 const Home = lazy(() => import("@/pages/Home"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 
-export type Page = "home" | "dashboard";
+export type Page = "home" | "dashboard" | "sample";
 
 export default function App(): JSX.Element {
   const [page, setPage] = useState<Page>(() => getPageFromPath());
 
   function navigate(nextPage: Page): void {
-    const path = nextPage === "dashboard" ? "/dashboard" : "/";
+    const path = nextPage === "dashboard" ? "/dashboard" : nextPage === "sample" ? "/sample" : "/";
     window.history.pushState({}, "", path);
     setPage(nextPage);
   }
@@ -61,13 +62,22 @@ export default function App(): JSX.Element {
 
           <div className="flex items-center gap-2">
             {page === "home" && (
+              <>
+              <button
+                onClick={() => navigate("sample")}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+              >
+                <Network className="h-3.5 w-3.5" />
+                View Sample
+              </button>
               <button
                 onClick={() => navigate("dashboard")}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-md bg-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300"
               >
                 <Network className="h-3.5 w-3.5" />
                 Open Dashboard
               </button>
+              </>
             )}
           </div>
         </div>
@@ -81,6 +91,11 @@ export default function App(): JSX.Element {
                 <Dashboard />
               </DemoAccessGate>
             )}
+            {page === "sample" && (
+              <main className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
+                <PublicSampleCourse />
+              </main>
+            )}
           </Suspense>
         </AppErrorBoundary>
       </div>
@@ -89,5 +104,7 @@ export default function App(): JSX.Element {
 }
 
 function getPageFromPath(): Page {
-  return window.location.pathname === "/dashboard" ? "dashboard" : "home";
+  if (window.location.pathname === "/dashboard") return "dashboard";
+  if (window.location.pathname === "/sample") return "sample";
+  return "home";
 }

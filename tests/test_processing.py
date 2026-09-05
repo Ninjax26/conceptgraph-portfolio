@@ -39,7 +39,7 @@ from app.services.exam_service import ExamService
 from app.services.ingestion_service import IngestionService
 from app.services.parser_service import DocumentChunk, ParserService
 from app.services.provider_failover import provider_circuit_breaker
-from app.services.rag_service import RetrievalService
+from app.services.rag_service import GraphRetrievalResult, RetrievalMode, RetrievalService
 from app.services.rerank_service import RerankService
 from app.services.security_service import DemoAccessService, RateLimitResult, RateLimitService
 from app.services.synthesis_service import SynthesisService
@@ -1506,6 +1506,84 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertIn("[:PREREQUISITE_OF*1..2]", generated.cypher)
         self.assertIn("path_node.upload_id IN $document_ids", generated.cypher)
         self.assertIn("(course)-[:CONTAINS]->(path_node)", generated.cypher)
+
+    def test_one_hop_ablation_uses_a_one_hop_cypher_bound(self):
+        generated = RetrievalService._fallback_cypher("zero trust", max_hops=1)
+
+        self.assertIn("[:PREREQUISITE_OF*1..1]", generated.cypher)
+        self.assertNotIn("[:PREREQUISITE_OF*1..2]", generated.cypher)
+
+    def test_vector_only_ablation_skips_neo4j_and_graph_query_expansion(self):
+        service = RetrievalService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+        service.execute_graph_retrieval = AsyncMock(
+            side_effect=AssertionError("Neo4j must not run for vector-only retrieval")
+        )
+        service.search_qdrant = Mock(return_value=[])
+        context = SimpleNamespace(
+            graph_status=GraphStatus.GRAPH_READY.value,
+            graph_course_ids=["course-1"],
+            document_ids=["upload-1"],
+        )
+
+        result = asyncio.run(
+            service.retrieve(
+                "What is zero trust?",
+                context,
+                retrieval_mode=RetrievalMode.VECTOR_ONLY,
+            )
+        )
+
+        service.execute_graph_retrieval.assert_not_awaited()
+        service.search_qdrant.assert_called_once_with(
+            "What is zero trust?", [], [], ["upload-1"], 10
+        )
+        self.assertEqual(result["graph_context"], [])
+        self.assertEqual(result["graph_metadata"]["retrieval_mode"], "vector_only")
+        self.assertEqual(
+            result["graph_metadata"]["graph_expansion"]["maximum_hops"], 0
+        )
+
+    def test_one_hop_mode_does_not_pass_two_hop_terms_to_qdrant(self):
+        service = RetrievalService(
+            graph_driver=SimpleNamespace(),
+            vector_client=SimpleNamespace(),
+        )
+        service.execute_graph_retrieval = AsyncMock(
+            return_value=GraphRetrievalResult(
+                concepts=[],
+                one_hop_prerequisite_names=["Direct"],
+                two_hop_prerequisite_names=[],
+                cypher="MATCH ...",
+                metadata={"retrieval_mode": "one_hop"},
+            )
+        )
+        service.search_qdrant = Mock(return_value=[])
+        context = SimpleNamespace(
+            graph_status=GraphStatus.GRAPH_READY.value,
+            graph_course_ids=["course-1"],
+            document_ids=["upload-1"],
+        )
+
+        asyncio.run(
+            service.retrieve(
+                "Explain deployment",
+                context,
+                retrieval_mode=RetrievalMode.ONE_HOP,
+            )
+        )
+
+        service.execute_graph_retrieval.assert_awaited_once_with(
+            question="Explain deployment",
+            context=context,
+            max_hops=1,
+            retrieval_mode=RetrievalMode.ONE_HOP,
+        )
+        service.search_qdrant.assert_called_once_with(
+            "Explain deployment", ["Direct"], [], ["upload-1"], 10
+        )
 
     def test_prerequisite_hops_keep_one_and_two_hop_results_separate(self):
         relationships = [
