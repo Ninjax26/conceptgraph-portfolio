@@ -339,7 +339,7 @@ Current free tiers are not service-level guarantees. Render free web services sp
 
 ### Before deployment
 
-1. Create PostgreSQL, Qdrant, Neo4j, R2, Groq, and Cohere credentials; create Cerebras credentials when failover is desired.
+1. Create PostgreSQL, Qdrant, Neo4j, R2, Groq, and Cohere credentials; create a Gemini API key for the recommended free-tier failover.
 2. Create a private R2 bucket; disable public development URLs and use least-privilege object credentials.
 3. Set all `sync: false` values in `render.yaml`, including the exact frontend `ALLOWED_ORIGINS` and API `VITE_API_BASE_URL`.
 4. Use a new Qdrant collection when changing embedding model or dimension. Startup rejects incompatible existing vectors.
@@ -348,7 +348,7 @@ Current free tiers are not service-level guarantees. Render free web services sp
 
 The API image binds on port `8000`, runs as a non-root user, contains no local ML model artifacts, and stores no durable data on the container filesystem.
 
-For Cerebras failover, keep `LLM_PROVIDER=groq` and add `CEREBRAS_API_KEY` only to the API service environment. Never add it to the static frontend or any `VITE_*` variable. `CEREBRAS_MODEL`, `CEREBRAS_BASE_URL`, and the cooldown have safe defaults in both the application and Blueprint.
+For Gemini failover, keep `LLM_PROVIDER=groq` and add `GEMINI_API_KEY` only to the API service environment. Never add it to the static frontend or any `VITE_*` variable. `GEMINI_MODEL` and the cooldown have safe defaults in both the application and Blueprint. Cerebras remains optional and is ignored when Gemini is configured.
 
 ## Schema changes and rollback
 
