@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from groq import (
     APIConnectionError,
     APITimeoutError,
+    AuthenticationError,
+    PermissionDeniedError,
     BadRequestError,
     Groq,
     InternalServerError,
@@ -236,13 +238,15 @@ class IngestionService:
                 return await asyncio.to_thread(self._extract_with_groq, text)
             except (
                 RateLimitError,
+                AuthenticationError,
+                PermissionDeniedError,
                 APIConnectionError,
                 APITimeoutError,
                 InternalServerError,
             ) as exc:
                 primary_error = exc
                 provider_circuit_breaker.block(
-                    "groq", settings.llm_failover_cooldown_seconds
+                    "groq", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning(
                     "Groq graph extraction is temporarily unavailable; trying Cerebras"
@@ -266,12 +270,13 @@ class IngestionService:
                 return await asyncio.to_thread(self._extract_with_cerebras, text)
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
                 provider_circuit_breaker.block(
-                    "cerebras", settings.llm_failover_cooldown_seconds
+                    "cerebras", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning("Cerebras graph extraction is temporarily unavailable")
-                if primary_error is None:
-                    raise
-            except (LLMConfigurationError, GraphStructureError) as exc:
+                # Stop the document on quota exhaustion even if Groq first
+                # failed schema validation; otherwise every batch retries Groq.
+                raise
+            except (LLMConfigurationError, LLMProviderRequestError, GraphStructureError) as exc:
                 logger.warning("Cerebras graph failover could not complete the batch: %s", exc)
                 if primary_error is None:
                     raise
@@ -554,6 +559,9 @@ class IngestionService:
         except ValidationError:
             pass
 
+        if not settings.graph_json_repair_enabled:
+            raise GraphStructureError("Groq returned an invalid graph; JSON repair is disabled")
+
         # Some compatible models reject strict JSON Schema even when they can
         # return valid JSON. Use the smallest context for one simpler fallback,
         # then still validate the graph locally before accepting it.
@@ -609,6 +617,9 @@ class IngestionService:
             )
         except (LLMProviderRequestError, ValidationError, ValueError):
             pass
+
+        if not settings.graph_json_repair_enabled:
+            raise GraphStructureError("Cerebras returned an invalid graph; JSON repair is disabled")
 
         try:
             content = cerebras_service.complete(

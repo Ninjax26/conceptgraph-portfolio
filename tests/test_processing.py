@@ -775,6 +775,7 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertIn("structure", message)
 
     def test_groq_retries_json_validation_with_smaller_context(self):
+        self.enterContext(patch("app.services.ingestion_service.settings.graph_json_repair_enabled", True))
         failure = BadRequestError(
             "Failed to validate JSON",
             response=httpx.Response(
@@ -810,6 +811,7 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(result, GraphExtractionResponse())
 
     def test_groq_exhausted_schema_failures_use_json_object_fallback(self):
+        self.enterContext(patch("app.services.ingestion_service.settings.graph_json_repair_enabled", True))
         failure = BadRequestError(
             "Failed to validate JSON",
             response=httpx.Response(
@@ -846,6 +848,7 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(result, GraphExtractionResponse())
 
     def test_groq_invalid_json_object_fallback_raises_structure_error(self):
+        self.enterContext(patch("app.services.ingestion_service.settings.graph_json_repair_enabled", True))
         failure = BadRequestError(
             "Failed to validate JSON",
             response=httpx.Response(
@@ -1205,6 +1208,7 @@ class ProcessingRulesTests(unittest.TestCase):
         )
 
     def test_answer_synthesis_falls_back_to_retrieved_evidence_on_quota(self):
+        self.enterContext(patch("app.services.cerebras_service.settings.cerebras_api_key", None))
         rate_limit = RateLimitError(
             "Daily token quota reached",
             response=httpx.Response(

@@ -169,6 +169,7 @@ class Settings(BaseSettings):
         le=120.0,
         alias="PROVIDER_TIMEOUT_SECONDS",
     )
+    graph_json_repair_enabled: bool = Field(default=False, alias="GRAPH_JSON_REPAIR_ENABLED")
     graph_batch_size: int = Field(
         default=4,
         ge=2,

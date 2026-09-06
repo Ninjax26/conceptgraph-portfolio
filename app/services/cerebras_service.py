@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.services.provider_failover import retry_after_seconds
 from app.core.exceptions import (
     LLMConfigurationError,
     LLMProviderRateLimitError,
@@ -67,7 +68,10 @@ class CerebrasService:
         if response.status_code in {401, 403}:
             raise LLMConfigurationError("CEREBRAS_API_KEY was rejected")
         if response.status_code == 429:
-            raise LLMProviderRateLimitError("Cerebras quota is temporarily exhausted")
+            raise LLMProviderRateLimitError(
+                "Cerebras quota is temporarily exhausted",
+                retry_after_seconds=retry_after_seconds(response.headers),
+            )
         if response.status_code >= 500:
             raise LLMProviderUnavailableError("Cerebras is temporarily unavailable")
         if response.status_code >= 400:

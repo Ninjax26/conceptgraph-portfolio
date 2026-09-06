@@ -290,9 +290,10 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `CEREBRAS_API_KEY` | Optional secret fallback key; never expose it to Vite or commit it |
 | `CEREBRAS_MODEL` | Fallback model; default `gpt-oss-120b` |
 | `CEREBRAS_BASE_URL` | OpenAI-compatible API base; default `https://api.cerebras.ai/v1` |
-| `LLM_FAILOVER_COOLDOWN_SECONDS` | Time to bypass a provider after quota/timeout; default `300` |
+| `LLM_FAILOVER_COOLDOWN_SECONDS` | Minimum provider cooldown after quota/timeout; default `300`. Longer `Retry-After` headers are respected. State is process-local and resets on restart. |
 | `GRAPH_BATCH_SIZE` | Chunks per graph request; default `4` |
-| `GRAPH_MAX_BATCHES` | Maximum graph requests planned per PDF; default `6` for free-tier control |
+| `GRAPH_MAX_BATCHES` | Maximum graph batches per PDF; default `6`. Each batch can call Groq and Cerebras once (up to 12 generation requests per PDF with default repair disabled). |
+| `GRAPH_JSON_REPAIR_ENABLED` | Default `false`. Opting into JSON repair allows another call per provider per batch (up to 24 requests with six batches). |
 | `ALLOWED_ORIGINS` | Exact deployed frontend origin; comma-separated if necessary |
 | `DEMO_ACCESS_TOKEN` | Secret reviewer code of at least 24 characters; configure it only in the hosting dashboard |
 | `REQUIRE_UPLOAD_AUTH` | `true` for public deployments |

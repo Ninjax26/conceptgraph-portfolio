@@ -13,6 +13,9 @@ from typing import Any
 from groq import (
     APIConnectionError,
     APITimeoutError,
+    AuthenticationError,
+    PermissionDeniedError,
+    BadRequestError,
     Groq,
     InternalServerError,
     RateLimitError,
@@ -283,13 +286,16 @@ class ExamService:
                 )
             except (
                 RateLimitError,
+                AuthenticationError,
+                PermissionDeniedError,
+                BadRequestError,
                 APIConnectionError,
                 APITimeoutError,
                 InternalServerError,
             ) as exc:
                 primary_error = exc
                 provider_circuit_breaker.block(
-                    "groq", settings.llm_failover_cooldown_seconds
+                    "groq", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning("Groq exam generation is unavailable; trying Cerebras")
             except ValueError as exc:
@@ -303,7 +309,7 @@ class ExamService:
                 )
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
                 provider_circuit_breaker.block(
-                    "cerebras", settings.llm_failover_cooldown_seconds
+                    "cerebras", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning("Cerebras exam generation is temporarily unavailable")
                 primary_error = primary_error or exc

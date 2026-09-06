@@ -6,6 +6,9 @@ from typing import Any
 from groq import (
     APIConnectionError,
     APITimeoutError,
+    AuthenticationError,
+    PermissionDeniedError,
+    BadRequestError,
     Groq,
     InternalServerError,
     RateLimitError,
@@ -15,6 +18,7 @@ from app.core.config import settings
 from app.core.exceptions import (
     LLMConfigurationError,
     LLMProviderRateLimitError,
+    LLMProviderRequestError,
     LLMProviderUnavailableError,
 )
 from app.services.cerebras_service import cerebras_service
@@ -90,12 +94,15 @@ class SynthesisService:
                 )
             except (
                 RateLimitError,
+                AuthenticationError,
+                PermissionDeniedError,
+                BadRequestError,
                 APIConnectionError,
                 APITimeoutError,
                 InternalServerError,
-            ):
+            ) as exc:
                 provider_circuit_breaker.block(
-                    "groq", settings.llm_failover_cooldown_seconds
+                    "groq", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning(
                     "Groq answer synthesis is temporarily unavailable; trying Cerebras"
@@ -109,12 +116,12 @@ class SynthesisService:
                     graph_context,
                     sources,
                 )
-            except (LLMProviderRateLimitError, LLMProviderUnavailableError):
+            except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
                 provider_circuit_breaker.block(
-                    "cerebras", settings.llm_failover_cooldown_seconds
+                    "cerebras", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning("Cerebras answer synthesis is temporarily unavailable")
-            except LLMConfigurationError as exc:
+            except (LLMConfigurationError, LLMProviderRequestError) as exc:
                 logger.warning("Cerebras answer failover is misconfigured: %s", exc)
 
         logger.warning(
