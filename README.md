@@ -40,7 +40,7 @@ ConceptGraph turns course PDFs into a searchable concept graph, grounded answers
 | Public access | One pre-uploaded read-only sample course and source previews without exposing upload/query/exam controls |
 | Data cleanup | Manual deletion across PostgreSQL, Qdrant, Neo4j, and R2; automatic demo retention; sample-course exclusion; shared-object protection |
 | Evaluation | Fifteen manually annotated questions, committed baseline results, top-five document/page checks, citation/refusal checks, latency measurement |
-| Verification | 120 focused backend tests plus Python compilation, TypeScript checking, Vite production build, and Docker Compose validation |
+| Verification | 125 focused backend tests plus Python compilation, TypeScript checking, Vite production build, and Docker Compose validation |
 | Scanned PDFs | Detected and rejected with an OCR-required message; OCR itself is intentionally listed as future work |
 
 The commit history records these improvements as separate, explainable phases: dashboard polish, answer formatting, cross-site sessions, complete deletion, demo hardening/public sample/retention, evaluation, graph quality and provenance, complex-PDF batching, quota-safe degradation, and Cerebras failover.
@@ -442,7 +442,9 @@ python scripts/run_fixture_ablation.py --reference-graph --repeats 3 \
   --output evaluation/ablation-reference.json
 ```
 
-The reference graph is intentionally authored and labelled as such. A normal provider-backed attempt writes [`evaluation/fixture-graphs.json`](evaluation/fixture-graphs.json); if Neo4j or the provider cannot be reached, the runner writes a [`status: blocked`](evaluation/ablation-provider-limited.md) report instead of treating missing graph data as a successful comparison.
+The reference graph is intentionally authored and labelled as such. A normal provider-backed attempt writes [`evaluation/fixture-graphs.json`](evaluation/fixture-graphs.json). Neo4j connectivity failure produces a [`status: blocked`](evaluation/ablation-provider-limited.md) report. If extraction produces no traversable graph, the runner records `incomplete_no_graph` and exits unsuccessfully: the resulting vector scores do not establish graph improvement.
+
+The [provider-generated run on 6 September 2026](evaluation/ablation-provider-2026-09-06.md) completed 66 retrieval requests (22 questions × 3 modes), with zero request errors. Extraction produced 8 nodes and 7 edges for the web PDF, then provider quota limits left the other two graphs empty. All modes found every required source after reranking for 17/17 supported questions; all retained complete evidence after the evidence gate for 13/17 and refused 5/5 unsupported questions. Average retrieval latency was 0.05s / 0.32s / 0.28s for vector / one hop / two hops. No two-hop expansion terms were used in this run, so it does not establish the benefit of deeper traversal. These measurements cover retrieval on a small synthetic corpus with partial graph coverage, not generated-answer quality or hosted HTTP performance.
 
 Interpret the result conservatively: one-hop or two-hop is useful only when it improves labelled retrieval enough to justify its latency. Equal scores are also meaningful—they show that the graph adds explainability for those questions but not retrieval accuracy. This small single-course set is portfolio evidence, not a claim of statistical significance.
 
@@ -521,7 +523,7 @@ Recommended next phases, in order:
 
 ## Verification
 
-Latest local verification: **120 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
+Latest local verification: **125 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
 
 ```bash
 source .venv/bin/activate

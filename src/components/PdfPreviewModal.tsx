@@ -16,10 +16,10 @@ export default function PdfPreviewModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-2 backdrop-blur-sm sm:p-4">
       <div className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#0B0B0F]">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
-          <div className="min-w-0">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-white/10">
+          <div className="min-w-0 flex-1 basis-40">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               PDF Preview
             </p>
@@ -47,7 +47,7 @@ export default function PdfPreviewModal({
           </div>
         </div>
         <iframe
-          className="h-full w-full bg-slate-100 dark:bg-black"
+          className="min-h-0 w-full flex-1 bg-slate-100 dark:bg-black"
           src={previewUrl}
           title={title}
         />

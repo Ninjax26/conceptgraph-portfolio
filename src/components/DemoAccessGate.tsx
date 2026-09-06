@@ -22,6 +22,16 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
   const [protectionEnabled, setProtectionEnabled] = useState(false);
 
   useEffect(() => {
+    const sessionExpired = () => {
+      setState("locked");
+      setMessage("Your session has expired. Enter the access code to continue.");
+      setAccessCode("");
+    };
+    window.addEventListener("conceptgraph:session-expired", sessionExpired);
+    return () => window.removeEventListener("conceptgraph:session-expired", sessionExpired);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     getAuthSession()
       .then((session) => {
@@ -112,7 +122,8 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
 
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[radial-gradient(circle_at_top_left,_rgba(13,148,136,0.08),_transparent_35%)] px-4 py-10 dark:bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.09),_transparent_35%)]">
-      <div className="mx-auto grid w-full max-w-6xl items-start gap-5 lg:grid-cols-[minmax(320px,400px)_1fr]">
+      <div className="mx-auto w-full max-w-6xl space-y-5">
+      <PublicSampleCourse />
       <section className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-white/10 dark:bg-[#15151b] dark:shadow-black/30">
         <div className="mb-5 flex items-start gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
@@ -173,7 +184,6 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
           </button>
         )}
       </section>
-      <PublicSampleCourse />
       </div>
     </main>
   );

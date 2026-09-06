@@ -104,15 +104,23 @@ async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: 
   const { timeout = 30000, ...requestOptions } = options;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
+  const headers = new Headers(requestOptions.headers);
+  if (!["GET", "HEAD", "OPTIONS"].includes((requestOptions.method ?? "GET").toUpperCase())) {
+    headers.set("X-ConceptGraph-Request", "1");
+  }
   
   try {
     const response = await fetch(url, {
       credentials: "include",
       ...requestOptions,
+      headers,
       signal: controller.signal,
     });
     clearTimeout(id);
     if (!response.ok) {
+      if (response.status === 401 && !url.includes("/auth/session")) {
+        window.dispatchEvent(new Event("conceptgraph:session-expired"));
+      }
       let message = response.statusText;
       const errorBody = await response.text();
       if (errorBody) {

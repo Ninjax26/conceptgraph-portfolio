@@ -100,9 +100,7 @@ async def run_direct_evaluation(
     """Evaluate the configured stores/providers without bypassing deployed HTTP auth."""
 
     from types import SimpleNamespace
-
     from sqlalchemy import text
-
     from app.core.database import AsyncSessionLocal, close_database_connections
     from app.services.citation_service import assess_evidence, build_sources
     from app.services.rag_service import RetrievalService
@@ -192,42 +190,18 @@ async def run_direct_ablation(
 ) -> dict[str, dict[str, Any]]:
     """Compare retrieval modes without paying for or varying answer synthesis."""
 
-    from types import SimpleNamespace
-
-    from sqlalchemy import text
-
     from app.core.database import AsyncSessionLocal, close_database_connections
+    from app.services.course_service import CourseService
     from app.services.citation_service import assess_evidence, build_sources
     from app.services.rag_service import RetrievalMode, RetrievalService
     from app.services.rerank_service import RerankService
 
-    async with AsyncSessionLocal() as session:
-        records = (
-            await session.execute(
-                text(
-                    "SELECT course_uuid, course_id, upload_id "
-                    "FROM document_uploads "
-                    "WHERE stage = :stage AND lower(course_id) = lower(:course_id)"
-                ),
-                {"stage": "READY", "course_id": course_id},
-            )
-        ).mappings().all()
-    if not records:
+    try:
+        async with AsyncSessionLocal() as session:
+            context = await CourseService().get_ready_context(session, course_id)
+    except Exception:
         await close_database_connections()
-        raise RuntimeError(f"No READY documents were found for course {course_id!r}.")
-
-    context = SimpleNamespace(
-        document_ids=[str(record["upload_id"]) for record in records],
-        graph_course_ids=sorted(
-            {
-                str(value)
-                for record in records
-                for value in (record["course_uuid"], record["course_id"])
-                if value
-            }
-        ),
-        graph_status="GRAPH_READY",
-    )
+        raise
     retrieval_service = RetrievalService()
     rerank_service = RerankService()
     mode_results: dict[str, list[dict[str, Any]]] = {

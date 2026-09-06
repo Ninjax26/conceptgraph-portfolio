@@ -56,9 +56,12 @@ export default function Dashboard(): JSX.Element {
   const [response, setResponse] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const requestVersion = useRef(0);
+  const [answeredQuestion, setAnsweredQuestion] = useState("");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadJobs, setUploadJobs] = useState<UploadJob[]>([]);
   const [courses, setCourses] = useState<CourseSummary[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(true);
   const [pendingCourseSelection, setPendingCourseSelection] = useState<string | null>(null);
   const [showAllUploads, setShowAllUploads] = useState(false);
   const [retryingUploadId, setRetryingUploadId] = useState<string | null>(null);
@@ -98,6 +101,7 @@ export default function Dashboard(): JSX.Element {
   );
 
   async function refreshUploads(): Promise<void> {
+    setIsRefreshing(true);
     try {
       const [nextUploads, nextCourses] = await Promise.all([listUploads(), listCourses()]);
       setUploadJobs(nextUploads);
@@ -108,10 +112,15 @@ export default function Dashboard(): JSX.Element {
           ? requestError.message
           : "Unable to load recent uploads.",
       );
+    } finally {
+      setIsRefreshing(false);
     }
   }
 
   function selectCourse(nextCourseId: string): void {
+    requestVersion.current += 1;
+    setIsLoading(false);
+    setAnsweredQuestion("");
     setCourseId(nextCourseId);
     setResponse(null);
     setError(null);
@@ -119,6 +128,7 @@ export default function Dashboard(): JSX.Element {
 
   useEffect(() => {
     void refreshUploads();
+    return () => { requestVersion.current += 1; };
   }, []);
 
   useEffect(() => {
@@ -311,31 +321,41 @@ export default function Dashboard(): JSX.Element {
 
   async function copyAnswer(): Promise<void> {
     if (!response?.answer) return;
-    await navigator.clipboard.writeText(response.answer);
-    setAnswerCopied(true);
-    window.setTimeout(() => setAnswerCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(response.answer);
+      setAnswerCopied(true);
+      window.setTimeout(() => setAnswerCopied(false), 1500);
+    } catch {
+      setError("Clipboard access was blocked. Select the answer text and copy it manually.");
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (!canSubmitQuery) {
+    if (!canSubmitQuery || isLoading) {
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setResponse(null);
+    const version = ++requestVersion.current;
+    const submittedQuestion = question.trim();
 
     try {
-      const result = await sendQuery(question.trim(), courseId.trim(), retrievalMode);
+      const result = await sendQuery(submittedQuestion, courseId.trim(), retrievalMode);
+      if (version !== requestVersion.current) return;
       setResponse(result);
+      setAnsweredQuestion(submittedQuestion);
     } catch (requestError) {
+      if (version !== requestVersion.current) return;
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Unable to resolve the query.",
       );
     } finally {
-      setIsLoading(false);
+      if (version === requestVersion.current) setIsLoading(false);
     }
   }
 
@@ -401,18 +421,25 @@ export default function Dashboard(): JSX.Element {
           </section>
         </div>
       ) : null}
-      <section className="flex min-h-[calc(100vh-136px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-panel">
+      <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-panel">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/70 p-4">
+          <div>
+            <h1 className="text-base font-semibold text-ink">Course workspace</h1>
+            <p className="mt-1 text-xs text-slate-500">Choose a course, ask a question, and inspect its sources.</p>
+          </div>
+          <button type="button" onClick={() => setIsUploadModalOpen(true)} className="shrink-0 rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800">Add PDF</button>
+        </div>
         <form className="border-b border-slate-200 p-4" onSubmit={handleSubmit}>
           <div className="space-y-3">
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Course (all READY PDFs)
+              Course
               <select
                 className="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm font-medium text-ink outline-none transition focus:border-signal focus:ring-2 focus:ring-teal-100"
                 value={courseId}
                 onChange={(event) => selectCourse(event.target.value)}
-                disabled={courses.length === 0}
+                disabled={courses.length === 0 || isRefreshing}
               >
-                {courses.length === 0 ? <option value="">Upload a course PDF to begin</option> : null}
+                {courses.length === 0 ? <option value="">{isRefreshing ? "Loading courses…" : "Upload a course PDF to begin"}</option> : null}
                 {courses.map((course) => (
                   <option
                     disabled={course.ready_documents === 0}
@@ -442,6 +469,7 @@ export default function Dashboard(): JSX.Element {
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
               Student Question
               <textarea
+                maxLength={4000}
                 className="mt-1 min-h-28 w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm leading-6 text-ink outline-none transition focus:border-signal focus:ring-2 focus:ring-teal-100"
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
@@ -499,6 +527,7 @@ export default function Dashboard(): JSX.Element {
           <div className="mb-3 flex min-h-7 items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grounded answer</p>
+              {response && answeredQuestion ? <p className="mt-2 break-words text-sm font-medium text-slate-800">{answeredQuestion}</p> : null}
               {response?.answer ? (
                 <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${confidenceClass(response.confidence.level)}`}>
                   {response.confidence.level} confidence · {Math.round(response.confidence.score * 100)}%
@@ -521,7 +550,7 @@ export default function Dashboard(): JSX.Element {
             </p>
           ) : null}
           {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
             </div>
           ) : null}
@@ -745,8 +774,8 @@ export default function Dashboard(): JSX.Element {
 
       </section>
 
-      <section className="min-h-[calc(100vh-136px)] overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-panel">
-        <div className="mb-3 flex items-center justify-between gap-4">
+      <section className="min-w-0 self-start overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-panel lg:sticky lg:top-20">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-base font-semibold text-ink">Concept map</h1>
@@ -787,14 +816,14 @@ export default function Dashboard(): JSX.Element {
             Add PDF
           </button>
         </div>
-        <div className="relative h-[calc(100%-56px)]">
+        <div className="relative h-[440px] min-w-0 lg:h-[min(68vh,760px)]">
           {isLoading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-white/60 backdrop-blur-sm dark:bg-[#0B0B0F]/60">
               <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
             </div>
           )}
           {graphElements.nodes.length > 0 ? (
-            <Suspense fallback={<div className="grid h-full min-h-[480px] place-items-center rounded-md border border-slate-200 bg-panel text-sm text-slate-500">Loading concept map...</div>}>
+            <Suspense fallback={<div className="grid h-full place-items-center rounded-md border border-slate-200 bg-panel text-sm text-slate-500">Loading concept map...</div>}>
               <ConceptGraphCanvas
                 nodes={graphElements.nodes}
                 edges={graphElements.edges}
@@ -811,16 +840,22 @@ export default function Dashboard(): JSX.Element {
               />
             </Suspense>
           ) : (
-            <div className="grid h-full min-h-[480px] place-items-center rounded-lg border border-dashed border-slate-300 bg-[radial-gradient(circle_at_center,_rgba(13,148,136,0.06),_transparent_55%)] px-8 text-center">
+            <div className="grid h-full place-items-center rounded-lg border border-dashed border-slate-300 bg-[radial-gradient(circle_at_center,_rgba(13,148,136,0.06),_transparent_55%)] px-8 text-center">
               <div className="max-w-sm">
                 <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-lg font-bold text-teal-700">CG</div>
                 <p className="font-semibold text-ink">
-                  {selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
+                  {response?.graph_metadata.retrieval_mode === "vector_only"
+                    ? "Answering from PDF passages"
+                    : selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
                     ? "No validated graph was produced"
                     : "Your course graph will appear here"}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  {selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
+                  {response?.graph_metadata.retrieval_mode === "vector_only"
+                    ? (response.graph_metadata.fallback_reason
+                      ? "The graph service is unavailable. Your answer and source citations are still available in the answer panel."
+                      : "Vector mode does not retrieve a graph. Choose One hop or Two hops and run your question to explore concept connections.")
+                    : selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
                     ? "The PDF is still searchable for grounded answers, but the extracted graph did not meet the minimum quality checks."
                     : "Select a ready course and ask a question to reveal relevant concepts, relationships, and prerequisites."}
                 </p>

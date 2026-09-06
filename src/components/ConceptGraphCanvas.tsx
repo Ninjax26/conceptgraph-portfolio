@@ -316,9 +316,9 @@ export default function ConceptGraphCanvas({
   }, [nodes, edges]);
 
   return (
-    <div className="relative h-full min-h-[480px] overflow-hidden rounded-md border border-slate-200 bg-panel">
+    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-slate-200 bg-panel">
       {nodes.length === 0 ? (
-        <div className="flex h-full min-h-[480px] items-center justify-center px-8 text-center text-sm text-slate-500">
+        <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-500">
           Ask a question to load the conceptual prerequisite map.
         </div>
       ) : null}

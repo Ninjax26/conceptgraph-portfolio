@@ -13,6 +13,25 @@ from scripts.run_evaluation import score_retrieval_result, summarize_retrieval
 
 
 class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
+    async def test_direct_ablation_uses_production_course_scope(self):
+        from scripts.run_evaluation import run_direct_ablation
+        from app.core import database
+        from app.services.course_service import CourseService
+        context = SimpleNamespace(document_ids=["ready-only"], graph_status="GRAPH_PARTIAL")
+        session = AsyncMock()
+        with patch.object(database, "AsyncSessionLocal", return_value=session), \
+             patch.object(database, "close_database_connections", AsyncMock()) as close, \
+             patch.object(CourseService, "get_ready_context", AsyncMock(return_value=context)) as resolve, \
+             patch.object(RetrievalService, "retrieve", AsyncMock(return_value={
+                 "chunks": [], "graph_metadata": {},
+             })) as retrieve, \
+             patch("app.services.rerank_service.RerankService.rerank", AsyncMock(return_value=[])):
+            await run_direct_ablation(course_id="canonical-id", questions=[{"question": "test"}])
+        resolve.assert_awaited_once_with(session.__aenter__.return_value, "canonical-id")
+        self.assertEqual(retrieve.await_count, 3)
+        self.assertTrue(all(call.kwargs["context"] is context for call in retrieve.await_args_list))
+        close.assert_awaited_once()
+
     async def test_graph_errors_preserve_vector_evidence_and_report_actual_mode(self):
         for error in (RuntimeError("graph offline"), TimeoutError("graph slow")):
             service = RetrievalService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
@@ -76,6 +95,15 @@ class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
 
 
 class EvaluationIntegrityTests(unittest.TestCase):
+    def test_empty_extraction_is_not_a_completed_graph_comparison(self):
+        from scripts.run_fixture_ablation import graph_comparison_status
+        self.assertEqual(graph_comparison_status({"a": {"extraction": {
+            "nodes": [], "relationships": [],
+        }}}), "incomplete_no_graph")
+        self.assertEqual(graph_comparison_status({"a": {"extraction": {
+            "nodes": [{"id": "a"}, {"id": "b"}], "relationships": [{"source": "a", "target": "b"}],
+        }}}), "complete")
+
     def test_invalid_retrieval_mode_is_rejected(self):
         with self.assertRaises(ValidationError):
             query.QueryRequest(question="Question", course_id="course", retrieval_mode="ten_hops")

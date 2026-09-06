@@ -46,7 +46,7 @@ export default function App(): JSX.Element {
               <div className="grid h-9 w-9 place-items-center rounded-md bg-ink text-sm font-bold text-white dark:bg-teal-400 dark:text-slate-950">
                 CG
               </div>
-              <div className="text-left">
+              <div className="hidden text-left md:block">
                 <p className="text-sm font-semibold text-ink dark:text-white">
                   ConceptGraph AI Pipeline
                 </p>
@@ -54,28 +54,28 @@ export default function App(): JSX.Element {
                   Academic graph retrieval dashboard
                 </p>
               </div>
-              <span className="hidden rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-700 sm:inline-flex">
+              <span className="hidden rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-700 xl:inline-flex">
                 Shared portfolio demo
               </span>
             </button>
           </div>
 
           <div className="flex items-center gap-2">
-            {page === "home" && (
+            {(
               <>
               <button
                 onClick={() => navigate("sample")}
                 className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
               >
                 <Network className="h-3.5 w-3.5" />
-                View Sample
+                Public preview
               </button>
               <button
                 onClick={() => navigate("dashboard")}
                 className="inline-flex items-center gap-2 rounded-md bg-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300"
               >
                 <Network className="h-3.5 w-3.5" />
-                Open Dashboard
+                Dashboard
               </button>
               </>
             )}

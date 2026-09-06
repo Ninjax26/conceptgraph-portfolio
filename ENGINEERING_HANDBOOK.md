@@ -179,6 +179,8 @@ This is a shared-secret portfolio demo, not multi-user authentication. Public de
 
 The frontend does not trust the login response alone. It performs a separate session-status request and unlocks protected controls only when the API validates the signed cookie. The reviewer code exists only in deployment secrets and is never compiled into the SPA or published in documentation.
 
+Cookie-authenticated writes require `X-ConceptGraph-Request: 1`, forcing cross-origin browser writes through CORS preflight. Explicit bearer authentication remains supported for scripts. Strict production configuration allows only the configured frontend origins, protected responses use `Cache-Control: no-store`, and the UI locks on a protected API 401. The process-local limiter expires prior windows and caps tracked keys to bound memory.
+
 Unauthenticated visitors receive one configured, pre-uploaded READY course through a dedicated read-only endpoint. That endpoint returns the bounded concept graph and permits PDF previews only for documents already belonging to that course; it cannot invoke LLM, upload, query, exam, retry, or deletion operations. Public sample reads have their own IP-fingerprinted process-local rate limit.
 
 The frontend `/sample` route is additionally backed by committed, generated fixture PDFs and editorial answer cards. It remains useful when the API is sleeping, databases are unavailable, or provider quota is exhausted; its graph is explicitly labelled as an illustrated reference, not a live LLM extraction.
@@ -193,7 +195,7 @@ When demo protection is enabled, a background retention sweep removes READY and 
 
 `GET /api/v1/health` checks PostgreSQL liveness. It is suitable for proving the process can reach its authority store.
 
-`GET /api/v1/ready` checks PostgreSQL, Qdrant, Neo4j, object storage, and coordinator startup. It returns `503` with dependency names when traffic should not be routed to the instance.
+`GET /api/v1/ready` requires PostgreSQL, Qdrant, object storage, and coordinator startup. It returns `503` if those dependencies are unavailable. Neo4j failure is reported in `degraded_services`, allowing vector retrieval to remain available; this does not guarantee graph ingestion or graph previews can succeed.
 
 Readiness does not prove that paid/provider quota is available for a full LLM request. Provider calls use bounded timeouts where supported and return safe `503` responses at the API boundary.
 

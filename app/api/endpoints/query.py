@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 class QueryRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    question: str = Field(..., min_length=1)
-    course_id: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=1, max_length=4000)
+    course_id: str = Field(..., min_length=1, max_length=256)
     retrieval_mode: RetrievalMode = RetrievalMode.TWO_HOP
 
 

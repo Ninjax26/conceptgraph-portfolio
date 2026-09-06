@@ -46,16 +46,15 @@ app = FastAPI(title="ConceptGraph", lifespan=lifespan)
 app.add_middleware(DemoProtectionMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
+    allow_origins=([
         "http://localhost:3000",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://0.0.0.0:3000",
         "http://0.0.0.0:5173",
-        *settings.configured_cors_origins,
-    ],
-    allow_origin_regex=LOCAL_DEV_ORIGIN_REGEX,
+    ] if not settings.strict_startup_validation else []) + settings.configured_cors_origins,
+    allow_origin_regex=LOCAL_DEV_ORIGIN_REGEX if not settings.strict_startup_validation else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

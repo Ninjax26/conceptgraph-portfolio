@@ -129,7 +129,7 @@ services:
         value: strict-origin-when-cross-origin
       - path: /*
         name: X-Frame-Options
-        value: DENY
+        value: SAMEORIGIN
     routes:
       - type: rewrite
         source: /*

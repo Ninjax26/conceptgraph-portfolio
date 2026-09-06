@@ -1,6 +1,6 @@
 {
   "name": "ConceptGraph authored computing course v1",
-  "provenance": "Original educational fixture written for this repository. Saved answers are editorial examples. Graphs for the benchmark must be extracted by the configured LLM; no expected graph is injected.",
+  "provenance": "Original educational fixture written for this repository. Saved answers and illustrated graphs are editorial examples. The benchmark supports either configured LLM extraction or an explicitly labelled authored reference graph; reference results do not measure extraction quality.",
   "documents": [
     {"filename": "web-foundations.pdf", "pages": [
       {"title": "HTTP", "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."},

@@ -29,7 +29,7 @@ class DemoAccessService:
         expected = self.config.demo_access_token_value
         if expected is None or candidate is None:
             return False
-        return hmac.compare_digest(candidate, expected)
+        return hmac.compare_digest(candidate.encode("utf-8"), expected.encode("utf-8"))
 
     def issue_cookie(self, *, now: int | None = None) -> str:
         timestamp = str(now if now is not None else int(time.time()))
@@ -57,6 +57,8 @@ class DemoAccessService:
             return None
         age = current_time - issued_at
         if age > self.config.auth_session_ttl_seconds:
+            return None
+        if not timestamp.isascii() or not signature.isascii():
             return None
         if not hmac.compare_digest(signature, self._sign(timestamp)):
             return None
@@ -87,6 +89,7 @@ class RateLimitService:
     def __init__(self) -> None:
         self._counts: dict[str, tuple[int, int]] = {}
         self._lock = asyncio.Lock()
+        self._last_cleanup_window: int | None = None
 
     async def check(
         self,
@@ -98,6 +101,11 @@ class RateLimitService:
         current_time = now if now is not None else int(time.time())
         window = current_time // 60
         async with self._lock:
+            if self._last_cleanup_window != window:
+                self._counts = {k: v for k, v in self._counts.items() if v[0] == window}
+                self._last_cleanup_window = window
+            if key not in self._counts and len(self._counts) >= 10_000:
+                return RateLimitResult(False, limit, 0, max(1, 60 - current_time % 60))
             stored_window, stored_count = self._counts.get(key, (window, 0))
             count = stored_count + 1 if stored_window == window else 1
             self._counts[key] = (window, count)

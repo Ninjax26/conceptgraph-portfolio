@@ -43,6 +43,15 @@ class DemoProtectionMiddleware(BaseHTTPMiddleware):
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        # Cookie credentials are ambient. A custom header forces cross-origin
+        # browser requests through CORS preflight, unlike multipart form POSTs.
+        authorization = request.headers.get("Authorization", "")
+        scheme, _, bearer = authorization.partition(" ")
+        bearer_authenticated = scheme.casefold() == "bearer" and demo_access_service.verify_access_token(bearer)
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and not bearer_authenticated:
+            if request.headers.get("X-ConceptGraph-Request") != "1":
+                return JSONResponse(status_code=403, content={"detail": "Request verification failed. Refresh the dashboard and try again."})
+
         rate_limit = (
             settings.rate_limit_expensive_per_minute
             if _is_expensive(request)
@@ -69,6 +78,7 @@ class DemoProtectionMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         response.headers.update(rate_headers)
+        response.headers["Cache-Control"] = "no-store"
         return response
 
 

@@ -27,6 +27,14 @@ from scripts.run_evaluation import (
 )
 
 
+def graph_comparison_status(graph_records):
+    """Do not count an experiment without any traversable graph as a comparison."""
+    return "complete" if any(
+        record["extraction"]["nodes"] and record["extraction"]["relationships"]
+        for record in graph_records.values()
+    ) else "incomplete_no_graph"
+
+
 async def run(args):
     from qdrant_client import QdrantClient
     from sentence_transformers import SentenceTransformer, CrossEncoder
@@ -165,6 +173,11 @@ async def run(args):
             "by_category": {category: summarize_retrieval([r for r in items if r['category']==category])
                 for category in sorted({r['category'] for r in items})}} for mode, items in results.items()}
         report = {
+            "status": graph_comparison_status(graph_records),
+            "graph_counts": {name: {
+                "nodes": len(record["extraction"]["nodes"]),
+                "relationships": len(record["extraction"]["relationships"]),
+            } for name, record in graph_records.items()},
             "dataset": dataset["name"], "generated_at": datetime.now(timezone.utc).isoformat(),
             "methodology": {
                 "scope": "Authored synthetic fixture; actual PDF parser, MiniLM, local Qdrant, remote Neo4j, cross-encoder and evidence gate",
@@ -182,9 +195,11 @@ async def run(args):
             }, "runs": runs, "comparison_to_vector_only": build_ablation_comparison(runs),
         }
         output.write_text(json.dumps(report, indent=2) + "\n")
-        output.with_suffix(".md").write_text(ablation_markdown_table(runs)+"\n")
+        warning = ("No traversable graph was produced. These scores measure vector retrieval only; the graph comparison is incomplete.\n\n"
+            if report["status"] != "complete" else "")
+        output.with_suffix(".md").write_text(warning + ablation_markdown_table(runs)+"\n")
         print(ablation_markdown_table(runs))
-        return 1 if any(r["summary"]["request_errors"] or r["summary"]["graph_fallbacks"] for r in runs.values()) else 0
+        return 1 if report["status"] != "complete" or any(r["summary"]["request_errors"] or r["summary"]["graph_fallbacks"] for r in runs.values()) else 0
     finally:
         for upload in uploads:
             await ingestion.cleanup_upload(upload, course_id)

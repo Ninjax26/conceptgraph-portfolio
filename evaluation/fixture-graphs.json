@@ -2,14 +2,219 @@
   "web-foundations.pdf": {
     "pdf_sha256": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
     "extraction": {
-      "nodes": [],
-      "relationships": [],
+      "nodes": [
+        {
+          "id": "tls",
+          "name": "TLS",
+          "type": "concept",
+          "description": "Transport Layer Security protocol that protects data in transit using encryption and integrity checks.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "tls",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        },
+        {
+          "id": "encryption",
+          "name": "encryption",
+          "type": "concept",
+          "description": "Cryptographic technique used by TLS to conceal data from eavesdroppers.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "encryption",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        },
+        {
+          "id": "certificate",
+          "name": "certificate",
+          "type": "concept",
+          "description": "Digital credential that helps the client authenticate the server during the TLS handshake.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "certificate",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        },
+        {
+          "id": "client_authentication",
+          "name": "client authentication",
+          "type": "concept",
+          "description": "Process by which the client verifies the server's identity using the certificate.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "clientauthentication",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        },
+        {
+          "id": "handshake",
+          "name": "handshake",
+          "type": "concept",
+          "description": "Initial exchange of messages in TLS that establishes a secure session.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "handshake",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        },
+        {
+          "id": "hostname_verification",
+          "name": "hostname verification",
+          "type": "concept",
+          "description": "Check that the certificate matches the requested hostname.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "hostnameverification",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        },
+        {
+          "id": "trusted_authority",
+          "name": "trusted authority",
+          "type": "concept",
+          "description": "Certificate authority that the browser trusts to validate certificates.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "trustedauthority",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        },
+        {
+          "id": "https",
+          "name": "HTTPS",
+          "type": "concept",
+          "description": "HTTP over TLS, providing secure web communication.",
+          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "normalized_name": "https",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2,
+          "section_heading": "TLS",
+          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "source_chunk_ids": [
+            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "TLS"
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "source_node_id": "tls",
+          "target_node_id": "encryption",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "tls",
+          "target_node_id": "certificate",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "certificate",
+          "target_node_id": "client_authentication",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "certificate",
+          "target_node_id": "handshake",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "certificate",
+          "target_node_id": "hostname_verification",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "hostname_verification",
+          "target_node_id": "trusted_authority",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "tls",
+          "target_node_id": "https",
+          "relation_type": "PREREQUISITE_OF"
+        }
+      ],
       "sections_total": 6,
-      "sections_succeeded": 0,
-      "sections_failed": 6,
+      "sections_succeeded": 1,
+      "sections_failed": 5,
       "batches_total": 6,
-      "batches_succeeded": 0,
-      "batches_failed": 5,
+      "batches_succeeded": 1,
+      "batches_failed": 4,
       "batches_skipped": 1,
       "provider_limited": true,
       "extraction_budget_applied": false,
@@ -18,8 +223,7 @@
         "DNS",
         "HTTP",
         "HTTPS",
-        "Status Codes",
-        "TLS"
+        "Status Codes"
       ]
     }
   },
