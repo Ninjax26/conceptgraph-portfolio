@@ -33,9 +33,9 @@ class SynthesisService:
 
     def validate_provider_configured(self) -> None:
         provider = settings.llm_provider.lower()
-        if provider == "groq" and not settings.groq_api_key and not cerebras_service.configured:
+        if provider == "groq" and not settings.groq_api_key and not cerebras_service.configured and not settings.gemini_api_key:
             raise LLMConfigurationError(
-                "GROQ_API_KEY or CEREBRAS_API_KEY is required when LLM_PROVIDER=groq"
+                "GROQ_API_KEY, CEREBRAS_API_KEY, or GEMINI_API_KEY is required when LLM_PROVIDER=groq"
             )
         if provider == "cerebras" and not cerebras_service.configured:
             raise LLMConfigurationError(
@@ -105,10 +105,10 @@ class SynthesisService:
                     "groq", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning(
-                    "Groq answer synthesis is temporarily unavailable; trying Cerebras"
+                    "Groq answer synthesis is temporarily unavailable; trying backup providers"
                 )
 
-        if cerebras_service.configured and provider_circuit_breaker.is_available("cerebras"):
+        if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
                 return await asyncio.to_thread(
                     self._synthesize_with_cerebras,
@@ -123,6 +123,15 @@ class SynthesisService:
                 logger.warning("Cerebras answer synthesis is temporarily unavailable")
             except (LLMConfigurationError, LLMProviderRequestError) as exc:
                 logger.warning("Cerebras answer failover is misconfigured: %s", exc)
+
+        if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
+            try:
+                return await asyncio.to_thread(
+                    self._synthesize_with_gemini, question, graph_context, sources
+                )
+            except Exception as exc:
+                provider_circuit_breaker.block("gemini", settings.llm_failover_cooldown_seconds, exc)
+                logger.warning("Gemini answer synthesis is unavailable; returning retrieved evidence")
 
         logger.warning(
             "All answer synthesis providers are unavailable; returning retrieved evidence"

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import httpx
-from groq import AuthenticationError
+from groq import AuthenticationError, RateLimitError
 from pydantic import SecretStr
 
 from app.core.exceptions import GraphStructureError, LLMProviderRateLimitError, LLMProviderRequestError
@@ -118,6 +118,18 @@ class ProviderQuotaTests(unittest.TestCase):
         self.assertEqual(answer, "backup answer")
         backup.assert_called_once()
         self.assertFalse(provider_circuit_breaker.is_available("groq"))
+
+    def test_gemini_is_used_after_groq_failure(self):
+        error = RateLimitError("simulated quota", response=httpx.Response(429,
+            request=httpx.Request("POST", "https://example.test")), body=None)
+        service = SynthesisService()
+        with patch("app.services.synthesis_service.settings.groq_api_key", "test"), \
+             patch("app.services.synthesis_service.settings.gemini_api_key", "gemini-test"), \
+             patch.object(service, "_synthesize_with_groq", side_effect=error), \
+             patch.object(service, "_synthesize_with_gemini", return_value="Gemini answer") as backup:
+            answer = asyncio.run(service._synthesize_with_failover("question", [], []))
+        self.assertEqual(answer, "Gemini answer")
+        backup.assert_called_once()
 
     def test_backup_request_error_returns_evidence_instead_of_failing_query(self):
         provider_circuit_breaker.block("groq", 3600)

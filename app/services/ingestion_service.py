@@ -248,24 +248,18 @@ class IngestionService:
                 provider_circuit_breaker.block(
                     "groq", settings.llm_failover_cooldown_seconds, exc
                 )
-                logger.warning(
-                    "Groq graph extraction is temporarily unavailable; trying Cerebras"
-                )
+                logger.warning("Groq graph extraction is temporarily unavailable; trying backup providers")
             except (BadRequestError, GraphStructureError) as exc:
                 primary_error = exc
                 logger.warning(
-                    "Groq could not produce a valid graph; trying Cerebras for this batch"
+                    "Groq could not produce a valid graph; trying backup providers for this batch"
                 )
-        elif not settings.groq_api_key and not cerebras_service.configured:
+        elif not settings.groq_api_key and not cerebras_service.configured and not settings.gemini_api_key:
             raise LLMConfigurationError(
-                "GROQ_API_KEY or CEREBRAS_API_KEY is required when LLM_PROVIDER=groq"
-            )
-        elif not cerebras_service.configured:
-            raise LLMProviderRateLimitError(
-                "Groq is cooling down and Cerebras failover is not configured"
+                "GROQ_API_KEY, CEREBRAS_API_KEY, or GEMINI_API_KEY is required when LLM_PROVIDER=groq"
             )
 
-        if cerebras_service.configured and provider_circuit_breaker.is_available("cerebras"):
+        if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
                 return await asyncio.to_thread(self._extract_with_cerebras, text)
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
@@ -273,17 +267,23 @@ class IngestionService:
                     "cerebras", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning("Cerebras graph extraction is temporarily unavailable")
-                # Stop the document on quota exhaustion even if Groq first
-                # failed schema validation; otherwise every batch retries Groq.
-                raise
+                primary_error = exc
             except (LLMConfigurationError, LLMProviderRequestError, GraphStructureError) as exc:
                 logger.warning("Cerebras graph failover could not complete the batch: %s", exc)
                 if primary_error is None:
                     raise
 
-        if isinstance(primary_error, RateLimitError):
+        if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
+            try:
+                return await asyncio.to_thread(self._extract_with_gemini, text)
+            except Exception as exc:
+                provider_circuit_breaker.block("gemini", settings.llm_failover_cooldown_seconds, exc)
+                logger.warning("Gemini graph extraction is unavailable")
+                primary_error = primary_error or exc
+
+        if isinstance(primary_error, (RateLimitError, LLMProviderRateLimitError)):
             raise LLMProviderRateLimitError(
-                "Groq quota is exhausted and Cerebras failover was unavailable"
+                "Groq quota is exhausted and configured failover providers were unavailable"
             ) from primary_error
         if isinstance(
             primary_error,

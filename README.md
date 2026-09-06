@@ -285,11 +285,13 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `RERANK_PROVIDER`, `COHERE_API_KEY` | `cohere` and a secret API key |
 | `NEO4J_*` | Neo4j Aura credentials |
 | `S3_*` | Private R2 bucket endpoint and scoped credentials |
-| `LLM_PROVIDER` | `groq` for the deployed primary/failover route; `cerebras` and `gemini` are supported direct alternatives |
+| `LLM_PROVIDER` | `groq` for the deployed primary/failover route; `gemini` and `cerebras` are supported alternatives |
 | `GROQ_API_KEY` | Secret graph/synthesis provider key |
-| `CEREBRAS_API_KEY` | Optional secret fallback key; never expose it to Vite or commit it |
+| `CEREBRAS_API_KEY` | Legacy optional fallback; ignored when `GEMINI_API_KEY` is configured |
 | `CEREBRAS_MODEL` | Fallback model; default `gpt-oss-120b` |
 | `CEREBRAS_BASE_URL` | OpenAI-compatible API base; default `https://api.cerebras.ai/v1` |
+| `GEMINI_API_KEY` | Optional Gemini fallback key; never expose it to Vite or commit it |
+| `GEMINI_MODEL` | Gemini fallback model; default `gemini-1.5-flash` |
 | `LLM_FAILOVER_COOLDOWN_SECONDS` | Minimum provider cooldown after quota/timeout; default `300`. Longer `Retry-After` headers are respected. State is process-local and resets on restart. |
 | `GRAPH_BATCH_SIZE` | Chunks per graph request; default `4` |
 | `GRAPH_MAX_BATCHES` | Maximum graph batches per PDF; default `6`. Each batch can call Groq and Cerebras once (up to 12 generation requests per PDF with default repair disabled). |
@@ -306,7 +308,8 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `MAX_PDF_SIZE_MB` | Default `10` |
 | `MAX_PDFS_PER_INSTALLATION` | Default `50` |
 
-Cerebras failover requires generation access, not just a valid API key. A successful
+Cerebras is retained as an optional backup, while Gemini is now the recommended
+free-tier backup. A valid API key does not guarantee generation access: a successful
 model-list request does not prove that inference quota is available. HTTP 402
 (`payment_required`) enters the quota cooldown path; no automatic purchase or
 billing change is performed. If neither provider can generate, answers fall back
