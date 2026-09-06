@@ -57,6 +57,14 @@ class ProviderQuotaTests(unittest.TestCase):
         self.assertEqual(raised.exception.retry_after_seconds, 7200)
         self.assertNotIn("private", str(raised.exception))
 
+    def test_cerebras_payment_required_enters_quota_failure_path(self):
+        with httpx.Client(base_url="https://example.test/v1", transport=httpx.MockTransport(
+            lambda request: httpx.Response(402, json={"code": "payment_required"})
+        )) as client, patch("app.services.cerebras_service.settings.cerebras_api_key", SecretStr("test")):
+            with self.assertRaises(LLMProviderRateLimitError) as raised:
+                CerebrasService(client).complete([])
+        self.assertIn("billing", str(raised.exception))
+
     def test_secondary_quota_is_not_hidden_by_primary_schema_error(self):
         service = IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
         with patch("app.services.ingestion_service.settings.groq_api_key", "test"), \

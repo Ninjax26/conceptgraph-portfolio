@@ -306,6 +306,12 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `MAX_PDF_SIZE_MB` | Default `10` |
 | `MAX_PDFS_PER_INSTALLATION` | Default `50` |
 
+Cerebras failover requires generation access, not just a valid API key. A successful
+model-list request does not prove that inference quota is available. HTTP 402
+(`payment_required`) enters the quota cooldown path; no automatic purchase or
+billing change is performed. If neither provider can generate, answers fall back
+to retrieved evidence and graph processing preserves completed batches.
+
 Generate the reviewer code with `openssl rand -base64 32` and save the result directly in the host's secret environment settings. Never paste the actual code into this README, `.env.example`, a commit, or a Vite variable. After login, the dashboard exchanges it for a signed, short-lived HttpOnly cookie and verifies that cookie with the API before enabling protected actions. Rate limiting is intentionally process-local because this deployment runs one API instance. Counters reset on restart and must be replaced by shared infrastructure before scaling horizontally.
 
 The public route exposes only the configured READY sample course and its source-PDF previews. It cannot upload documents, run queries, or generate exams. Uploads made during authenticated reviewer sessions are automatically removed from PostgreSQL, Qdrant, Neo4j, and object storage after the retention window; the configured public sample course is excluded from cleanup. Retention runs only when `REQUIRE_UPLOAD_AUTH=true`.

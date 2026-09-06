@@ -67,6 +67,14 @@ class CerebrasService:
 
         if response.status_code in {401, 403}:
             raise LLMConfigurationError("CEREBRAS_API_KEY was rejected")
+        if response.status_code == 402:
+            # A valid key can list models while generation requires billing.
+            # Treat this as unavailable quota so every query/batch does not
+            # immediately retry the same account-level rejection.
+            raise LLMProviderRateLimitError(
+                "Cerebras generation requires billing or available account quota",
+                retry_after_seconds=retry_after_seconds(response.headers),
+            )
         if response.status_code == 429:
             raise LLMProviderRateLimitError(
                 "Cerebras quota is temporarily exhausted",
