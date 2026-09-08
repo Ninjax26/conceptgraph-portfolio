@@ -236,7 +236,9 @@ class IngestionService:
         primary_error: Exception | None = None
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
-                return await asyncio.to_thread(self._extract_with_groq, text)
+                result = await asyncio.to_thread(self._extract_with_groq, text)
+                provider_circuit_breaker.record_success("groq")
+                return result
             except (
                 RateLimitError,
                 AuthenticationError,
@@ -262,7 +264,9 @@ class IngestionService:
 
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
-                return await asyncio.to_thread(self._extract_with_cerebras, text)
+                result = await asyncio.to_thread(self._extract_with_cerebras, text)
+                provider_circuit_breaker.record_success("cerebras")
+                return result
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
                 provider_circuit_breaker.block(
                     "cerebras", settings.llm_failover_cooldown_seconds, exc
@@ -276,7 +280,9 @@ class IngestionService:
 
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
-                return await asyncio.to_thread(self._extract_with_gemini, text)
+                result = await asyncio.to_thread(self._extract_with_gemini, text)
+                provider_circuit_breaker.record_success("gemini")
+                return result
             except Exception as exc:
                 provider_circuit_breaker.block("gemini", settings.llm_failover_cooldown_seconds, exc)
                 logger.warning("Gemini graph extraction is unavailable")
@@ -291,7 +297,7 @@ class IngestionService:
             (APIConnectionError, APITimeoutError, InternalServerError),
         ):
             raise LLMProviderUnavailableError(
-                "Groq and Cerebras are temporarily unavailable"
+                "Groq and configured failover providers are temporarily unavailable"
             ) from primary_error
         if primary_error is not None:
             raise primary_error

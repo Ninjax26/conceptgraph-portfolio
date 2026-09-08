@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from groq import (
@@ -29,6 +30,14 @@ from app.services.provider_failover import provider_circuit_breaker
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class GenerationResult:
+    answer: str
+    provider_used: str
+    failover_used: bool = False
+    failover_reason: str | None = None
+
+
 class SynthesisService:
     MAX_GRAPH_CONTEXT_CHARS = 6_000
 
@@ -51,32 +60,56 @@ class SynthesisService:
         graph_context: list[dict[str, Any]],
         sources: list[dict[str, Any]],
     ) -> str:
+        result = await self.synthesize_with_metadata(question, graph_context, sources)
+        return result.answer
+
+    async def synthesize_with_metadata(
+        self,
+        question: str,
+        graph_context: list[dict[str, Any]],
+        sources: list[dict[str, Any]],
+    ) -> GenerationResult:
         self.validate_provider_configured()
         provider = settings.llm_provider.lower()
         if provider == "gemini":
-            return await asyncio.to_thread(
-                self._synthesize_with_gemini,
-                question,
-                graph_context,
-                sources,
-            )
+            try:
+                answer = await asyncio.to_thread(
+                    self._synthesize_with_gemini, question, graph_context, sources
+                )
+                provider_circuit_breaker.record_success("gemini")
+                return GenerationResult(answer, "gemini")
+            except Exception as exc:
+                provider_circuit_breaker.block(
+                    "gemini", settings.llm_failover_cooldown_seconds, exc
+                )
+                raise
         if provider == "groq":
-            return await self._synthesize_with_failover(
+            return await self._synthesize_with_failover_metadata(
                 question, graph_context, sources
             )
         if provider == "cerebras":
             try:
-                return await asyncio.to_thread(
+                answer = await asyncio.to_thread(
                     self._synthesize_with_cerebras,
                     question,
                     graph_context,
                     sources,
                 )
-            except (LLMProviderRateLimitError, LLMProviderUnavailableError):
+                provider_circuit_breaker.record_success("cerebras")
+                return GenerationResult(answer, "cerebras")
+            except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
+                provider_circuit_breaker.block(
+                    "cerebras", settings.llm_failover_cooldown_seconds, exc
+                )
                 logger.warning(
                     "Cerebras answer synthesis is unavailable; returning retrieved evidence"
                 )
-                return self._grounded_evidence_fallback(sources)
+                return GenerationResult(
+                    self._grounded_evidence_fallback(sources),
+                    "evidence_fallback",
+                    True,
+                    type(exc).__name__,
+                )
         raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
 
     async def _synthesize_with_failover(
@@ -85,14 +118,28 @@ class SynthesisService:
         graph_context: list[dict[str, Any]],
         sources: list[dict[str, Any]],
     ) -> str:
+        result = await self._synthesize_with_failover_metadata(
+            question, graph_context, sources
+        )
+        return result.answer
+
+    async def _synthesize_with_failover_metadata(
+        self,
+        question: str,
+        graph_context: list[dict[str, Any]],
+        sources: list[dict[str, Any]],
+    ) -> GenerationResult:
+        primary_failure: str | None = None
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
-                return await asyncio.to_thread(
+                answer = await asyncio.to_thread(
                     self._synthesize_with_groq,
                     question,
                     graph_context,
                     sources,
                 )
+                provider_circuit_breaker.record_success("groq")
+                return GenerationResult(answer, "groq")
             except (
                 RateLimitError,
                 AuthenticationError,
@@ -102,21 +149,28 @@ class SynthesisService:
                 APITimeoutError,
                 InternalServerError,
             ) as exc:
+                primary_failure = type(exc).__name__
                 provider_circuit_breaker.block(
                     "groq", settings.llm_failover_cooldown_seconds, exc
                 )
                 logger.warning(
                     "Groq answer synthesis is temporarily unavailable; trying backup providers"
                 )
+        elif settings.groq_api_key:
+            primary_failure = "CircuitOpen"
+        else:
+            primary_failure = "NotConfigured"
 
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
-                return await asyncio.to_thread(
+                answer = await asyncio.to_thread(
                     self._synthesize_with_cerebras,
                     question,
                     graph_context,
                     sources,
                 )
+                provider_circuit_breaker.record_success("cerebras")
+                return GenerationResult(answer, "cerebras", True, primary_failure)
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
                 provider_circuit_breaker.block(
                     "cerebras", settings.llm_failover_cooldown_seconds, exc
@@ -127,9 +181,11 @@ class SynthesisService:
 
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
-                return await asyncio.to_thread(
+                answer = await asyncio.to_thread(
                     self._synthesize_with_gemini, question, graph_context, sources
                 )
+                provider_circuit_breaker.record_success("gemini")
+                return GenerationResult(answer, "gemini", True, primary_failure)
             except Exception as exc:
                 provider_circuit_breaker.block("gemini", settings.llm_failover_cooldown_seconds, exc)
                 logger.warning("Gemini answer synthesis is unavailable; returning retrieved evidence")
@@ -137,7 +193,12 @@ class SynthesisService:
         logger.warning(
             "All answer synthesis providers are unavailable; returning retrieved evidence"
         )
-        return self._grounded_evidence_fallback(sources)
+        return GenerationResult(
+            self._grounded_evidence_fallback(sources),
+            "evidence_fallback",
+            True,
+            primary_failure or "NoProviderAvailable",
+        )
 
     def _synthesize_with_groq(
         self,

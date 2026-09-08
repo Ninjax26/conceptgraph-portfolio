@@ -167,6 +167,20 @@ class ProviderQuotaTests(unittest.TestCase):
         self.assertEqual(answer, "Gemini answer")
         backup.assert_called_once()
 
+    def test_gemini_failover_reports_provider_and_reason(self):
+        error = RateLimitError("simulated quota", response=httpx.Response(429,
+            request=httpx.Request("POST", "https://example.test")), body=None)
+        service = SynthesisService()
+        with patch("app.services.synthesis_service.settings.groq_api_key", "test"), \
+             patch("app.services.synthesis_service.settings.gemini_api_key", "gemini-test"), \
+             patch.object(service, "_synthesize_with_groq", side_effect=error), \
+             patch.object(service, "_synthesize_with_gemini", return_value="Gemini answer"):
+            result = asyncio.run(service._synthesize_with_failover_metadata("question", [], []))
+        self.assertEqual(result.provider_used, "gemini")
+        self.assertTrue(result.failover_used)
+        self.assertEqual(result.failover_reason, "RateLimitError")
+        self.assertEqual(provider_circuit_breaker.status("gemini")["last_outcome"], "success")
+
     def test_gemini_graph_failover_after_groq_quota(self):
         error = RateLimitError("quota", response=httpx.Response(429,
             request=httpx.Request("POST", "https://example.test")), body=None)

@@ -65,7 +65,10 @@ class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
             "chunks": [{"text": "Evidence"}], "graph_context": [{"concept": {"name": "Unrelated"}}],
             "graph_metadata": {"filter_reason": "course_graph_visualization_fallback"},
         }))
-        synthesis = SimpleNamespace(synthesize=AsyncMock(return_value="Answer [Source 1]"))
+        synthesis = SimpleNamespace(synthesize_with_metadata=AsyncMock(return_value=SimpleNamespace(
+            answer="Answer [Source 1]", provider_used="groq", failover_used=False,
+            failover_reason=None,
+        )))
         with patch.object(query.CourseService, "get_ready_context", AsyncMock(return_value=context)), \
              patch.object(query, "get_rerank_service", return_value=SimpleNamespace(rerank=AsyncMock(return_value=[]))), \
              patch.object(query, "assess_evidence", return_value=([], {"level": "high", "score": .9, "evidence_count": 1, "reason": "test"})), \
@@ -73,7 +76,7 @@ class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
              patch.object(query, "get_synthesis_service", return_value=synthesis):
             await query.query_conceptgraph(query.QueryRequest(question="Question", course_id="course", retrieval_mode="vector_only"), retrieval, None)
         self.assertEqual(retrieval.retrieve.await_args.kwargs["retrieval_mode"], "vector_only")
-        self.assertEqual(synthesis.synthesize.await_args.kwargs["graph_context"], [])
+        self.assertEqual(synthesis.synthesize_with_metadata.await_args.kwargs["graph_context"], [])
 
     async def test_readiness_allows_optional_graph_outage_but_requires_vector_store(self):
         import app.main as main

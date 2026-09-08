@@ -282,9 +282,11 @@ class ExamService:
         primary_error: Exception | None = None
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
-                return await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self._generate_with_groq, context_text, num_questions, sources,
                 )
+                provider_circuit_breaker.record_success("groq")
+                return result
             except (
                 RateLimitError,
                 AuthenticationError,
@@ -298,16 +300,18 @@ class ExamService:
                 provider_circuit_breaker.block(
                     "groq", settings.llm_failover_cooldown_seconds, exc
                 )
-                logger.warning("Groq exam generation is unavailable; trying Cerebras")
+                logger.warning("Groq exam generation is unavailable; trying backup providers")
             except ValueError as exc:
                 primary_error = exc
                 logger.warning("Groq returned an invalid exam; trying Cerebras")
 
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
-                return await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self._generate_with_cerebras, context_text, num_questions, sources,
                 )
+                provider_circuit_breaker.record_success("cerebras")
+                return result
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
                 provider_circuit_breaker.block(
                     "cerebras", settings.llm_failover_cooldown_seconds, exc
@@ -317,15 +321,17 @@ class ExamService:
 
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
-                return await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self._generate_with_gemini, context_text, num_questions, sources,
                 )
+                provider_circuit_breaker.record_success("gemini")
+                return result
+            except (LLMProviderRequestError, LLMConfigurationError, ValueError) as exc:
+                logger.warning("Gemini exam failover could not generate a valid exam")
+                primary_error = primary_error or exc
             except Exception as exc:
                 provider_circuit_breaker.block("gemini", settings.llm_failover_cooldown_seconds, exc)
                 logger.warning("Gemini exam generation is unavailable")
-                primary_error = primary_error or exc
-            except (LLMProviderRequestError, LLMConfigurationError, ValueError) as exc:
-                logger.warning("Cerebras exam failover could not generate a valid exam")
                 primary_error = primary_error or exc
 
         raise LLMProviderUnavailableError(

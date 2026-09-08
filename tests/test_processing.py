@@ -1348,7 +1348,12 @@ class ProcessingRulesTests(unittest.TestCase):
         )
         reranker = SimpleNamespace(rerank=AsyncMock(return_value=[chunk]))
         synthesizer = SimpleNamespace(
-            synthesize=AsyncMock(return_value="Quishing uses QR codes. [Source 1]")
+            synthesize_with_metadata=AsyncMock(return_value=SimpleNamespace(
+                answer="Quishing uses QR codes. [Source 1]",
+                provider_used="groq",
+                failover_used=False,
+                failover_reason=None,
+            ))
         )
 
         with (

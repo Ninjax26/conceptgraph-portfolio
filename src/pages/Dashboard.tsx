@@ -27,9 +27,11 @@ import {
   GraphStatus,
   IngestResponse,
   QueryResponse,
+  ProviderStatusResponse,
   RetrievalMode,
   UploadStatusResponse,
   getUploadStatus,
+  getProviderStatus,
   listCourses,
   listUploads,
   retryUpload,
@@ -75,6 +77,7 @@ export default function Dashboard(): JSX.Element {
     title: string;
     previewUrl: string;
   } | null>(null);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatusResponse | null>(null);
 
   const graphElements = useMemo(
     () => buildGraphElements(response?.graph_context ?? []),
@@ -128,6 +131,7 @@ export default function Dashboard(): JSX.Element {
 
   useEffect(() => {
     void refreshUploads();
+    void getProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null));
     return () => { requestVersion.current += 1; };
   }, []);
 
@@ -347,6 +351,7 @@ export default function Dashboard(): JSX.Element {
       if (version !== requestVersion.current) return;
       setResponse(result);
       setAnsweredQuestion(submittedQuestion);
+      void getProviderStatus().then(setProviderStatus).catch(() => undefined);
     } catch (requestError) {
       if (version !== requestVersion.current) return;
       setError(
@@ -429,6 +434,20 @@ export default function Dashboard(): JSX.Element {
           </div>
           <button type="button" onClick={() => setIsUploadModalOpen(true)} className="shrink-0 rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800">Add PDF</button>
         </div>
+        {providerStatus ? (
+          <div className="border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-600" role="status">
+            <span className="font-semibold text-slate-700">AI routing:</span>{" "}
+            {providerStatus.primary} primary
+            {providerStatus.fallback_order.length ? ` → ${providerStatus.fallback_order.join(" → ")} fallback` : " · no fallback configured"}
+            <span className="ml-2 inline-flex flex-wrap gap-1.5">
+              {providerStatus.providers.filter((provider) => provider.name === providerStatus.primary || providerStatus.fallback_order.includes(provider.name)).map((provider) => (
+                <span key={provider.name} className={`rounded-full px-2 py-0.5 font-semibold ${provider.configured && provider.available ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                  {provider.name}: {!provider.configured ? "not configured" : provider.available ? (provider.last_outcome === "success" ? "last call passed" : "configured") : `cooling down ${provider.cooldown_seconds}s`}
+                </span>
+              ))}
+            </span>
+          </div>
+        ) : null}
         <form className="border-b border-slate-200 p-4" onSubmit={handleSubmit}>
           <div className="space-y-3">
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -543,11 +562,20 @@ export default function Dashboard(): JSX.Element {
           </div>
 
           {response ? (
-            <p className="mb-3 rounded-md bg-slate-100 p-2 text-xs text-slate-600" role="status">
-              {response.graph_metadata.fallback_reason
-                ? "Graph unavailable; answering from PDF evidence using vector retrieval."
-                : `Answer retrieved with ${(response.graph_metadata.retrieval_mode ?? "two_hop").split("_").join(" ")}.`}
-            </p>
+            <div className="mb-3 space-y-1 rounded-md bg-slate-100 p-2 text-xs text-slate-600" role="status">
+              <p>{response.graph_metadata.fallback_reason
+                  ? "Graph unavailable; answering from PDF evidence using vector retrieval."
+                  : `Evidence retrieved with ${(response.graph_metadata.retrieval_mode ?? "two_hop").split("_").join(" ")}.`} {response.sources.length} source passage{response.sources.length === 1 ? "" : "s"} passed the evidence check.</p>
+              <p>
+                <span className="font-semibold text-slate-700">Answer provider:</span>{" "}
+                {response.generation_metadata.provider_used === "not_attempted"
+                  ? "not called because retrieval evidence was insufficient"
+                  : response.generation_metadata.provider_used === "evidence_fallback"
+                    ? "retrieved evidence fallback (both LLM routes unavailable)"
+                    : `${response.generation_metadata.provider_used}${response.generation_metadata.failover_used ? " (failover used)" : ""}`}
+                {response.generation_metadata.failover_reason ? ` · Groq result: ${formatProviderReason(response.generation_metadata.failover_reason)}` : ""}
+              </p>
+            </div>
           ) : null}
           {error ? (
             <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -1014,6 +1042,20 @@ function confidenceClass(level: QueryResponse["confidence"]["level"]): string {
     low: "bg-amber-50 text-amber-700",
     insufficient: "bg-red-50 text-red-700",
   }[level];
+}
+
+function formatProviderReason(reason: string): string {
+  return ({
+    RateLimitError: "quota or rate limit",
+    AuthenticationError: "key rejected",
+    PermissionDeniedError: "permission denied",
+    BadRequestError: "request rejected",
+    APIConnectionError: "connection error",
+    APITimeoutError: "timeout",
+    InternalServerError: "provider server error",
+    CircuitOpen: "temporarily skipped after an earlier failure",
+    NotConfigured: "not configured",
+  } as Record<string, string>)[reason] ?? "unavailable";
 }
 
 function friendlyUploadError(message: string | null | undefined): string {

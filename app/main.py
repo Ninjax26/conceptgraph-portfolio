@@ -19,6 +19,7 @@ from app.services.security_service import rate_limit_service
 from app.services.document_processing_service import document_processing_service
 from app.services.demo_retention_service import demo_retention_service
 from app.services.storage_service import storage_service
+from app.services.provider_failover import provider_circuit_breaker
 from sqlalchemy import text
 
 LOCAL_DEV_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
@@ -74,6 +75,31 @@ async def health_check() -> dict[str, str]:
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Database is unavailable.") from exc
     return {"status": "healthy"}
+
+
+@app.get("/api/v1/providers/status", tags=["system"])
+async def provider_status() -> dict:
+    """Expose routing configuration and observed outcomes, never credentials."""
+    configured = {
+        "groq": bool(settings.groq_api_key),
+        "gemini": bool(settings.gemini_api_key),
+        "cerebras": bool(settings.cerebras_api_key_value),
+    }
+    providers = []
+    for name in ("groq", "gemini", "cerebras"):
+        runtime = provider_circuit_breaker.status(name)
+        providers.append({
+            "name": name,
+            "configured": configured[name],
+            **runtime,
+        })
+    fallback_order = ["gemini"] if configured["gemini"] else (["cerebras"] if configured["cerebras"] else [])
+    return {
+        "primary": settings.llm_provider.lower(),
+        "fallback_order": fallback_order,
+        "providers": providers,
+        "note": "Configured means the server loaded a key; last outcome comes from a real generation request in this process.",
+    }
 
 
 @app.get("/api/v1/ready", tags=["system"])

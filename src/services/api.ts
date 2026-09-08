@@ -80,6 +80,26 @@ export interface QueryResponse {
     evidence_count: number;
     reason: string;
   };
+  generation_metadata: {
+    provider_used: "groq" | "gemini" | "cerebras" | "evidence_fallback" | "not_attempted";
+    failover_used: boolean;
+    failover_reason?: string | null;
+  };
+}
+
+export interface ProviderStatusResponse {
+  primary: string;
+  fallback_order: string[];
+  providers: Array<{
+    name: string;
+    configured: boolean;
+    available: boolean;
+    cooldown_seconds: number;
+    last_outcome: "success" | "failure" | null;
+    last_failure_category: string | null;
+    last_checked_at: string | null;
+  }>;
+  note: string;
 }
 
 export interface PublicSampleDocument {
@@ -216,6 +236,14 @@ export async function sendQuery(
   });
 
   return response.json() as Promise<QueryResponse>;
+}
+
+export async function getProviderStatus(): Promise<ProviderStatusResponse> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/providers/status`, {
+    method: "GET",
+    timeout: 15000,
+  });
+  return response.json() as Promise<ProviderStatusResponse>;
 }
 
 export interface MockQuestion {

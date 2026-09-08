@@ -34,12 +34,19 @@ class AnswerConfidence(BaseModel):
     reason: str
 
 
+class GenerationMetadata(BaseModel):
+    provider_used: Literal["groq", "gemini", "cerebras", "evidence_fallback", "not_attempted"]
+    failover_used: bool = False
+    failover_reason: str | None = None
+
+
 class QueryResponse(BaseModel):
     answer: str
     sources: list[dict[str, Any]]
     graph_context: list[dict[str, Any]]
     graph_metadata: dict[str, Any]
     confidence: AnswerConfidence
+    generation_metadata: GenerationMetadata
 
 
 @lru_cache
@@ -112,10 +119,11 @@ async def query_conceptgraph(
             graph_context=retrieval_result["graph_context"],
             graph_metadata=retrieval_result["graph_metadata"],
             confidence=confidence,
+            generation_metadata=GenerationMetadata(provider_used="not_attempted"),
         )
     synthesis_service = get_synthesis_service()
     try:
-        answer = await synthesis_service.synthesize(
+        generation = await synthesis_service.synthesize_with_metadata(
             question=request.question,
             graph_context=(retrieval_result["graph_context"]
                 if retrieval_result["graph_metadata"].get("filter_reason") == "query_subgraph" else []),
@@ -134,9 +142,14 @@ async def query_conceptgraph(
         ) from exc
 
     return QueryResponse(
-        answer=answer,
+        answer=generation.answer,
         sources=sources,
         graph_context=retrieval_result["graph_context"],
         graph_metadata=retrieval_result["graph_metadata"],
         confidence=confidence,
+        generation_metadata=GenerationMetadata(
+            provider_used=generation.provider_used,
+            failover_used=generation.failover_used,
+            failover_reason=generation.failover_reason,
+        ),
     )
