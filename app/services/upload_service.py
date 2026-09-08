@@ -22,6 +22,17 @@ class UploadService:
         ProcessingStage.FAILED.value,
     }
 
+    @staticmethod
+    def can_reprocess(record: DocumentUpload) -> bool:
+        failed_retry = (
+            record.stage == ProcessingStage.FAILED.value and record.retryable
+        )
+        graph_rebuild = (
+            record.stage == ProcessingStage.READY.value
+            and record.graph_status == GraphStatus.READY_WITHOUT_GRAPH.value
+        )
+        return (failed_retry or graph_rebuild) and record.attempt_count < MAX_PROCESSING_ATTEMPTS
+
     async def create_upload(
         self,
         session: AsyncSession,
@@ -301,12 +312,7 @@ class UploadService:
             .with_for_update()
         )
         record = result.scalar_one_or_none()
-        if (
-            record is None
-            or record.stage != ProcessingStage.FAILED.value
-            or not record.retryable
-            or record.attempt_count >= MAX_PROCESSING_ATTEMPTS
-        ):
+        if record is None or not self.can_reprocess(record):
             return None
         record.task_id = task_id
         record.status = "active"

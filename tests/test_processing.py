@@ -2513,6 +2513,26 @@ class ReadyContextTests(unittest.TestCase):
 
 
 class RetryEndpointTests(unittest.TestCase):
+    def test_ready_without_graph_is_eligible_for_reprocessing(self):
+        record = SimpleNamespace(
+            stage=ProcessingStage.READY.value,
+            graph_status=GraphStatus.READY_WITHOUT_GRAPH.value,
+            retryable=False,
+            attempt_count=1,
+        )
+
+        self.assertTrue(UploadService.can_reprocess(record))
+
+    def test_ready_graph_is_not_eligible_for_reprocessing(self):
+        record = SimpleNamespace(
+            stage=ProcessingStage.READY.value,
+            graph_status=GraphStatus.GRAPH_READY.value,
+            retryable=False,
+            attempt_count=1,
+        )
+
+        self.assertFalse(UploadService.can_reprocess(record))
+
     def test_full_queue_defers_retry_without_marking_it_failed(self):
         with tempfile.NamedTemporaryFile(suffix=".pdf") as source:
             record = SimpleNamespace(
@@ -2524,6 +2544,8 @@ class RetryEndpointTests(unittest.TestCase):
                 storage_key=str(Path(source.name)),
                 stage="FAILED",
                 retryable=True,
+                graph_status=None,
+                attempt_count=1,
             )
             retried_record = SimpleNamespace(**vars(record))
             retried_record.task_id = "new-task"

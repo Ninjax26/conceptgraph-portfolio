@@ -260,13 +260,19 @@ async def retry_upload(
     existing = await upload_service.get_upload(db, upload_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Upload not found.")
-    if existing.stage != "FAILED" or not existing.retryable:
-        raise HTTPException(status_code=409, detail="Only failed uploads can be retried.")
+    if not upload_service.can_reprocess(existing):
+        raise HTTPException(
+            status_code=409,
+            detail="Only retryable failures or documents without a graph can be reprocessed.",
+        )
 
     task_id = str(uuid4())
     record = await upload_service.retry_upload(db, upload_id, task_id)
     if record is None:
-        raise HTTPException(status_code=409, detail="Only failed uploads can be retried.")
+        raise HTTPException(
+            status_code=409,
+            detail="This document is not eligible for reprocessing.",
+        )
 
     try:
         source_exists = await asyncio.to_thread(storage_service.exists, record.storage_key)

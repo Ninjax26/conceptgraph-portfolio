@@ -727,7 +727,8 @@ export default function Dashboard(): JSX.Element {
                           Preview
                         </button>
                       ) : null}
-                      {job.status === "failed" && job.retryable ? (
+                      {(job.status === "failed" && job.retryable) ||
+                      (job.status === "ready" && job.graph_status === "READY_WITHOUT_GRAPH") ? (
                         <button
                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                           disabled={retryingUploadId === job.upload_id}
@@ -735,7 +736,7 @@ export default function Dashboard(): JSX.Element {
                           type="button"
                         >
                           {retryingUploadId === job.upload_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                          Retry
+                          {job.status === "ready" ? "Rebuild graph" : "Retry"}
                         </button>
                       ) : null}
                       {job.status === "ready" || job.status === "failed" ? (
