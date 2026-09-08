@@ -8,10 +8,10 @@ The React SPA calls one FastAPI service. FastAPI owns both HTTP handling and a b
 
 External AI services are deliberately provider-configurable:
 
-- graph extraction, synthesis, and exams: Groq by default, with optional Cerebras failover;
+- graph extraction, synthesis, and exams: Groq by default, with Gemini failover and optional legacy Cerebras support;
 - embeddings: local MiniLM or Qdrant Cloud Inference;
 - reranking: local cross-encoder or Cohere;
-- Gemini is an optional LLM alternative.
+- Gemini uses a lightweight REST adapter and is also supported as a direct provider.
 
 The production requirements use hosted embeddings/reranking so the API process does not load Torch. Local models are an explicit optional install.
 
@@ -102,7 +102,7 @@ At least one page and one chunk are mandatory. Every chunk must be accepted by t
 
 Graph extraction is a bounded section-batch workflow rather than a multi-agent system. Chunks are grouped by detected section, each section contributes beginning/middle/end evidence, and a fair selector distributes the configured request budget across the document. Production defaults allow four chunks per request and at most six graph requests per PDF. Each batch asks for at most eight concepts and ten relationships and supplies stable source chunk IDs.
 
-Provider output is schema-validated, limited to six relationship types (`PREREQUISITE_OF`, `PART_OF`, `EXPLAINS`, `RELATED_TO`, `CAUSES`, and `APPLIES_TO`), checked for valid endpoints, deduplicated using lowercase whitespace-free concept names, and rejected at node level when it cites an unknown source chunk. Strict JSON Schema is attempted first; a smaller JSON-object request is the compatibility fallback, and both responses still pass local Pydantic validation. Successful batches are merged deterministically, so one malformed or timed-out section does not discard completed graph work.
+Provider output is schema-validated, limited to six relationship types (`PREREQUISITE_OF`, `PART_OF`, `EXPLAINS`, `RELATED_TO`, `CAUSES`, and `APPLIES_TO`), checked for valid endpoints, deduplicated using lowercase whitespace-free concept names, and rejected at node level when it cites an unknown source chunk. Strict JSON Schema is attempted first. An optional smaller JSON-object repair request can be enabled, but is disabled by default because it doubles calls for malformed batches. Both responses still pass local Pydantic validation. Successful batches are merged deterministically, so one malformed or timed-out section does not discard completed graph work.
 
 Quality is reported separately from document readiness. Two or more concepts with at least one valid relationship are `GRAPH_READY`; a non-empty graph below that threshold is `GRAPH_PARTIAL`; zero retained concepts is `READY_WITHOUT_GRAPH`. All three documents remain vector-searchable, so an empty graph is visible without falsely turning successful PDF indexing into a processing failure.
 
@@ -112,11 +112,11 @@ Text extraction currently uses PyMuPDF's native text layer. An image-only/scanne
 
 ## LLM resilience and failover
 
-`LLM_PROVIDER=groq` keeps Groq as the primary provider. When `CEREBRAS_API_KEY` is configured, graph extraction, answer synthesis, and exam generation can fail over to Cerebras `gpt-oss-120b` after a Groq quota response, timeout, connection failure, or provider-side server error. Graph extraction can also use Cerebras when Groq cannot produce a valid structured graph for a batch.
+`LLM_PROVIDER=groq` keeps Groq as the primary provider. When `GEMINI_API_KEY` is configured, graph extraction, answer synthesis, and exam generation fail over to Gemini after a Groq quota response, timeout, connection failure, provider-side server error, or invalid structured graph. Cerebras remains a legacy optional backup and is ignored when Gemini is configured.
 
 A process-wide, thread-safe circuit breaker records a provider cooldown, defaulting to 300 seconds. Requests bypass a cooling provider instead of repeatedly spending latency and quota on a failure that is expected to recur. Provider SDK retries are disabled on the Groq calls covered by failover so routing happens promptly.
 
-Cerebras uses its OpenAI-compatible chat-completions endpoint. Strict structured output omits unsupported array-size schema keywords, while prompt limits and local validation still enforce the application's bounded graph contract. Provider response bodies and credentials are never copied into public errors.
+Gemini uses a small HTTP adapter around the official `generateContent` endpoint; the key is sent in the `x-goog-api-key` header and never included in a URL or public error. Cerebras uses its OpenAI-compatible chat-completions endpoint when selected. Prompt limits and local validation enforce the application's bounded graph contract. Provider response bodies and credentials are never copied into public errors.
 
 If both providers are unavailable:
 

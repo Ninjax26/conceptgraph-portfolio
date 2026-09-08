@@ -1,4 +1,3 @@
 -r requirements.txt
 
-# Optional alternative to the default Groq provider.
-google-generativeai==0.8.6
+# Gemini uses the lightweight HTTP client already included in requirements.txt.

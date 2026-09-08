@@ -58,6 +58,8 @@ from pydantic import SecretStr, ValidationError
 class ProcessingRulesTests(unittest.TestCase):
     def setUp(self):
         provider_circuit_breaker.clear()
+        # Tests must never inherit real provider credentials from local .env.
+        self.enterContext(patch("app.core.config.settings.gemini_api_key", None))
 
     def test_course_normalization_collapses_case_and_space(self):
         self.assertEqual(normalize_course_name("  CYBER  "), "cyber")

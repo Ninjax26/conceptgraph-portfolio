@@ -270,7 +270,7 @@ RERANK_MODEL_NAME=rerank-v3.5
 COHERE_API_KEY=...
 ```
 
-Gemini remains an optional alternative LLM provider and is installed with `requirements-gemini.txt`.
+Gemini is the preferred failover and uses the existing lightweight HTTP dependency; no provider SDK is required.
 
 ## Configuration
 
@@ -291,7 +291,7 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `CEREBRAS_MODEL` | Fallback model; default `gpt-oss-120b` |
 | `CEREBRAS_BASE_URL` | OpenAI-compatible API base; default `https://api.cerebras.ai/v1` |
 | `GEMINI_API_KEY` | Optional Gemini fallback key; never expose it to Vite or commit it |
-| `GEMINI_MODEL` | Gemini fallback model; default `gemini-1.5-flash` |
+| `GEMINI_MODEL` | Gemini fallback model; default `gemini-3.5-flash-lite` |
 | `LLM_FAILOVER_COOLDOWN_SECONDS` | Minimum provider cooldown after quota/timeout; default `300`. Longer `Retry-After` headers are respected. State is process-local and resets on restart. |
 | `GRAPH_BATCH_SIZE` | Chunks per graph request; default `4` |
 | `GRAPH_MAX_BATCHES` | Maximum graph batches per PDF; default `6`. Each batch can call Groq and Cerebras once (up to 12 generation requests per PDF with default repair disabled). |
@@ -333,7 +333,7 @@ Current low-cost deployment:
 - Vectors/inference: [Qdrant Cloud free cluster](https://qdrant.tech/documentation/cloud/create-cluster/) with [Cloud Inference](https://qdrant.tech/documentation/cloud/inference/).
 - Graph: one [Neo4j AuraDB](https://neo4j.com/docs/aura/getting-started/create-instance/) Free instance.
 - PDFs: a private [Cloudflare R2](https://developers.cloudflare.com/r2/) bucket using its [S3-compatible API](https://developers.cloudflare.com/r2/api/), with public access disabled.
-- LLM/reranking: [Groq](https://console.groq.com/docs/overview) primary, [Cerebras Chat Completions](https://inference-docs.cerebras.ai/api-reference/chat-completions) failover, and [Cohere Rerank](https://docs.cohere.com/v2/reference/rerank), each with account-side limits.
+- LLM/reranking: [Groq](https://console.groq.com/docs/overview) primary, Gemini `generateContent` failover, and [Cohere Rerank](https://docs.cohere.com/v2/reference/rerank), each with account-side limits. Cerebras remains a legacy optional provider.
 
 Current free tiers are not service-level guarantees. Render free web services spin down after inactivity and use an ephemeral filesystem; that is why source PDFs live in R2 and processing uses durable leases/recovery. Provider quotas, retention rules, and prices can change, so verify them before deployment. See [Render compute plans](https://render.com/docs/compute-plans) and [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/) for current limits.
 
@@ -490,6 +490,7 @@ The graph improved raw multi-source recall on this small fixture (48→51) but d
 | `app/services/rag_service.py` | READY-scoped graph and vector retrieval |
 | `app/services/rerank_service.py` | Local/Cohere provider-neutral reranking |
 | `app/services/synthesis_service.py` | Evidence-bounded answers and provider degradation |
+| `app/services/gemini_service.py` | Lightweight Gemini REST client and normalized provider errors |
 | `app/services/cerebras_service.py` | OpenAI-compatible Cerebras client and normalized provider errors |
 | `app/services/provider_failover.py` | Thread-safe provider cooldown circuit breaker |
 | `app/services/exam_service.py` | Citation-validated course MCQ generation |
@@ -544,7 +545,7 @@ npm run build
 docker compose config -q
 ```
 
-Tests focus on system boundaries and failure behavior: durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY deletion, demo retention, empty graphs, relationship validation, provider timeouts/rate limits, Cerebras request compatibility and circuit-breaker failover, scanned PDFs without text, READY gating, graph sampling and provenance, hosted inference/reranking, object storage, PDF byte ranges and citation links, verified auth sessions, public sample isolation, evidence refusal, and readiness-sensitive course behavior.
+Tests focus on system boundaries and failure behavior: durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY deletion, demo retention, empty graphs, relationship validation, provider timeouts/rate limits, Gemini/Cerebras request compatibility and circuit-breaker failover, scanned PDFs without text, READY gating, graph sampling and provenance, hosted inference/reranking, object storage, PDF byte ranges and citation links, verified auth sessions, public sample isolation, evidence refusal, and readiness-sensitive course behavior.
 
 ## API surface
 

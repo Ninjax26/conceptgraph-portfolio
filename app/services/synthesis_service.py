@@ -22,6 +22,7 @@ from app.core.exceptions import (
     LLMProviderUnavailableError,
 )
 from app.services.cerebras_service import cerebras_service
+from app.services.gemini_service import gemini_service
 from app.services.provider_failover import provider_circuit_breaker
 
 
@@ -202,19 +203,13 @@ class SynthesisService:
         graph_context: list[dict[str, Any]],
         sources: list[dict[str, Any]],
     ) -> str:
-        import google.generativeai as genai
-
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
-        response = model.generate_content(
+        return gemini_service.generate(
             [
                 self._system_prompt(),
                 self._user_prompt(question, graph_context, sources),
             ],
-            generation_config={"temperature": 0},
-            request_options={"timeout": settings.provider_timeout_seconds},
+            max_output_tokens=1_200,
         )
-        return response.text or ""
 
     @staticmethod
     def _system_prompt() -> str:

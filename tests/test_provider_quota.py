@@ -11,6 +11,8 @@ from app.core.exceptions import GraphStructureError, LLMProviderRateLimitError, 
 from app.schemas.extraction import GraphExtractionResponse
 from app.services.cerebras_service import CerebrasService
 from app.services.ingestion_service import IngestionService
+from app.services.gemini_service import GeminiService
+from app.services.exam_service import ExamService
 from app.services.provider_failover import ProviderCircuitBreaker, provider_circuit_breaker, retry_after_seconds
 from app.services.synthesis_service import SynthesisService
 
@@ -19,6 +21,8 @@ class ProviderQuotaTests(unittest.TestCase):
     def setUp(self):
         provider_circuit_breaker.clear()
         self.addCleanup(provider_circuit_breaker.clear)
+        # Individual tests opt in with fake keys; never call a real provider.
+        self.enterContext(patch("app.core.config.settings.gemini_api_key", None))
 
     def test_retry_after_numeric_date_and_invalid(self):
         self.assertEqual(retry_after_seconds({"retry-after": "3600"}), 3600)
@@ -26,6 +30,38 @@ class ProviderQuotaTests(unittest.TestCase):
             self.assertEqual(retry_after_seconds({"retry-after": "Thu, 01 Jan 1970 01:00:00 GMT"}), 3600)
         for value in ("bad", "nan", "inf", ""):
             self.assertIsNone(retry_after_seconds({"retry-after": value}))
+
+    def test_gemini_client_uses_header_and_returns_text(self):
+        observed = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            observed["path"] = request.url.path
+            observed["key"] = request.headers.get("x-goog-api-key")
+            return httpx.Response(200, json={
+                "candidates": [{"content": {"parts": [{"text": "OK"}]}}]
+            })
+
+        with httpx.Client(
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+            transport=httpx.MockTransport(handler),
+        ) as client, patch("app.services.gemini_service.settings.gemini_api_key", "secret"), \
+             patch("app.services.gemini_service.settings.gemini_model", "gemini-test"):
+            content = GeminiService(client).generate(["hello"], json_mode=True)
+
+        self.assertEqual(content, "OK")
+        self.assertEqual(observed["path"], "/v1beta/models/gemini-test:generateContent")
+        self.assertEqual(observed["key"], "secret")
+
+    def test_gemini_rate_limit_is_normalized(self):
+        with httpx.Client(
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(429, headers={"Retry-After": "900"})
+            ),
+        ) as client, patch("app.services.gemini_service.settings.gemini_api_key", "secret"):
+            with self.assertRaises(LLMProviderRateLimitError) as raised:
+                GeminiService(client).generate(["hello"])
+        self.assertEqual(raised.exception.retry_after_seconds, 900)
 
     def test_cooldown_honors_reset_and_cannot_be_shortened(self):
         breaker = ProviderCircuitBreaker()
@@ -129,6 +165,32 @@ class ProviderQuotaTests(unittest.TestCase):
              patch.object(service, "_synthesize_with_gemini", return_value="Gemini answer") as backup:
             answer = asyncio.run(service._synthesize_with_failover("question", [], []))
         self.assertEqual(answer, "Gemini answer")
+        backup.assert_called_once()
+
+    def test_gemini_graph_failover_after_groq_quota(self):
+        error = RateLimitError("quota", response=httpx.Response(429,
+            request=httpx.Request("POST", "https://example.test")), body=None)
+        expected = GraphExtractionResponse()
+        service = IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
+        with patch("app.services.ingestion_service.settings.groq_api_key", "test"), \
+             patch("app.services.ingestion_service.settings.gemini_api_key", "gemini-test"), \
+             patch.object(service, "_extract_with_groq", side_effect=error), \
+             patch.object(service, "_extract_with_gemini", return_value=expected) as backup:
+            result = asyncio.run(service._extract_with_failover("text"))
+        self.assertIs(result, expected)
+        backup.assert_called_once()
+
+    def test_gemini_exam_failover_after_groq_quota(self):
+        error = RateLimitError("quota", response=httpx.Response(429,
+            request=httpx.Request("POST", "https://example.test")), body=None)
+        expected = [Mock()]
+        service = ExamService(vector_client=SimpleNamespace())
+        with patch("app.services.exam_service.settings.groq_api_key", "test"), \
+             patch("app.services.exam_service.settings.gemini_api_key", "gemini-test"), \
+             patch.object(service, "_generate_with_groq", side_effect=error), \
+             patch.object(service, "_generate_with_gemini", return_value=expected) as backup:
+            result = asyncio.run(service._generate_with_failover("text", 1, []))
+        self.assertIs(result, expected)
         backup.assert_called_once()
 
     def test_backup_request_error_returns_evidence_instead_of_failing_query(self):

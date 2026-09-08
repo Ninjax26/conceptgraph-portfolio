@@ -36,6 +36,7 @@ from app.core.exceptions import (
 from app.schemas.exam import ExamResponse, ExamSource, MockQuestion
 from app.services.course_service import ReadyCourseContext
 from app.services.cerebras_service import cerebras_service
+from app.services.gemini_service import gemini_service
 from app.services.provider_failover import provider_circuit_breaker
 
 logger = logging.getLogger(__name__)
@@ -389,22 +390,12 @@ class ExamService:
         if not settings.gemini_api_key:
             raise LLMConfigurationError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
 
-        import google.generativeai as genai
-
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
-        response = model.generate_content(
-            [
-                self._system_prompt(num_questions),
-                self._user_prompt(context_text),
-            ],
-            generation_config={
-                "temperature": 0,
-                "response_mime_type": "application/json",
-            },
-            request_options={"timeout": settings.provider_timeout_seconds},
+        content = gemini_service.generate(
+            [self._system_prompt(num_questions), self._user_prompt(context_text)],
+            json_mode=True,
+            max_output_tokens=2_500,
         )
-        return self._parse_questions(response.text or "{}", sources)
+        return self._parse_questions(content, sources)
 
     # ------------------------------------------------------------------
     # Prompt construction

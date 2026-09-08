@@ -16,6 +16,7 @@ from qdrant_client.models import Document, FieldCondition, Filter, MatchAny
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
 from app.services.course_service import ReadyCourseContext
+from app.services.gemini_service import gemini_service
 
 logger = logging.getLogger(__name__)
 
@@ -499,19 +500,12 @@ class RetrievalService:
         if not settings.gemini_api_key:
             return self._fallback_cypher(question)
 
-        import google.generativeai as genai
-
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
-        response = model.generate_content(
+        content = gemini_service.generate(
             [self._cypher_system_prompt(), question],
-            generation_config={
-                "temperature": 0,
-                "response_mime_type": "application/json",
-            },
-            request_options={"timeout": settings.provider_timeout_seconds},
+            json_mode=True,
+            max_output_tokens=800,
         )
-        return CypherGenerationResponse.model_validate_json(response.text or "{}")
+        return CypherGenerationResponse.model_validate_json(content)
 
     @staticmethod
     def _cypher_system_prompt() -> str:

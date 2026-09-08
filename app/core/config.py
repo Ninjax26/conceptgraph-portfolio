@@ -199,7 +199,7 @@ class Settings(BaseSettings):
         alias="LLM_FAILOVER_COOLDOWN_SECONDS",
     )
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-1.5-flash", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-3.5-flash-lite", alias="GEMINI_MODEL")
     evidence_min_score: float = Field(default=0.35, ge=0, le=1, alias="EVIDENCE_MIN_SCORE")
     evidence_medium_score: float = Field(default=0.5, ge=0, le=1, alias="EVIDENCE_MEDIUM_SCORE")
     evidence_high_score: float = Field(default=0.7, ge=0, le=1, alias="EVIDENCE_HIGH_SCORE")

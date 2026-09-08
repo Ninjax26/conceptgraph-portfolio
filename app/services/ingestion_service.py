@@ -47,6 +47,7 @@ from app.schemas.extraction import (
     normalize_concept_name,
 )
 from app.services.cerebras_service import cerebras_service
+from app.services.gemini_service import gemini_service
 from app.services.parser_service import DocumentChunk
 from app.services.provider_failover import provider_circuit_breaker
 
@@ -693,23 +694,15 @@ class IngestionService:
         if not settings.gemini_api_key:
             raise LLMConfigurationError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
 
-        import google.generativeai as genai
-
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
-        response = model.generate_content(
-            [
-                self._extraction_system_prompt(),
-                text,
-            ],
-            generation_config={
-                "temperature": 0,
-                "response_mime_type": "application/json",
-            },
-            request_options={"timeout": settings.provider_timeout_seconds},
+        content = gemini_service.generate(
+            [self._extraction_system_prompt(), text],
+            json_mode=True,
+            max_output_tokens=1_000,
         )
         try:
-            return GraphExtractionResponse.model_validate_json(response.text or "{}")
+            return self._validate_graph_batch_size(
+                GraphExtractionResponse.model_validate_json(content)
+            )
         except ValidationError as exc:
             raise GraphStructureError(
                 "json_validate_failed: Gemini could not produce a valid graph for this section."
