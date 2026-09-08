@@ -218,6 +218,7 @@ export default function Dashboard(): JSX.Element {
       );
 
       if (terminalUpdates.length > 0) {
+        void getProviderStatus().then(setProviderStatus).catch(() => undefined);
         try {
           const nextCourses = await listCourses();
           setCourses(nextCourses);
@@ -1020,7 +1021,17 @@ function graphLimitLabel(resultJson: Record<string, unknown> | null | undefined)
     return "Provider quota reached; completed graph data was preserved";
   }
   if (resultJson.graph_extraction_budget_applied === true) {
-    return "Free-demo extraction budget applied";
+    const total = resultJson.graph_batches_total;
+    const succeeded = resultJson.graph_batches_succeeded;
+    const failed = resultJson.graph_batches_failed;
+    const attempted =
+      typeof succeeded === "number" && typeof failed === "number"
+        ? succeeded + failed
+        : null;
+    if (typeof total === "number" && attempted !== null) {
+      return `Free-demo graph sampling: ${attempted} of ${total} batches attempted; all PDF chunks remain searchable`;
+    }
+    return "Free-demo graph sampling applied; all PDF chunks remain searchable";
   }
   return null;
 }

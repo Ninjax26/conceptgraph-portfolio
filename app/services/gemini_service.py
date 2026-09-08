@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any
 
 import httpx
 
@@ -29,6 +30,7 @@ class GeminiService:
         contents: Sequence[str],
         *,
         json_mode: bool = False,
+        response_schema: dict[str, Any] | None = None,
         max_output_tokens: int = 1_200,
     ) -> str:
         if not settings.gemini_api_key:
@@ -40,6 +42,8 @@ class GeminiService:
         }
         if json_mode:
             generation_config["responseMimeType"] = "application/json"
+            if response_schema is not None:
+                generation_config["responseJsonSchema"] = response_schema
         payload = {
             "contents": [
                 {

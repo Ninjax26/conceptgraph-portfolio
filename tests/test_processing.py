@@ -738,7 +738,9 @@ class ProcessingRulesTests(unittest.TestCase):
             graph_driver=SimpleNamespace(),
             vector_client=SimpleNamespace(),
         )
-        result = GraphExtractionResponse()
+        result = GraphExtractionResponse(
+            nodes=[ConceptNode(id="course", name="Course", type="concept")]
+        )
         with (
             patch("app.services.ingestion_service.settings.llm_provider", "groq"),
             patch("app.services.ingestion_service.settings.groq_api_key", "test-key"),

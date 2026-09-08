@@ -1,4 +1,5 @@
 import asyncio
+import json
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -8,7 +9,7 @@ from groq import AuthenticationError, RateLimitError
 from pydantic import SecretStr
 
 from app.core.exceptions import GraphStructureError, LLMProviderRateLimitError, LLMProviderRequestError
-from app.schemas.extraction import GraphExtractionResponse
+from app.schemas.extraction import ConceptNode, GraphExtractionResponse
 from app.services.cerebras_service import CerebrasService
 from app.services.ingestion_service import IngestionService
 from app.services.gemini_service import GeminiService
@@ -37,6 +38,7 @@ class ProviderQuotaTests(unittest.TestCase):
         def handler(request: httpx.Request) -> httpx.Response:
             observed["path"] = request.url.path
             observed["key"] = request.headers.get("x-goog-api-key")
+            observed["payload"] = json.loads(request.content)
             return httpx.Response(200, json={
                 "candidates": [{"content": {"parts": [{"text": "OK"}]}}]
             })
@@ -46,11 +48,19 @@ class ProviderQuotaTests(unittest.TestCase):
             transport=httpx.MockTransport(handler),
         ) as client, patch("app.services.gemini_service.settings.gemini_api_key", "secret"), \
              patch("app.services.gemini_service.settings.gemini_model", "gemini-test"):
-            content = GeminiService(client).generate(["hello"], json_mode=True)
+            content = GeminiService(client).generate(
+                ["hello"],
+                json_mode=True,
+                response_schema={"type": "object"},
+            )
 
         self.assertEqual(content, "OK")
         self.assertEqual(observed["path"], "/v1beta/models/gemini-test:generateContent")
         self.assertEqual(observed["key"], "secret")
+        self.assertEqual(
+            observed["payload"]["generationConfig"]["responseJsonSchema"],
+            {"type": "object"},
+        )
 
     def test_gemini_rate_limit_is_normalized(self):
         with httpx.Client(
@@ -117,7 +127,9 @@ class ProviderQuotaTests(unittest.TestCase):
         with patch("app.services.ingestion_service.settings.groq_api_key", "test"), \
              patch("app.services.cerebras_service.settings.cerebras_api_key", SecretStr("test")), \
              patch.object(service, "_extract_with_groq") as groq, \
-             patch.object(service, "_extract_with_cerebras", return_value=GraphExtractionResponse()) as backup:
+             patch.object(service, "_extract_with_cerebras", return_value=GraphExtractionResponse(nodes=[
+                 ConceptNode(id="node", name="Node", type="concept")
+             ])) as backup:
             asyncio.run(service._extract_with_failover("text"))
         groq.assert_not_called()
         backup.assert_called_once()
@@ -184,13 +196,46 @@ class ProviderQuotaTests(unittest.TestCase):
     def test_gemini_graph_failover_after_groq_quota(self):
         error = RateLimitError("quota", response=httpx.Response(429,
             request=httpx.Request("POST", "https://example.test")), body=None)
-        expected = GraphExtractionResponse()
+        expected = GraphExtractionResponse(nodes=[
+            ConceptNode(id="node", name="Node", type="concept")
+        ])
         service = IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
         with patch("app.services.ingestion_service.settings.groq_api_key", "test"), \
              patch("app.services.ingestion_service.settings.gemini_api_key", "gemini-test"), \
              patch.object(service, "_extract_with_groq", side_effect=error), \
              patch.object(service, "_extract_with_gemini", return_value=expected) as backup:
             result = asyncio.run(service._extract_with_failover("text"))
+        self.assertIs(result, expected)
+        backup.assert_called_once()
+
+    def test_empty_groq_graph_triggers_gemini_failover(self):
+        service = IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
+        expected = GraphExtractionResponse(nodes=[
+            ConceptNode(id="network", name="Network", type="concept", source_chunk_id="upload:1:0")
+        ])
+        source = "[Source chunk ID: upload:1:0 | PDF: networking.pdf | Page: 1]\nNetwork basics"
+        with patch("app.services.ingestion_service.settings.groq_api_key", "test"), \
+             patch("app.services.ingestion_service.settings.gemini_api_key", "gemini-test"), \
+             patch.object(service, "_extract_with_groq", return_value=GraphExtractionResponse()), \
+             patch.object(service, "_extract_with_gemini", return_value=expected) as backup:
+            result = asyncio.run(service._extract_with_failover(source))
+        self.assertIs(result, expected)
+        backup.assert_called_once()
+
+    def test_graph_with_invented_source_ids_triggers_gemini_failover(self):
+        service = IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
+        invalid = GraphExtractionResponse(nodes=[
+            ConceptNode(id="bad", name="Bad", type="concept", source_chunk_id="invented")
+        ])
+        expected = GraphExtractionResponse(nodes=[
+            ConceptNode(id="good", name="Good", type="concept", source_chunk_id="upload:1:0")
+        ])
+        source = "[Source chunk ID: upload:1:0 | PDF: networking.pdf | Page: 1]\nNetwork basics"
+        with patch("app.services.ingestion_service.settings.groq_api_key", "test"), \
+             patch("app.services.ingestion_service.settings.gemini_api_key", "gemini-test"), \
+             patch.object(service, "_extract_with_groq", return_value=invalid), \
+             patch.object(service, "_extract_with_gemini", return_value=expected) as backup:
+            result = asyncio.run(service._extract_with_failover(source))
         self.assertIs(result, expected)
         backup.assert_called_once()
 

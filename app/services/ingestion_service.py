@@ -225,11 +225,13 @@ class IngestionService:
     async def extract_graph_from_text(self, text: str) -> GraphExtractionResponse:
         provider = settings.llm_provider.lower()
         if provider == "gemini":
-            return await asyncio.to_thread(self._extract_with_gemini, text)
+            extraction = await asyncio.to_thread(self._extract_with_gemini, text)
+            return self._validate_provider_graph(extraction, text)
         if provider == "groq":
             return await self._extract_with_failover(text)
         if provider == "cerebras":
-            return await asyncio.to_thread(self._extract_with_cerebras, text)
+            extraction = await asyncio.to_thread(self._extract_with_cerebras, text)
+            return self._validate_provider_graph(extraction, text)
         raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
 
     async def _extract_with_failover(self, text: str) -> GraphExtractionResponse:
@@ -237,6 +239,7 @@ class IngestionService:
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
                 result = await asyncio.to_thread(self._extract_with_groq, text)
+                result = self._validate_provider_graph(result, text)
                 provider_circuit_breaker.record_success("groq")
                 return result
             except (
@@ -265,6 +268,7 @@ class IngestionService:
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
                 result = await asyncio.to_thread(self._extract_with_cerebras, text)
+                result = self._validate_provider_graph(result, text)
                 provider_circuit_breaker.record_success("cerebras")
                 return result
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
@@ -281,8 +285,12 @@ class IngestionService:
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
                 result = await asyncio.to_thread(self._extract_with_gemini, text)
+                result = self._validate_provider_graph(result, text)
                 provider_circuit_breaker.record_success("gemini")
                 return result
+            except GraphStructureError as exc:
+                logger.warning("Gemini returned an unusable graph for this batch")
+                primary_error = primary_error or exc
             except Exception as exc:
                 provider_circuit_breaker.block("gemini", settings.llm_failover_cooldown_seconds, exc)
                 logger.warning("Gemini graph extraction is unavailable")
@@ -688,6 +696,31 @@ class IngestionService:
         return extraction
 
     @staticmethod
+    def _validate_provider_graph(
+        extraction: GraphExtractionResponse,
+        source_text: str,
+    ) -> GraphExtractionResponse:
+        """Reject structurally valid output that cannot produce a sourced graph."""
+        if not extraction.nodes:
+            raise GraphStructureError("The provider returned an empty graph.")
+
+        source_ids = {
+            match.strip()
+            for match in re.findall(
+                r"\[Source chunk ID:\s*([^|\]\n]+)",
+                source_text,
+            )
+            if match.strip()
+        }
+        if source_ids and not any(
+            node.source_chunk_id in source_ids for node in extraction.nodes
+        ):
+            raise GraphStructureError(
+                "The provider graph did not reference any supplied source chunk."
+            )
+        return extraction
+
+    @staticmethod
     def _is_json_validation_failure(exc: BadRequestError) -> bool:
         body = exc.body
         if isinstance(body, dict):
@@ -703,6 +736,7 @@ class IngestionService:
         content = gemini_service.generate(
             [self._extraction_system_prompt(), text],
             json_mode=True,
+            response_schema=self._graph_extraction_schema(),
             max_output_tokens=1_000,
         )
         try:
