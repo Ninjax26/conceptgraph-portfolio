@@ -14,16 +14,12 @@ import {
   UploadCloud,
 } from "lucide-react";
 
-import type {
-  GraphCanvasEdge,
-  GraphCanvasNode,
-} from "../components/ConceptGraphCanvas";
 import PdfPreviewModal from "../components/PdfPreviewModal";
 import UploadModal from "../components/UploadModal";
+import { buildGraphElements } from "../lib/graphElements";
 import {
   API_BASE_URL,
   CourseSummary,
-  GraphContextItem,
   GraphStatus,
   IngestResponse,
   QueryResponse,
@@ -896,84 +892,6 @@ export default function Dashboard(): JSX.Element {
       </section>
     </main>
   );
-}
-
-function buildGraphElements(graphContext: GraphContextItem[]): {
-  nodes: GraphCanvasNode[];
-  edges: GraphCanvasEdge[];
-} {
-  const nodes = new Map<string, GraphCanvasNode>();
-  const edges = new Map<string, GraphCanvasEdge>();
-
-  const upsertNode = (node: GraphCanvasNode): void => {
-    const existing = nodes.get(node.id);
-    if (!existing) {
-      nodes.set(node.id, node);
-      return;
-    }
-    const hops = [existing.retrievalHop, node.retrievalHop].filter(
-      (hop): hop is 0 | 1 | 2 => hop !== undefined,
-    );
-    nodes.set(node.id, {
-      ...existing,
-      ...node,
-      retrievalHop: hops.length > 0 ? Math.min(...hops) as 0 | 1 | 2 : undefined,
-    });
-  };
-
-  graphContext.forEach((item, itemIndex) => {
-    const conceptId = item.concept.id ?? `concept-${itemIndex}`;
-    upsertNode({
-      id: conceptId,
-      label: item.concept.name ?? conceptId,
-      type: item.concept.type,
-      description: item.concept.description,
-      documentName: item.concept.document_name,
-      pageNumber: item.concept.page_number,
-      sectionHeading: item.concept.section_heading,
-      uploadId: item.concept.upload_id,
-      retrievalHop: item.concept.retrieval_hop,
-    });
-
-    (item.related_concepts ?? item.prerequisites).forEach((relatedConcept, relatedIndex) => {
-      const relatedId =
-        relatedConcept.id ?? `${conceptId}-related-${relatedIndex}`;
-      upsertNode({
-        id: relatedId,
-        label: relatedConcept.name ?? relatedId,
-        type: relatedConcept.type,
-        description: relatedConcept.description,
-        documentName: relatedConcept.document_name,
-        pageNumber: relatedConcept.page_number,
-        sectionHeading: relatedConcept.section_heading,
-        uploadId: relatedConcept.upload_id,
-        retrievalHop: relatedConcept.retrieval_hop,
-      });
-
-    });
-
-    item.relationships.forEach((relationship) => {
-      if (!nodes.has(relationship.source) || !nodes.has(relationship.target)) return;
-      const edgeId = `${relationship.source}->${relationship.target}:${relationship.type}`;
-      const sourceHop = nodes.get(relationship.source)?.retrievalHop;
-      const targetHop = nodes.get(relationship.target)?.retrievalHop;
-      const edgeHop = relationship.type === "PREREQUISITE_OF"
-        ? Math.max(sourceHop ?? 0, targetHop ?? 0)
-        : 0;
-      edges.set(edgeId, {
-        id: edgeId,
-        source: relationship.source,
-        target: relationship.target,
-        label: relationship.type,
-        retrievalHop: edgeHop === 1 || edgeHop === 2 ? edgeHop : undefined,
-      });
-    });
-  });
-
-  return {
-    nodes: Array.from(nodes.values()),
-    edges: Array.from(edges.values()),
-  };
 }
 
 function formatRelativeTime(value: string): string {

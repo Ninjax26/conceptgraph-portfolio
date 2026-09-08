@@ -63,6 +63,42 @@ class GraphRetrievalResult:
 
 
 class RetrievalService:
+    QUERY_STOP_WORDS = frozenset(
+        {
+            "and",
+            "about",
+            "are",
+            "can",
+            "define",
+            "describe",
+            "does",
+            "explain",
+            "for",
+            "from",
+            "how",
+            "into",
+            "is",
+            "learn",
+            "most",
+            "should",
+            "tell",
+            "that",
+            "the",
+            "their",
+            "they",
+            "these",
+            "this",
+            "types",
+            "what",
+            "when",
+            "where",
+            "which",
+            "why",
+            "with",
+            "work",
+        }
+    )
+
     def __init__(
         self,
         graph_driver: AsyncDriver = neo4j_driver,
@@ -532,16 +568,27 @@ class RetrievalService:
         if max_hops not in {1, 2}:
             raise ValueError("Graph retrieval supports only one-hop or two-hop expansion.")
         terms = [
-            term.lower()
-            for term in re.findall(r"[A-Za-z][A-Za-z0-9_+-]{2,}", question)
-            if len(term) > 2
+            term
+            for term in dict.fromkeys(
+                match.casefold()
+                for match in re.findall(r"[A-Za-z][A-Za-z0-9_+-]{2,}", question)
+            )
+            if term not in RetrievalService.QUERY_STOP_WORDS
         ][:12]
         return CypherGenerationResponse(
             cypher=f"""
             MATCH (course:Course)-[:CONTAINS]->(concept:Concept)
             WHERE course.id IN $course_ids
               AND concept.upload_id IN $document_ids
-              AND any(term IN $terms WHERE toLower(concept.name) CONTAINS term)
+            WITH course, concept,
+                 reduce(match_score = 0, term IN $terms |
+                   match_score + CASE
+                     WHEN toLower(concept.name) = term THEN 6
+                     WHEN toLower(concept.name) CONTAINS term THEN 3
+                     WHEN toLower(coalesce(concept.description, '')) CONTAINS term THEN 1
+                     ELSE 0
+                   END) AS match_score
+            WHERE match_score > 0
             OPTIONAL MATCH prerequisite_path =
               (prerequisite:Concept)-[:PREREQUISITE_OF*1..{max_hops}]->(concept)
             WHERE all(
@@ -549,13 +596,14 @@ class RetrievalService:
               WHERE path_node.upload_id IN $document_ids
                 AND (course)-[:CONTAINS]->(path_node)
             )
-            WITH course, concept, collect(DISTINCT prerequisite_path) AS prerequisite_paths
+            WITH course, concept, match_score,
+                 collect(DISTINCT prerequisite_path) AS prerequisite_paths
             OPTIONAL MATCH (concept)-[adjacent_relationship]-(adjacent:Concept)
             WHERE adjacent IS NULL OR (
               (course)-[:CONTAINS]->(adjacent)
               AND adjacent.upload_id IN $document_ids
             )
-            WITH concept, prerequisite_paths,
+            WITH concept, prerequisite_paths, match_score,
                  collect(DISTINCT adjacent) AS adjacent_nodes,
                  collect(DISTINCT adjacent_relationship) AS adjacent_edges
             RETURN concept,
@@ -564,7 +612,9 @@ class RetrievalService:
                        node_acc + nodes(path)[0..-1]) AS related_concepts,
                    adjacent_edges +
                      reduce(edge_acc = [], path IN prerequisite_paths |
-                       edge_acc + relationships(path)) AS relationships
+                       edge_acc + relationships(path)) AS relationships,
+                   match_score
+            ORDER BY match_score DESC, concept.name
             LIMIT 5
             """,
             parameters={"terms": terms or [question.lower()]},

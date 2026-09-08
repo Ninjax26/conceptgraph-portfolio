@@ -1,16 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BookOpen, LoaderCircle } from "lucide-react";
 
-import type {
-  GraphCanvasEdge,
-  GraphCanvasNode,
-} from "@/components/ConceptGraphCanvas";
 import PdfPreviewModal from "@/components/PdfPreviewModal";
+import { buildGraphElements } from "@/lib/graphElements";
 import SavedSampleCourse from "./SavedSampleCourse";
 import {
   API_BASE_URL,
   getPublicSample,
-  type GraphContextItem,
   type PublicSampleResponse,
 } from "@/services/api";
 
@@ -48,7 +44,7 @@ function LiveSampleCourse(): JSX.Element {
   }, []);
 
   const graph = useMemo(
-    () => buildSampleGraph(sample?.graph_context ?? []),
+    () => buildGraphElements(sample?.graph_context ?? []),
     [sample],
   );
 
@@ -123,41 +119,4 @@ function LiveSampleCourse(): JSX.Element {
       ) : null}
     </section>
   );
-}
-
-function buildSampleGraph(graphContext: GraphContextItem[]): {
-  nodes: GraphCanvasNode[];
-  edges: GraphCanvasEdge[];
-} {
-  const nodes = new Map<string, GraphCanvasNode>();
-  const edges = new Map<string, GraphCanvasEdge>();
-  graphContext.forEach((item, itemIndex) => {
-    const candidates = [item.concept, ...item.related_concepts];
-    candidates.forEach((concept, conceptIndex) => {
-      const id = concept.id ?? `sample-${itemIndex}-${conceptIndex}`;
-      nodes.set(id, {
-        id,
-        label: concept.name ?? id,
-        type: concept.type,
-        description: concept.description,
-        documentName: concept.document_name,
-        pageNumber: concept.page_number,
-        sectionHeading: concept.section_heading,
-        uploadId: concept.upload_id,
-      });
-    });
-  });
-  graphContext.forEach((item) => {
-    item.relationships.forEach((relationship) => {
-      if (!nodes.has(relationship.source) || !nodes.has(relationship.target)) return;
-      const id = `${relationship.source}->${relationship.target}:${relationship.type}`;
-      edges.set(id, {
-        id,
-        source: relationship.source,
-        target: relationship.target,
-        label: relationship.type,
-      });
-    });
-  });
-  return { nodes: [...nodes.values()], edges: [...edges.values()] };
 }

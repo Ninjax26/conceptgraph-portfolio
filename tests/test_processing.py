@@ -1001,6 +1001,13 @@ class ProcessingRulesTests(unittest.TestCase):
             )
         )
 
+    def test_graph_prompt_defines_relationship_direction_and_avoids_invented_edges(self):
+        prompt = IngestionService._extraction_system_prompt()
+
+        self.assertIn("A PREREQUISITE_OF B means A must be understood before B", prompt)
+        self.assertIn("Prefer a small connected graph", prompt)
+        self.assertIn("never invent an edge from document order or general knowledge", prompt)
+
     def test_unsupported_relationship_type_is_removed(self):
         graph = GraphExtractionResponse(
             nodes=[
@@ -1512,6 +1519,15 @@ class ProcessingRulesTests(unittest.TestCase):
             generated.cypher,
         )
         self.assertIn("related_concepts", generated.cypher)
+
+    def test_graph_query_ignores_prompt_words_and_ranks_strong_name_matches(self):
+        generated = RetrievalService._fallback_cypher(
+            "Explain the types of cyber attacks and how they work"
+        )
+
+        self.assertEqual(generated.parameters["terms"], ["cyber", "attacks"])
+        self.assertIn("AS match_score", generated.cypher)
+        self.assertIn("ORDER BY match_score DESC", generated.cypher)
 
     def test_graph_query_fetches_bounded_two_hop_prerequisites(self):
         generated = RetrievalService._fallback_cypher("zero trust")
