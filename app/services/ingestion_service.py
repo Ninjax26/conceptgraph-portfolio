@@ -1,7 +1,8 @@
 import asyncio
+import hashlib
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from groq import (
@@ -57,9 +58,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class GraphSectionBatch:
+    batch_key: str
     section_key: str
     section_label: str
     chunks: tuple[DocumentChunk, ...]
+    kind: str = "section"
 
 
 class IngestionService:
@@ -129,16 +132,32 @@ class IngestionService:
     async def extract_graph_from_chunks(
         self,
         chunks: Sequence[DocumentChunk],
+        *,
+        completed_batches: Mapping[str, GraphExtractionResponse] | None = None,
+        on_batch_completed: Callable[
+            [GraphSectionBatch, GraphExtractionResponse], Awaitable[None]
+        ]
+        | None = None,
     ) -> GraphExtractionResponse:
         if not chunks:
             return GraphExtractionResponse()
 
+        completed_batches = completed_batches or {}
         candidate_batches = self._graph_section_batches(
             chunks,
             batch_size=settings.graph_batch_size,
         )
+        candidate_keys = {batch.batch_key for batch in candidate_batches}
+        cached_by_key = {
+            key: extraction
+            for key, extraction in completed_batches.items()
+            if key in candidate_keys
+        }
+        missing_batches = [
+            batch for batch in candidate_batches if batch.batch_key not in cached_by_key
+        ]
         batches = self._select_graph_batches(
-            candidate_batches,
+            missing_batches,
             settings.graph_max_batches,
         )
         section_labels = {
@@ -146,12 +165,22 @@ class IngestionService:
             for batch in candidate_batches
         }
         represented_sections: set[str] = set()
-        successful_batches = 0
+        successful_batches = len(cached_by_key)
         failed_batches = 0
-        skipped_batches = len(candidate_batches) - len(batches)
+        skipped_batches = len(missing_batches) - len(batches)
         provider_limited = False
         consecutive_timeouts = 0
         partials: list[GraphExtractionResponse] = []
+        completed_section_batches: list[GraphSectionBatch] = []
+
+        for batch in candidate_batches:
+            extraction = cached_by_key.get(batch.batch_key)
+            if extraction is None:
+                continue
+            partials.append(extraction)
+            completed_section_batches.append(batch)
+            if extraction.nodes:
+                represented_sections.add(batch.section_key)
 
         for batch_index, batch in enumerate(batches):
             context = "\n\n".join(
@@ -203,9 +232,12 @@ class IngestionService:
             if enriched.nodes:
                 represented_sections.add(batch.section_key)
             partials.append(enriched)
+            completed_section_batches.append(batch)
+            if on_batch_completed is not None:
+                await on_batch_completed(batch, enriched)
 
         failed_sections = set(section_labels) - represented_sections
-        return self._merge_graph_extractions(
+        merged = self._merge_graph_extractions(
             partials,
             sections_total=len(section_labels),
             sections_succeeded=len(represented_sections),
@@ -215,11 +247,81 @@ class IngestionService:
             batches_failed=failed_batches,
             batches_skipped=skipped_batches,
             provider_limited=provider_limited,
-            extraction_budget_applied=len(candidate_batches) > len(batches),
+            extraction_budget_applied=skipped_batches > 0,
             failed_section_labels=sorted(
                 section_labels[key]
                 for key in failed_sections
             ),
+        )
+
+        global_attempted = False
+        global_succeeded = False
+        if (
+            settings.graph_global_linking_enabled
+            and not provider_limited
+            and len(merged.nodes) >= 2
+            and len(represented_sections) >= 2
+        ):
+            global_batch = self._global_linking_batch(completed_section_batches)
+            if global_batch is not None:
+                global_attempted = True
+                linked = completed_batches.get(global_batch.batch_key)
+                if linked is None:
+                    context = (
+                        "Cross-section linking pass. Extract only concepts and relationships "
+                        "that are explicitly supported across these representative excerpts.\n\n"
+                        + "\n\n".join(
+                            self._format_graph_excerpt(chunk)
+                            for chunk in global_batch.chunks
+                        )
+                    )
+                    try:
+                        extraction = await self.extract_graph_from_text(context)
+                        linked = self._attach_provenance(
+                            extraction, global_batch.chunks
+                        )
+                        if on_batch_completed is not None:
+                            await on_batch_completed(global_batch, linked)
+                    except (
+                        RateLimitError,
+                        LLMProviderRateLimitError,
+                        APIConnectionError,
+                        APITimeoutError,
+                        InternalServerError,
+                        LLMProviderUnavailableError,
+                        LLMProviderRequestError,
+                        LLMConfigurationError,
+                        AuthenticationError,
+                        PermissionDeniedError,
+                        BadRequestError,
+                        GraphStructureError,
+                    ):
+                        logger.warning(
+                            "Optional cross-section graph linking pass was skipped; "
+                            "the validated section graph remains usable"
+                        )
+                        linked = None
+                if linked is not None and linked.nodes:
+                    global_succeeded = True
+                    merged = self._merge_graph_extractions(
+                        [merged, linked],
+                        sections_total=merged.sections_total,
+                        sections_succeeded=merged.sections_succeeded,
+                        sections_failed=merged.sections_failed,
+                        batches_total=merged.batches_total,
+                        batches_succeeded=merged.batches_succeeded,
+                        batches_failed=merged.batches_failed,
+                        batches_skipped=merged.batches_skipped,
+                        provider_limited=merged.provider_limited,
+                        extraction_budget_applied=merged.extraction_budget_applied,
+                        failed_section_labels=merged.failed_section_labels,
+                    )
+
+        return merged.model_copy(
+            update={
+                "global_linking_attempted": global_attempted,
+                "global_linking_succeeded": global_succeeded,
+            }
         )
 
     async def extract_graph_from_text(self, text: str) -> GraphExtractionResponse:
@@ -425,6 +527,12 @@ class IngestionService:
         }
 
     async def cleanup_upload(self, upload_id: str, course_id: str) -> None:
+        self.cleanup_vectors(upload_id)
+        await self.cleanup_graph(upload_id, course_id)
+
+    def cleanup_vectors(self, upload_id: str) -> None:
+        """Remove only vector points for an upload."""
+
         if self._collection_exists_for_cleanup():
             self.vector_client.delete(
                 collection_name=self.collection_name,
@@ -435,6 +543,10 @@ class IngestionService:
                 ),
                 wait=True,
             )
+
+    async def cleanup_graph(self, upload_id: str, course_id: str) -> None:
+        """Remove only the Neo4j projection for an upload, preserving vectors."""
+
         async with self.graph_driver.session() as session:
             await session.run(
                 """
@@ -895,12 +1007,62 @@ class IngestionService:
             for offset in range(0, len(section_chunks), batch_size):
                 batches.append(
                     GraphSectionBatch(
+                        batch_key=cls._graph_batch_key(
+                            section_key,
+                            section_chunks[offset : offset + batch_size],
+                        ),
                         section_key=section_key,
                         section_label=section_label,
                         chunks=tuple(section_chunks[offset : offset + batch_size]),
                     )
                 )
         return batches
+
+    @staticmethod
+    def _graph_batch_key(
+        section_key: str,
+        chunks: Sequence[DocumentChunk],
+    ) -> str:
+        digest = hashlib.sha256()
+        digest.update(section_key.encode("utf-8"))
+        for chunk in chunks:
+            digest.update(b"\0")
+            digest.update(chunk.id.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(chunk.text.encode("utf-8"))
+        return f"section:{digest.hexdigest()}"
+
+    @classmethod
+    def _global_linking_batch(
+        cls,
+        completed_batches: Sequence[GraphSectionBatch],
+    ) -> GraphSectionBatch | None:
+        """Select one representative excerpt per section for one bounded linking call."""
+
+        first_by_section: dict[str, GraphSectionBatch] = {}
+        for batch in completed_batches:
+            if batch.kind == "section" and batch.chunks:
+                first_by_section.setdefault(batch.section_key, batch)
+        representatives = list(first_by_section.values())
+        if len(representatives) < 2:
+            return None
+        positions = cls._evenly_spaced_positions(
+            len(representatives),
+            min(cls.MAX_CONCEPTS_PER_BATCH, len(representatives)),
+        )
+        selected = [representatives[position].chunks[0] for position in positions]
+        digest = hashlib.sha256()
+        for chunk in selected:
+            digest.update(chunk.id.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(chunk.text.encode("utf-8"))
+        return GraphSectionBatch(
+            batch_key=f"global:{digest.hexdigest()}",
+            section_key="__global__",
+            section_label="Cross-section linking",
+            chunks=tuple(selected),
+            kind="global",
+        )
 
     @staticmethod
     def _select_graph_batches(

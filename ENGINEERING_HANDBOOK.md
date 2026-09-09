@@ -100,15 +100,19 @@ At least one page and one chunk are mandatory. Every chunk must be accepted by t
 
 ## Graph quality and provenance
 
-Graph extraction is a bounded section-batch workflow rather than a multi-agent system. Chunks are grouped by detected section, each section contributes beginning/middle/end evidence, and a fair selector distributes the configured request budget across the document. Production defaults allow four chunks per request and at most six graph requests per PDF. Each batch asks for at most eight concepts and ten relationships and supplies stable source chunk IDs.
+Graph extraction is a bounded section-batch workflow rather than a multi-agent system. Chunks are grouped by detected section, each section contributes beginning/middle/end evidence, and a fair selector distributes the configured request budget across the document. Production defaults allow four chunks per request and at most six missing section batches per processing run. Each batch asks for at most eight concepts and ten relationships and supplies stable source chunk IDs.
 
-Provider output is schema-validated, limited to six relationship types (`PREREQUISITE_OF`, `PART_OF`, `EXPLAINS`, `RELATED_TO`, `CAUSES`, and `APPLIES_TO`), checked for valid endpoints, deduplicated using lowercase whitespace-free concept names, and rejected at node level when it cites an unknown source chunk. Strict JSON Schema is attempted first. An optional smaller JSON-object repair request can be enabled, but is disabled by default because it doubles calls for malformed batches. Both responses still pass local Pydantic validation. Successful batches are merged deterministically, so one malformed or timed-out section does not discard completed graph work.
+Provider output is schema-validated, limited to six relationship types (`PREREQUISITE_OF`, `PART_OF`, `EXPLAINS`, `RELATED_TO`, `CAUSES`, and `APPLIES_TO`), checked for valid endpoints, deduplicated using lowercase whitespace-free concept names, and rejected at node level when it cites an unknown source chunk. Strict JSON Schema is attempted first. An optional smaller JSON-object repair request can be enabled, but is disabled by default because it doubles calls for malformed batches. Both responses still pass local Pydantic validation. Each successful batch is committed to PostgreSQL under a deterministic hash of its section, chunk IDs, and source text. A continuation loads matching checkpoints and selects only missing batches, so quota exhaustion or a restart does not repeat accepted LLM work.
+
+After section extraction, one optional global pass samples one representative source excerpt from up to eight successful sections. It uses the same schema, endpoint, relationship, source-ID, and size validation as local batches. Its output is checkpointed separately and merged by normalized concept name. Failure of this enrichment pass never invalidates the section graph.
 
 Quality is reported separately from document readiness. Two or more concepts with at least one valid relationship are `GRAPH_READY`; a non-empty graph below that threshold is `GRAPH_PARTIAL`; zero retained concepts is `READY_WITHOUT_GRAPH`. All three documents remain vector-searchable, so an empty graph is visible without falsely turning successful PDF indexing into a processing failure.
 
 Each retained Neo4j concept stores upload ID, PDF filename, source chunk ID, page number, and detected section heading. Graph retrieval returns those properties to the dashboard, where a selected concept can open the original PDF at its source page.
 
-Text extraction currently uses PyMuPDF's native text layer. An image-only/scanned PDF is rejected with a safe OCR-required error before vector or graph writes. OCR is a documented future extension, not a currently claimed capability.
+Text extraction first uses PyMuPDF's native block/line/span dictionary with text-only flags. A document-wide character-weighted median estimates body font size. Native lines receive a deterministic heading score from relative size, boldness, length, numbering, capitalization, punctuation, and vertical gaps; a score of four is required. Repeated text in the top or bottom page margins is filtered when it appears on at least 30% of pages, preventing running headers and footers from becoming sections.
+
+A page below the configured readable-character threshold is rendered at a bounded DPI and sent to local Tesseract OCR. OCR output replaces sparse native text only when it recovers more readable characters. Because scanned pages do not contain trustworthy PDF font metadata, OCR text uses the original capitalization/numbering heuristic. Chunks retain `extraction_method`, `ocr_confidence`, `heading_detection_method`, and `heading_score`; completed upload metadata reports native/OCR page counts and mean OCR confidence. Page attempts and execution time are bounded so scanned documents cannot monopolize the worker indefinitely. Tesseract is text-focused and does not imply table, diagram, handwriting, or equation-to-LaTeX support.
 
 ## LLM resilience and failover
 
@@ -126,7 +130,7 @@ If both providers are unavailable:
 
 ## Idempotency and compensation
 
-Each execution has an execution token. Before processing starts, Qdrant points and Neo4j nodes for the upload are removed. New chunk payloads, graph nodes, and relationships carry upload provenance and the execution token.
+Each execution has an execution token. Before processing starts, Qdrant points for the upload are removed and deterministically rebuilt. Validated LLM batches remain in PostgreSQL checkpoints. Immediately before publishing a merged graph, only the prior Neo4j projection for that upload is removed and replaced. New chunk payloads, graph nodes, and relationships carry upload provenance and the execution token.
 
 Qdrant point IDs and graph concept IDs are deterministic within their document/course scope. Re-execution therefore replaces or merges known artifacts instead of accumulating anonymous duplicates.
 
@@ -144,12 +148,12 @@ READY and FAILED document deletion repeats provenance-scoped Qdrant and Neo4j cl
 The dispatcher periodically examines active rows whose leases are absent/expired. For each interrupted record it:
 
 1. marks the old attempt failed with a worker interruption reason;
-2. checks the global three-attempt cap;
+2. checks the three-attempt crash/failure recovery cap;
 3. creates a new attempt and task token when budget remains;
 4. resets the current stage to `UPLOADED` and clears lease metadata;
 5. queues the durable candidate when memory capacity is available.
 
-Manual retry uses the same attempt cap and creates a new task token. Retry cannot proceed for a permanent document/configuration failure or a missing source object. An old status URL remains useful because task lookup can resolve attempt history to the document's current attempt.
+Manual retry of a failed execution uses the same three-attempt cap and creates a new task token. A READY `GRAPH_PARTIAL` or `READY_WITHOUT_GRAPH` document can instead continue checkpointed graph extraction for up to eight total attempts. Retry cannot proceed for a permanent document/configuration failure or a missing source object. An old status URL remains useful because task lookup can resolve attempt history to the document's current attempt.
 
 ## Retrieval and evidence
 

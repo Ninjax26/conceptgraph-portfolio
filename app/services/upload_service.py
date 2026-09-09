@@ -10,10 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.processing import (
     FailureCategory,
     GraphStatus,
+    MAX_GRAPH_PROCESSING_ATTEMPTS,
     MAX_PROCESSING_ATTEMPTS,
     ProcessingStage,
 )
-from app.models.document_upload import Course, DocumentUpload, ProcessingAttempt
+from app.models.document_upload import (
+    Course,
+    DocumentUpload,
+    GraphExtractionCheckpoint,
+    ProcessingAttempt,
+)
 
 
 class UploadService:
@@ -29,9 +35,81 @@ class UploadService:
         )
         graph_rebuild = (
             record.stage == ProcessingStage.READY.value
-            and record.graph_status == GraphStatus.READY_WITHOUT_GRAPH.value
+            and record.graph_status
+            in {
+                GraphStatus.GRAPH_PARTIAL.value,
+                GraphStatus.READY_WITHOUT_GRAPH.value,
+            }
         )
-        return (failed_retry or graph_rebuild) and record.attempt_count < MAX_PROCESSING_ATTEMPTS
+        if graph_rebuild:
+            return record.attempt_count < MAX_GRAPH_PROCESSING_ATTEMPTS
+        return failed_retry and record.attempt_count < MAX_PROCESSING_ATTEMPTS
+
+    async def load_graph_checkpoints(
+        self,
+        session: AsyncSession,
+        upload_id: str,
+    ) -> list[GraphExtractionCheckpoint]:
+        result = await session.execute(
+            select(GraphExtractionCheckpoint)
+            .where(GraphExtractionCheckpoint.upload_id == upload_id)
+            .order_by(GraphExtractionCheckpoint.created_at)
+        )
+        return list(result.scalars().all())
+
+    async def save_graph_checkpoint(
+        self,
+        session: AsyncSession,
+        *,
+        upload_id: str,
+        task_id: str,
+        lease_owner: str,
+        batch_key: str,
+        section_key: str,
+        section_label: str,
+        extraction_json: dict[str, Any],
+    ) -> bool:
+        record = await self._get_current_upload(
+            session,
+            upload_id,
+            task_id,
+            lease_owner=lease_owner,
+        )
+        if record is None or record.status != "active":
+            return False
+        result = await session.execute(
+            select(GraphExtractionCheckpoint).where(
+                GraphExtractionCheckpoint.upload_id == upload_id,
+                GraphExtractionCheckpoint.batch_key == batch_key,
+            )
+        )
+        checkpoint = result.scalar_one_or_none()
+        if checkpoint is None:
+            checkpoint = GraphExtractionCheckpoint(
+                id=str(uuid4()),
+                upload_id=upload_id,
+                batch_key=batch_key,
+                section_key=section_key,
+                section_label=section_label,
+                extraction_json=extraction_json,
+            )
+            session.add(checkpoint)
+        else:
+            checkpoint.section_key = section_key
+            checkpoint.section_label = section_label
+            checkpoint.extraction_json = extraction_json
+        await session.commit()
+        return True
+
+    async def clear_graph_checkpoints(
+        self,
+        session: AsyncSession,
+        upload_id: str,
+    ) -> None:
+        checkpoints = await self.load_graph_checkpoints(session, upload_id)
+        for checkpoint in checkpoints:
+            await session.delete(checkpoint)
+        await session.commit()
 
     async def create_upload(
         self,

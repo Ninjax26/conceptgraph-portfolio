@@ -99,6 +99,33 @@ class Settings(BaseSettings):
         le=10_000,
         alias="MAX_PDFS_PER_INSTALLATION",
     )
+    ocr_enabled: bool = Field(default=True, alias="OCR_ENABLED")
+    ocr_language: str = Field(
+        default="eng",
+        min_length=3,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_+-]+$",
+        alias="OCR_LANGUAGE",
+    )
+    ocr_dpi: int = Field(default=200, ge=150, le=300, alias="OCR_DPI")
+    ocr_min_native_characters: int = Field(
+        default=40,
+        ge=0,
+        le=2_000,
+        alias="OCR_MIN_NATIVE_CHARACTERS",
+    )
+    ocr_max_pages_per_document: int = Field(
+        default=50,
+        ge=1,
+        le=500,
+        alias="OCR_MAX_PAGES_PER_DOCUMENT",
+    )
+    ocr_page_timeout_seconds: int = Field(
+        default=20,
+        ge=1,
+        le=120,
+        alias="OCR_PAGE_TIMEOUT_SECONDS",
+    )
     require_upload_auth: bool = Field(
         default=False,
         alias="REQUIRE_UPLOAD_AUTH",
@@ -181,6 +208,10 @@ class Settings(BaseSettings):
         ge=1,
         le=24,
         alias="GRAPH_MAX_BATCHES",
+    )
+    graph_global_linking_enabled: bool = Field(
+        default=True,
+        alias="GRAPH_GLOBAL_LINKING_ENABLED",
     )
 
     llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")

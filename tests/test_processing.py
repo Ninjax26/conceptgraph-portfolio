@@ -37,7 +37,13 @@ from app.services.document_processing_service import DocumentProcessingService
 from app.services.demo_retention_service import DemoRetentionService
 from app.services.exam_service import ExamService
 from app.services.ingestion_service import IngestionService
-from app.services.parser_service import DocumentChunk, ParserService
+from app.services.parser_service import (
+    DocumentChunk,
+    ExtractedPage,
+    LayoutLine,
+    OCRResult,
+    ParserService,
+)
 from app.services.provider_failover import provider_circuit_breaker
 from app.services.rag_service import GraphRetrievalResult, RetrievalMode, RetrievalService
 from app.services.rerank_service import RerankService
@@ -65,6 +71,10 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(normalize_course_name("  CYBER  "), "cyber")
         self.assertEqual(normalize_course_name("Cyber"), "cyber")
         self.assertEqual(normalize_course_name("cyber"), "cyber")
+
+    def test_ocr_language_rejects_shell_metacharacters(self):
+        with self.assertRaises(ValidationError):
+            Settings(_env_file=None, OCR_LANGUAGE="eng; touch unsafe")
 
     def test_qdrant_api_key_is_unwrapped_only_for_the_client(self):
         config = Settings(
@@ -1077,6 +1087,152 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(selected[-1].chunks[0].id, "section-9")
         self.assertTrue(any(batch.chunks[0].id == "section-5" for batch in selected))
 
+    def test_graph_batch_keys_are_stable_and_change_with_source_text(self):
+        chunk = DocumentChunk(
+            id="chunk-1",
+            text="Original lesson text",
+            metadata={
+                "document_name": "course.pdf",
+                "section_heading": "Lesson",
+                "page_number": 1,
+            },
+        )
+        first = IngestionService._graph_section_batches([chunk], batch_size=4)[0]
+        second = IngestionService._graph_section_batches([chunk], batch_size=4)[0]
+        changed = IngestionService._graph_section_batches(
+            [chunk.__class__(id=chunk.id, text="Changed lesson text", metadata=chunk.metadata)],
+            batch_size=4,
+        )[0]
+
+        self.assertEqual(first.batch_key, second.batch_key)
+        self.assertNotEqual(first.batch_key, changed.batch_key)
+
+    def test_graph_resume_skips_checkpointed_batches(self):
+        chunks = [
+            DocumentChunk(
+                id=f"chunk-{index}",
+                text=f"Lesson {index}",
+                metadata={
+                    "document_name": "course.pdf",
+                    "section_heading": f"Section {index}",
+                    "page_number": index + 1,
+                    "upload_id": "upload-1",
+                },
+            )
+            for index in range(3)
+        ]
+        candidates = IngestionService._graph_section_batches(chunks, batch_size=4)
+        cached = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(
+                    id="cached",
+                    name="Cached concept",
+                    type="topic",
+                    source_chunk_id="chunk-0",
+                    upload_id="upload-1",
+                    document_name="course.pdf",
+                    page_number=1,
+                    section_heading="Section 0",
+                    source_chunk_ids=["chunk-0"],
+                    page_numbers=[1],
+                    section_headings=["Section 0"],
+                )
+            ]
+        )
+        fresh = [
+            GraphExtractionResponse(
+                nodes=[
+                    ConceptNode(
+                        id=f"fresh-{index}",
+                        name=f"Fresh concept {index}",
+                        type="topic",
+                        source_chunk_id=f"chunk-{index}",
+                    )
+                ]
+            )
+            for index in (1, 2)
+        ]
+        service = IngestionService(
+            graph_driver=SimpleNamespace(), vector_client=SimpleNamespace()
+        )
+        service.extract_graph_from_text = AsyncMock(side_effect=fresh)
+        checkpoint = AsyncMock()
+
+        with patch(
+            "app.services.ingestion_service.settings.graph_global_linking_enabled",
+            False,
+        ):
+            graph = asyncio.run(
+                service.extract_graph_from_chunks(
+                    chunks,
+                    completed_batches={candidates[0].batch_key: cached},
+                    on_batch_completed=checkpoint,
+                )
+            )
+
+        self.assertEqual(graph.batches_succeeded, 3)
+        self.assertEqual(graph.sections_succeeded, 3)
+        self.assertEqual(service.extract_graph_from_text.await_count, 2)
+        self.assertEqual(checkpoint.await_count, 2)
+
+    def test_global_linking_pass_adds_cross_section_relationship(self):
+        chunks = [
+            DocumentChunk(
+                id=f"chunk-{index}",
+                text=f"Concept {index} supports the next lesson.",
+                metadata={
+                    "document_name": "course.pdf",
+                    "section_heading": f"Section {index}",
+                    "page_number": index + 1,
+                    "upload_id": "upload-1",
+                },
+            )
+            for index in range(2)
+        ]
+        local_graphs = [
+            GraphExtractionResponse(
+                nodes=[
+                    ConceptNode(
+                        id=f"concept-{index}",
+                        name=f"Concept {index}",
+                        type="topic",
+                        source_chunk_id=f"chunk-{index}",
+                    )
+                ]
+            )
+            for index in range(2)
+        ]
+        linked = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(id="left", name="Concept 0", type="topic", source_chunk_id="chunk-0"),
+                ConceptNode(id="right", name="Concept 1", type="topic", source_chunk_id="chunk-1"),
+            ],
+            relationships=[
+                ConceptRelationship(
+                    source_node_id="left",
+                    target_node_id="right",
+                    relation_type="PREREQUISITE_OF",
+                )
+            ],
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(), vector_client=SimpleNamespace()
+        )
+        service.extract_graph_from_text = AsyncMock(
+            side_effect=[*local_graphs, linked]
+        )
+
+        with patch(
+            "app.services.ingestion_service.settings.graph_global_linking_enabled",
+            True,
+        ):
+            graph = asyncio.run(service.extract_graph_from_chunks(chunks))
+
+        self.assertTrue(graph.global_linking_attempted)
+        self.assertTrue(graph.global_linking_succeeded)
+        self.assertEqual(len(graph.relationships), 1)
+        self.assertEqual(service.extract_graph_from_text.await_count, 3)
+
     def test_provider_quota_preserves_completed_graph_batches(self):
         chunks = [
             DocumentChunk(
@@ -1307,12 +1463,198 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(headings, {"INTRODUCTION", "Threat Models"})
         self.assertTrue(all(chunk.metadata["page_number"] == 3 for chunk in chunks))
 
-    def test_scanned_pdf_without_text_produces_no_pages_or_chunks(self):
+    def test_native_text_page_skips_ocr_and_records_provenance(self):
+        document = fitz.open()
+        page = document.new_page()
+        page.insert_text(
+            (72, 120),
+            "DIGITAL SECURITY NOTES\nThis native text layer contains enough readable content.",
+        )
+        content = document.tobytes()
+        document.close()
+        parser = ParserService(ocr_min_native_characters=20)
+
+        with patch.object(parser, "_ocr_page") as ocr:
+            pages = parser.extract_pages_from_bytes(content)
+
+        self.assertEqual(len(pages), 1)
+        self.assertEqual(pages[0].extraction_method, "native_text")
+        self.assertIsNone(pages[0].ocr_confidence)
+        self.assertTrue(pages[0].layout_lines)
+        ocr.assert_not_called()
+
+    def test_layout_heading_uses_relative_font_boldness_and_spacing(self):
+        document = fitz.open()
+        page = document.new_page(width=612, height=792)
+        page.insert_text(
+            (72, 150),
+            "3. Network Security",
+            fontsize=18,
+            fontname="hebo",
+        )
+        page.insert_text(
+            (72, 190),
+            "The attacker may obtain sensitive information.",
+            fontsize=11,
+            fontname="helv",
+        )
+        page.insert_text(
+            (72, 215),
+            "A firewall filters traffic between trusted and untrusted networks.",
+            fontsize=11,
+            fontname="helv",
+        )
+        content = document.tobytes()
+        document.close()
+        parser = ParserService(ocr_enabled=False)
+
+        pages = parser.extract_pages_from_bytes(content)
+        chunks = parser.chunk_pages(
+            pages,
+            "course-1",
+            "upload-1",
+            "digital.pdf",
+        )
+
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0].metadata["section_heading"], "3. Network Security")
+        self.assertEqual(chunks[0].metadata["heading_detection_method"], "layout")
+        self.assertGreaterEqual(int(chunks[0].metadata["heading_score"] or 0), 4)
+        self.assertIn("The attacker may obtain", chunks[0].text)
+
+    def test_layout_heading_rejects_normal_body_sentence(self):
+        body = LayoutLine(
+            text="The attacker may obtain sensitive information.",
+            font_size=11,
+            bold=False,
+            bbox=(72, 100, 400, 114),
+            page_height=792,
+        )
+
+        score = ParserService._layout_heading_score(
+            body,
+            body_font_size=11,
+            previous=None,
+            following=None,
+        )
+
+        self.assertLess(score, 4)
+
+    def test_repeated_running_header_is_removed_from_native_sections(self):
+        document = fitz.open()
+        for page_number in range(1, 4):
+            page = document.new_page(width=612, height=792)
+            page.insert_text(
+                (72, 40),
+                "CONCEPTGRAPH COURSE NOTES",
+                fontsize=9,
+                fontname="hebo",
+            )
+            page.insert_text(
+                (72, 140),
+                f"{page_number}. Topic {page_number}",
+                fontsize=16,
+                fontname="hebo",
+            )
+            page.insert_text(
+                (72, 180),
+                "This paragraph contains enough ordinary body text for extraction.",
+                fontsize=11,
+            )
+        content = document.tobytes()
+        document.close()
+        parser = ParserService(ocr_enabled=False)
+
+        pages = parser.extract_pages_from_bytes(content)
+        chunks = parser.chunk_pages(
+            pages,
+            "course-1",
+            "upload-1",
+            "digital.pdf",
+        )
+
+        self.assertEqual(len(chunks), 3)
+        self.assertTrue(
+            all("CONCEPTGRAPH COURSE NOTES" not in chunk.text for chunk in chunks)
+        )
+        self.assertEqual(
+            [chunk.metadata["section_heading"] for chunk in chunks],
+            ["1. Topic 1", "2. Topic 2", "3. Topic 3"],
+        )
+
+    def test_sparse_page_uses_ocr_and_propagates_confidence_to_chunks(self):
         document = fitz.open()
         document.new_page()
         content = document.tobytes()
         document.close()
         parser = ParserService()
+
+        with patch.object(
+            parser,
+            "_ocr_page",
+            return_value=OCRResult(
+                text="NETWORK SECURITY\nA firewall filters network traffic.",
+                confidence=91.4,
+            ),
+        ):
+            pages = parser.extract_pages_from_bytes(content)
+        chunks = parser.chunk_pages(
+            pages,
+            "course-1",
+            "upload-1",
+            "scan.pdf",
+        )
+
+        self.assertEqual(
+            pages,
+            [
+                ExtractedPage(
+                    page_number=1,
+                    text="NETWORK SECURITY\nA firewall filters network traffic.",
+                    extraction_method="ocr",
+                    ocr_confidence=91.4,
+                )
+            ],
+        )
+        self.assertEqual(chunks[0].metadata["extraction_method"], "ocr")
+        self.assertEqual(chunks[0].metadata["ocr_confidence"], 91.4)
+        self.assertEqual(
+            chunks[0].metadata["heading_detection_method"],
+            "text_heuristic",
+        )
+
+    def test_tesseract_tsv_parser_reconstructs_lines_and_weighted_confidence(self):
+        result = ParserService._parse_tesseract_tsv(
+            "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n"
+            "5\t1\t1\t1\t1\t1\t0\t0\t10\t10\t90\tNetwork\n"
+            "5\t1\t1\t1\t1\t2\t0\t0\t10\t10\t80\tSecurity\n"
+            "5\t1\t1\t1\t2\t1\t0\t0\t10\t10\t95\tFirewall\n"
+        )
+
+        self.assertEqual(result.text, "Network Security\nFirewall")
+        self.assertGreater(result.confidence or 0, 80)
+        self.assertLess(result.confidence or 100, 96)
+
+    def test_ocr_page_limit_stops_unbounded_scanned_documents(self):
+        document = fitz.open()
+        document.new_page()
+        document.new_page()
+        content = document.tobytes()
+        document.close()
+        parser = ParserService(ocr_max_pages_per_document=1)
+
+        with (
+            patch.object(parser, "_ocr_page", return_value=OCRResult("", None)),
+            self.assertRaisesRegex(ValueError, "OCR page limit"),
+        ):
+            parser.extract_pages_from_bytes(content)
+
+    def test_scanned_pdf_without_text_produces_no_pages_or_chunks(self):
+        document = fitz.open()
+        document.new_page()
+        content = document.tobytes()
+        document.close()
+        parser = ParserService(ocr_enabled=False)
 
         pages = parser.extract_pages_from_bytes(content)
         chunks = parser.chunk_pages(pages, "course-1", "upload-1", "scan.pdf")
@@ -1324,6 +1666,15 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(chunks, [])
         self.assertEqual(category, FailureCategory.DOCUMENT_ERROR)
         self.assertFalse(retryable)
+
+    def test_missing_ocr_engine_has_safe_configuration_error(self):
+        category, retryable, message = classify_failure(
+            RuntimeError("The OCR engine is unavailable. Install Tesseract.")
+        )
+
+        self.assertEqual(category, FailureCategory.CONFIGURATION_ERROR)
+        self.assertFalse(retryable)
+        self.assertIn("OCR", message)
 
     def test_query_returns_evidence_when_graph_is_empty(self):
         context = SimpleNamespace()
@@ -2549,6 +2900,16 @@ class RetryEndpointTests(unittest.TestCase):
 
         self.assertFalse(UploadService.can_reprocess(record))
 
+    def test_partial_graph_is_eligible_for_checkpointed_continuation(self):
+        record = SimpleNamespace(
+            stage=ProcessingStage.READY.value,
+            graph_status=GraphStatus.GRAPH_PARTIAL.value,
+            retryable=False,
+            attempt_count=3,
+        )
+
+        self.assertTrue(UploadService.can_reprocess(record))
+
     def test_full_queue_defers_retry_without_marking_it_failed(self):
         with tempfile.NamedTemporaryFile(suffix=".pdf") as source:
             record = SimpleNamespace(
@@ -2687,6 +3048,8 @@ class DocumentProcessingServiceTests(unittest.TestCase):
         )
         ingestion_service = SimpleNamespace(
             cleanup_upload=AsyncMock(),
+            cleanup_graph=AsyncMock(),
+            cleanup_vectors=Mock(),
             upsert_chunks_to_qdrant=Mock(return_value=1),
             extract_graph_from_chunks=AsyncMock(return_value=graph),
             store_graph_extraction=AsyncMock(),
@@ -2746,7 +3109,9 @@ class DocumentProcessingServiceTests(unittest.TestCase):
             ],
         )
         self.assertEqual(chunk.metadata["execution_token"], "task-1")
-        ingestion_service.cleanup_upload.assert_awaited_once_with(
+        ingestion_service.cleanup_upload.assert_not_awaited()
+        ingestion_service.cleanup_vectors.assert_called_once_with("upload-1")
+        ingestion_service.cleanup_graph.assert_awaited_once_with(
             "upload-1", "course-1"
         )
         graph_call = ingestion_service.store_graph_extraction.await_args
@@ -2758,6 +3123,8 @@ class DocumentProcessingServiceTests(unittest.TestCase):
         self.assertEqual(completed_result["graph_sections_succeeded"], 1)
         self.assertEqual(completed_result["graph_batches_failed"], 1)
         self.assertEqual(completed_result["graph_failed_sections"], ["Appendix"])
+        self.assertEqual(completed_result["native_text_pages"], 1)
+        self.assertEqual(completed_result["ocr_pages"], 0)
 
     def test_empty_provider_graph_keeps_vectorized_document_ready(self):
         service, upload_service, ingestion_service, _ = self._service_fixture()
@@ -2803,7 +3170,7 @@ class DocumentProcessingServiceTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "failed")
-        self.assertEqual(ingestion_service.cleanup_upload.await_count, 2)
+        self.assertEqual(ingestion_service.cleanup_upload.await_count, 1)
         upload_service.mark_failed.assert_awaited_once()
 
 

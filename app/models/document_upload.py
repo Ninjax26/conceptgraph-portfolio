@@ -79,3 +79,31 @@ class ProcessingAttempt(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class GraphExtractionCheckpoint(Base):
+    """Durable, per-batch LLM output used to resume graph construction."""
+
+    __tablename__ = "graph_extraction_checkpoints"
+    __table_args__ = (UniqueConstraint("upload_id", "batch_key"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    upload_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("document_uploads.upload_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    batch_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    section_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    section_label: Mapped[str] = mapped_column(String(512), nullable=False)
+    extraction_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

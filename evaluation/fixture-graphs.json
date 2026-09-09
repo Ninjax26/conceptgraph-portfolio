@@ -4,165 +4,141 @@
     "extraction": {
       "nodes": [
         {
+          "id": "http",
+          "name": "HTTP",
+          "type": "protocol",
+          "description": "Defines requests and responses between a client and a server without encryption.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
+          "normalized_name": "http",
+          "document_name": "web-foundations.pdf",
+          "page_number": 1,
+          "section_heading": "HTTP",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:3:0"
+          ],
+          "page_numbers": [
+            1,
+            2,
+            3
+          ],
+          "section_headings": [
+            "HTTP",
+            "TLS",
+            "HTTPS"
+          ]
+        },
+        {
           "id": "tls",
           "name": "TLS",
-          "type": "concept",
-          "description": "Transport Layer Security protocol that protects data in transit using encryption and integrity checks.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "type": "protocol",
+          "description": "Transport Layer Security used in web communication for encryption.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
           "normalized_name": "tls",
           "document_name": "web-foundations.pdf",
-          "page_number": 2,
-          "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "page_number": 1,
+          "section_heading": "HTTP",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
           "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:3:0"
           ],
           "page_numbers": [
-            2
+            1,
+            2,
+            3
           ],
           "section_headings": [
-            "TLS"
-          ]
-        },
-        {
-          "id": "encryption",
-          "name": "encryption",
-          "type": "concept",
-          "description": "Cryptographic technique used by TLS to conceal data from eavesdroppers.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
-          "normalized_name": "encryption",
-          "document_name": "web-foundations.pdf",
-          "page_number": 2,
-          "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
-          "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
-          ],
-          "page_numbers": [
-            2
-          ],
-          "section_headings": [
-            "TLS"
-          ]
-        },
-        {
-          "id": "certificate",
-          "name": "certificate",
-          "type": "concept",
-          "description": "Digital credential that helps the client authenticate the server during the TLS handshake.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
-          "normalized_name": "certificate",
-          "document_name": "web-foundations.pdf",
-          "page_number": 2,
-          "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
-          "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
-          ],
-          "page_numbers": [
-            2
-          ],
-          "section_headings": [
-            "TLS"
-          ]
-        },
-        {
-          "id": "client_authentication",
-          "name": "client authentication",
-          "type": "concept",
-          "description": "Process by which the client verifies the server's identity using the certificate.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
-          "normalized_name": "clientauthentication",
-          "document_name": "web-foundations.pdf",
-          "page_number": 2,
-          "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
-          "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
-          ],
-          "page_numbers": [
-            2
-          ],
-          "section_headings": [
-            "TLS"
-          ]
-        },
-        {
-          "id": "handshake",
-          "name": "handshake",
-          "type": "concept",
-          "description": "Initial exchange of messages in TLS that establishes a secure session.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
-          "normalized_name": "handshake",
-          "document_name": "web-foundations.pdf",
-          "page_number": 2,
-          "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
-          "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
-          ],
-          "page_numbers": [
-            2
-          ],
-          "section_headings": [
-            "TLS"
-          ]
-        },
-        {
-          "id": "hostname_verification",
-          "name": "hostname verification",
-          "type": "concept",
-          "description": "Check that the certificate matches the requested hostname.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
-          "normalized_name": "hostnameverification",
-          "document_name": "web-foundations.pdf",
-          "page_number": 2,
-          "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
-          "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
-          ],
-          "page_numbers": [
-            2
-          ],
-          "section_headings": [
-            "TLS"
-          ]
-        },
-        {
-          "id": "trusted_authority",
-          "name": "trusted authority",
-          "type": "concept",
-          "description": "Certificate authority that the browser trusts to validate certificates.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
-          "normalized_name": "trustedauthority",
-          "document_name": "web-foundations.pdf",
-          "page_number": 2,
-          "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
-          "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
-          ],
-          "page_numbers": [
-            2
-          ],
-          "section_headings": [
-            "TLS"
+            "HTTP",
+            "TLS",
+            "HTTPS"
           ]
         },
         {
           "id": "https",
           "name": "HTTPS",
-          "type": "concept",
-          "description": "HTTP over TLS, providing secure web communication.",
-          "source_chunk_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0",
+          "type": "protocol",
+          "description": "Secure version of HTTP built on top of TLS.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
           "normalized_name": "https",
+          "document_name": "web-foundations.pdf",
+          "page_number": 1,
+          "section_heading": "HTTP",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:3:0"
+          ],
+          "page_numbers": [
+            1,
+            2,
+            3
+          ],
+          "section_headings": [
+            "HTTP",
+            "TLS",
+            "HTTPS"
+          ]
+        },
+        {
+          "id": "http_request",
+          "name": "HTTP Request",
+          "type": "message",
+          "description": "Contains a method, target, headers, and sometimes a body.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
+          "normalized_name": "httprequest",
+          "document_name": "web-foundations.pdf",
+          "page_number": 1,
+          "section_heading": "HTTP",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0"
+          ],
+          "page_numbers": [
+            1
+          ],
+          "section_headings": [
+            "HTTP"
+          ]
+        },
+        {
+          "id": "http_response",
+          "name": "HTTP Response",
+          "type": "message",
+          "description": "Contains a status code, headers, and optionally a body.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0",
+          "normalized_name": "httpresponse",
+          "document_name": "web-foundations.pdf",
+          "page_number": 1,
+          "section_heading": "HTTP",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:1:0"
+          ],
+          "page_numbers": [
+            1
+          ],
+          "section_headings": [
+            "HTTP"
+          ]
+        },
+        {
+          "id": "certificate",
+          "name": "Certificate",
+          "type": "security_credential",
+          "description": "Helps the client authenticate the server during the handshake.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:2:0",
+          "normalized_name": "certificate",
           "document_name": "web-foundations.pdf",
           "page_number": 2,
           "section_heading": "TLS",
-          "upload_id": "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
           "source_chunk_ids": [
-            "ablation-af1d1b9f-0203-4063-b3e9-2d933cb0e955-0:2:0"
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:2:0"
           ],
           "page_numbers": [
             2
@@ -170,109 +146,1484 @@
           "section_headings": [
             "TLS"
           ]
+        },
+        {
+          "id": "dns",
+          "name": "DNS",
+          "type": "concept",
+          "description": "Resolves domain names to records such as IP addresses.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0",
+          "normalized_name": "dns",
+          "document_name": "web-foundations.pdf",
+          "page_number": 4,
+          "section_heading": "DNS",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "DNS"
+          ]
+        },
+        {
+          "id": "dns_lookup",
+          "name": "DNS Lookup",
+          "type": "process",
+          "description": "Locates a server but does not prove application health.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0",
+          "normalized_name": "dnslookup",
+          "document_name": "web-foundations.pdf",
+          "page_number": 4,
+          "section_heading": "DNS",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "DNS"
+          ]
+        },
+        {
+          "id": "dns_caching",
+          "name": "DNS Caching",
+          "type": "technique",
+          "description": "Reuses name resolution results until time to live expires.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0",
+          "normalized_name": "dnscaching",
+          "document_name": "web-foundations.pdf",
+          "page_number": 4,
+          "section_heading": "DNS",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "DNS"
+          ]
+        },
+        {
+          "id": "http_caching",
+          "name": "HTTP Caching",
+          "type": "technique",
+          "description": "Reuses application responses at a different layer than DNS caching.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0",
+          "normalized_name": "httpcaching",
+          "document_name": "web-foundations.pdf",
+          "page_number": 4,
+          "section_heading": "DNS",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:4:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0"
+          ],
+          "page_numbers": [
+            4,
+            5
+          ],
+          "section_headings": [
+            "DNS",
+            "HTTP Caching"
+          ]
+        },
+        {
+          "id": "cache_control",
+          "name": "Cache-Control",
+          "type": "Header",
+          "description": "Can specify private responses or prohibit storage with no-store.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0",
+          "normalized_name": "cache-control",
+          "document_name": "web-foundations.pdf",
+          "page_number": 5,
+          "section_heading": "HTTP Caching",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "HTTP Caching"
+          ]
+        },
+        {
+          "id": "etag",
+          "name": "ETag",
+          "type": "Validator",
+          "description": "A validator that can support conditional requests and avoid downloading an unchanged representation.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0",
+          "normalized_name": "etag",
+          "document_name": "web-foundations.pdf",
+          "page_number": 5,
+          "section_heading": "HTTP Caching",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "HTTP Caching"
+          ]
+        },
+        {
+          "id": "conditional_requests",
+          "name": "Conditional Requests",
+          "type": "Request Type",
+          "description": "Requests supported by validators like ETag to avoid downloading unchanged representations.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0",
+          "normalized_name": "conditionalrequests",
+          "document_name": "web-foundations.pdf",
+          "page_number": 5,
+          "section_heading": "HTTP Caching",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "HTTP Caching"
+          ]
+        },
+        {
+          "id": "shared_cache",
+          "name": "Shared Cache",
+          "type": "Cache Type",
+          "description": "A cache type that must not assume it may safely store a personalized response.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0",
+          "normalized_name": "sharedcache",
+          "document_name": "web-foundations.pdf",
+          "page_number": 5,
+          "section_heading": "HTTP Caching",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "HTTP Caching"
+          ]
+        },
+        {
+          "id": "database_index",
+          "name": "Database Index",
+          "type": "Database Component",
+          "description": "Accelerates locating rows without storing an HTTP response.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0",
+          "normalized_name": "databaseindex",
+          "document_name": "web-foundations.pdf",
+          "page_number": 5,
+          "section_heading": "HTTP Caching",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "HTTP Caching"
+          ]
+        },
+        {
+          "id": "http_401",
+          "name": "HTTP 401",
+          "type": "status_code",
+          "description": "Indicates authentication is required or credentials are not accepted.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0",
+          "normalized_name": "http401",
+          "document_name": "web-foundations.pdf",
+          "page_number": 6,
+          "section_heading": "Status Codes",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Status Codes"
+          ]
+        },
+        {
+          "id": "http_403",
+          "name": "HTTP 403",
+          "type": "status_code",
+          "description": "Indicates the request is forbidden even when identity is known.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0",
+          "normalized_name": "http403",
+          "document_name": "web-foundations.pdf",
+          "page_number": 6,
+          "section_heading": "Status Codes",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Status Codes"
+          ]
+        },
+        {
+          "id": "http_429",
+          "name": "HTTP 429",
+          "type": "status_code",
+          "description": "Indicates too many requests and can include a Retry-After header.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0",
+          "normalized_name": "http429",
+          "document_name": "web-foundations.pdf",
+          "page_number": 6,
+          "section_heading": "Status Codes",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Status Codes"
+          ]
+        },
+        {
+          "id": "http_503",
+          "name": "HTTP 503",
+          "type": "status_code",
+          "description": "Indicates that a service is temporarily unavailable.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0",
+          "normalized_name": "http503",
+          "document_name": "web-foundations.pdf",
+          "page_number": 6,
+          "section_heading": "Status Codes",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Status Codes"
+          ]
+        },
+        {
+          "id": "authentication",
+          "name": "Authentication",
+          "type": "concept",
+          "description": "Process required or checked by HTTP 401 responses.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0",
+          "normalized_name": "authentication",
+          "document_name": "web-foundations.pdf",
+          "page_number": 6,
+          "section_heading": "Status Codes",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Status Codes"
+          ]
+        },
+        {
+          "id": "status_codes",
+          "name": "Status Codes",
+          "type": "Component",
+          "description": "Codes indicating response status such as 401, 403, 429, and 503.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0",
+          "normalized_name": "statuscodes",
+          "document_name": "web-foundations.pdf",
+          "page_number": 6,
+          "section_heading": "Status Codes",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-0:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Status Codes"
+          ]
         }
       ],
       "relationships": [
         {
-          "source_node_id": "tls",
-          "target_node_id": "encryption",
-          "relation_type": "APPLIES_TO"
+          "source_node_id": "http_request",
+          "target_node_id": "http",
+          "relation_type": "PART_OF"
         },
         {
-          "source_node_id": "tls",
-          "target_node_id": "certificate",
-          "relation_type": "APPLIES_TO"
+          "source_node_id": "http_response",
+          "target_node_id": "http",
+          "relation_type": "PART_OF"
         },
         {
-          "source_node_id": "certificate",
-          "target_node_id": "client_authentication",
-          "relation_type": "APPLIES_TO"
-        },
-        {
-          "source_node_id": "certificate",
-          "target_node_id": "handshake",
-          "relation_type": "APPLIES_TO"
-        },
-        {
-          "source_node_id": "certificate",
-          "target_node_id": "hostname_verification",
-          "relation_type": "APPLIES_TO"
-        },
-        {
-          "source_node_id": "hostname_verification",
-          "target_node_id": "trusted_authority",
-          "relation_type": "APPLIES_TO"
+          "source_node_id": "http",
+          "target_node_id": "tls",
+          "relation_type": "PREREQUISITE_OF"
         },
         {
           "source_node_id": "tls",
           "target_node_id": "https",
           "relation_type": "PREREQUISITE_OF"
+        },
+        {
+          "source_node_id": "certificate",
+          "target_node_id": "tls",
+          "relation_type": "PART_OF"
+        },
+        {
+          "source_node_id": "http",
+          "target_node_id": "https",
+          "relation_type": "PART_OF"
+        },
+        {
+          "source_node_id": "dns_lookup",
+          "target_node_id": "dns",
+          "relation_type": "PART_OF"
+        },
+        {
+          "source_node_id": "dns_caching",
+          "target_node_id": "dns",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "dns_caching",
+          "target_node_id": "http_caching",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "cache_control",
+          "target_node_id": "http_caching",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "etag",
+          "target_node_id": "conditional_requests",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "shared_cache",
+          "target_node_id": "http_caching",
+          "relation_type": "PART_OF"
+        },
+        {
+          "source_node_id": "database_index",
+          "target_node_id": "http_caching",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "authentication",
+          "target_node_id": "http_401",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "http",
+          "target_node_id": "https",
+          "relation_type": "PREREQUISITE_OF"
         }
       ],
       "sections_total": 6,
-      "sections_succeeded": 1,
-      "sections_failed": 5,
+      "sections_succeeded": 6,
+      "sections_failed": 0,
       "batches_total": 6,
-      "batches_succeeded": 1,
-      "batches_failed": 4,
-      "batches_skipped": 1,
-      "provider_limited": true,
+      "batches_succeeded": 6,
+      "batches_failed": 0,
+      "batches_skipped": 0,
+      "provider_limited": false,
       "extraction_budget_applied": false,
-      "failed_section_labels": [
-        "CONCEPTGRAPH / COMPUTING FOUNDATIONS",
-        "DNS",
-        "HTTP",
-        "HTTPS",
-        "Status Codes"
-      ]
+      "global_linking_attempted": true,
+      "global_linking_succeeded": true,
+      "failed_section_labels": []
     }
   },
   "identity-security.pdf": {
     "pdf_sha256": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
     "extraction": {
-      "nodes": [],
-      "relationships": [],
+      "nodes": [
+        {
+          "id": "authentication",
+          "name": "Authentication",
+          "type": "Concept",
+          "description": "Establishes the identity of a caller using credentials or an existing session.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:1:0",
+          "normalized_name": "authentication",
+          "document_name": "identity-security.pdf",
+          "page_number": 1,
+          "section_heading": "Authentication",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0"
+          ],
+          "page_numbers": [
+            1,
+            2,
+            3
+          ],
+          "section_headings": [
+            "Authentication",
+            "Authorization",
+            "Document Access Control"
+          ]
+        },
+        {
+          "id": "authorization",
+          "name": "Authorization",
+          "type": "Concept",
+          "description": "Decides whether an established identity may perform a specific action on a resource.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:1:0",
+          "normalized_name": "authorization",
+          "document_name": "identity-security.pdf",
+          "page_number": 1,
+          "section_heading": "Authentication",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0"
+          ],
+          "page_numbers": [
+            1,
+            2,
+            3
+          ],
+          "section_headings": [
+            "Authentication",
+            "Authorization",
+            "Document Access Control"
+          ]
+        },
+        {
+          "id": "document_access_control",
+          "name": "Document Access Control",
+          "type": "Concept",
+          "description": "Control mechanism for restricting access to specific PDFs in an application.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:1:0",
+          "normalized_name": "documentaccesscontrol",
+          "document_name": "identity-security.pdf",
+          "page_number": 1,
+          "section_heading": "Authentication",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0"
+          ],
+          "page_numbers": [
+            1,
+            2,
+            3
+          ],
+          "section_headings": [
+            "Authentication",
+            "Authorization",
+            "Document Access Control"
+          ]
+        },
+        {
+          "id": "vector_searches",
+          "name": "Vector Searches",
+          "type": "Operation",
+          "description": "Protected with the same document scope used for PDF previews.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0",
+          "normalized_name": "vectorsearches",
+          "document_name": "identity-security.pdf",
+          "page_number": 3,
+          "section_heading": "Document Access Control",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0"
+          ],
+          "page_numbers": [
+            3
+          ],
+          "section_headings": [
+            "Document Access Control"
+          ]
+        },
+        {
+          "id": "graph_traversals",
+          "name": "Graph Traversals",
+          "type": "Operation",
+          "description": "Protected with the same document scope used for PDF previews.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0",
+          "normalized_name": "graphtraversals",
+          "document_name": "identity-security.pdf",
+          "page_number": 3,
+          "section_heading": "Document Access Control",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0"
+          ],
+          "page_numbers": [
+            3
+          ],
+          "section_headings": [
+            "Document Access Control"
+          ]
+        },
+        {
+          "id": "https",
+          "name": "HTTPS",
+          "type": "Technology",
+          "description": "Protects transport, but cannot replace resource permission checks.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0",
+          "normalized_name": "https",
+          "document_name": "identity-security.pdf",
+          "page_number": 3,
+          "section_heading": "Document Access Control",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:3:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0"
+          ],
+          "page_numbers": [
+            3,
+            5
+          ],
+          "section_headings": [
+            "Document Access Control",
+            "Phishing"
+          ]
+        },
+        {
+          "id": "signed_session_cookie",
+          "name": "Signed Session Cookie",
+          "type": "concept",
+          "description": "A cookie that lets a server detect tampering and verify an expiry time using a signature.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0",
+          "normalized_name": "signedsessioncookie",
+          "document_name": "identity-security.pdf",
+          "page_number": 4,
+          "section_heading": "Signed Sessions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Signed Sessions"
+          ]
+        },
+        {
+          "id": "httponly",
+          "name": "HttpOnly",
+          "type": "mechanism",
+          "description": "A flag that prevents page JavaScript from reading the cookie.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0",
+          "normalized_name": "httponly",
+          "document_name": "identity-security.pdf",
+          "page_number": 4,
+          "section_heading": "Signed Sessions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Signed Sessions"
+          ]
+        },
+        {
+          "id": "secure",
+          "name": "Secure",
+          "type": "mechanism",
+          "description": "A flag that restricts cookie transmission to HTTPS.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0",
+          "normalized_name": "secure",
+          "document_name": "identity-security.pdf",
+          "page_number": 4,
+          "section_heading": "Signed Sessions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Signed Sessions"
+          ]
+        },
+        {
+          "id": "signature",
+          "name": "Signature",
+          "type": "security_property",
+          "description": "Provides integrity for the session cookie rather than secrecy.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0",
+          "normalized_name": "signature",
+          "document_name": "identity-security.pdf",
+          "page_number": 4,
+          "section_heading": "Signed Sessions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Signed Sessions"
+          ]
+        },
+        {
+          "id": "stateless_signed_cookie",
+          "name": "Stateless Signed Cookie",
+          "type": "concept",
+          "description": "Does not by itself create per-user document ownership or provide instant revocation.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0",
+          "normalized_name": "statelesssignedcookie",
+          "document_name": "identity-security.pdf",
+          "page_number": 4,
+          "section_heading": "Signed Sessions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Signed Sessions"
+          ]
+        },
+        {
+          "id": "phishing",
+          "name": "Phishing",
+          "type": "Concept",
+          "description": "Uses deceptive messages or websites to persuade disclosure of credentials or unsafe actions.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0",
+          "normalized_name": "phishing",
+          "document_name": "identity-security.pdf",
+          "page_number": 5,
+          "section_heading": "Phishing",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Phishing"
+          ]
+        },
+        {
+          "id": "deceptive_messages",
+          "name": "Deceptive Messages",
+          "type": "Technique",
+          "description": "Messages that may manufacture urgency to discourage checking the sender.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0",
+          "normalized_name": "deceptivemessages",
+          "document_name": "identity-security.pdf",
+          "page_number": 5,
+          "section_heading": "Phishing",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Phishing"
+          ]
+        },
+        {
+          "id": "credential_disclosure",
+          "name": "Credential Disclosure",
+          "type": "Outcome",
+          "description": "The unauthorized disclosure of user credentials caused by deceptive attacks.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0",
+          "normalized_name": "credentialdisclosure",
+          "document_name": "identity-security.pdf",
+          "page_number": 5,
+          "section_heading": "Phishing",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Phishing"
+          ]
+        },
+        {
+          "id": "transport_protection",
+          "name": "Transport Protection",
+          "type": "Concept",
+          "description": "Encryption of traffic, distinguished from human deception.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0",
+          "normalized_name": "transportprotection",
+          "document_name": "identity-security.pdf",
+          "page_number": 5,
+          "section_heading": "Phishing",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Phishing"
+          ]
+        },
+        {
+          "id": "rate_limits",
+          "name": "Rate Limits",
+          "type": "Concept",
+          "description": "Bound the number of requests a caller may make in a time window.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0",
+          "normalized_name": "ratelimits",
+          "document_name": "identity-security.pdf",
+          "page_number": 6,
+          "section_heading": "Rate Limits",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Rate Limits"
+          ]
+        },
+        {
+          "id": "expensive_ai_operations",
+          "name": "Expensive AI Operations",
+          "type": "Concept",
+          "description": "Operations that can have a smaller budget than read-only metadata requests.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0",
+          "normalized_name": "expensiveaioperations",
+          "document_name": "identity-security.pdf",
+          "page_number": 6,
+          "section_heading": "Rate Limits",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Rate Limits"
+          ]
+        },
+        {
+          "id": "http_429",
+          "name": "HTTP 429",
+          "type": "Protocol",
+          "description": "Status code that can tell a client to slow down.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0",
+          "normalized_name": "http429",
+          "document_name": "identity-security.pdf",
+          "page_number": 6,
+          "section_heading": "Rate Limits",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Rate Limits"
+          ]
+        },
+        {
+          "id": "shared_reviewer_code",
+          "name": "Shared Reviewer Code",
+          "type": "Concept",
+          "description": "Maps all reviewers to one shared request budget and shared workspace.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0",
+          "normalized_name": "sharedreviewercode",
+          "document_name": "identity-security.pdf",
+          "page_number": 6,
+          "section_heading": "Rate Limits",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-1:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Rate Limits"
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "source_node_id": "authentication",
+          "target_node_id": "authorization",
+          "relation_type": "PREREQUISITE_OF"
+        },
+        {
+          "source_node_id": "authorization",
+          "target_node_id": "document_access_control",
+          "relation_type": "PREREQUISITE_OF"
+        },
+        {
+          "source_node_id": "document_access_control",
+          "target_node_id": "vector_searches",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "document_access_control",
+          "target_node_id": "graph_traversals",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "httponly",
+          "target_node_id": "signed_session_cookie",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "secure",
+          "target_node_id": "signed_session_cookie",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "signature",
+          "target_node_id": "signed_session_cookie",
+          "relation_type": "PART_OF"
+        },
+        {
+          "source_node_id": "stateless_signed_cookie",
+          "target_node_id": "signed_session_cookie",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "deceptive_messages",
+          "target_node_id": "phishing",
+          "relation_type": "PART_OF"
+        },
+        {
+          "source_node_id": "phishing",
+          "target_node_id": "credential_disclosure",
+          "relation_type": "CAUSES"
+        },
+        {
+          "source_node_id": "https",
+          "target_node_id": "transport_protection",
+          "relation_type": "EXPLAINS"
+        },
+        {
+          "source_node_id": "https",
+          "target_node_id": "phishing",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "rate_limits",
+          "target_node_id": "expensive_ai_operations",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "rate_limits",
+          "target_node_id": "http_429",
+          "relation_type": "CAUSES"
+        },
+        {
+          "source_node_id": "shared_reviewer_code",
+          "target_node_id": "rate_limits",
+          "relation_type": "RELATED_TO"
+        }
+      ],
       "sections_total": 6,
-      "sections_succeeded": 0,
-      "sections_failed": 6,
+      "sections_succeeded": 6,
+      "sections_failed": 0,
       "batches_total": 6,
-      "batches_succeeded": 0,
-      "batches_failed": 1,
-      "batches_skipped": 5,
-      "provider_limited": true,
+      "batches_succeeded": 6,
+      "batches_failed": 0,
+      "batches_skipped": 0,
+      "provider_limited": false,
       "extraction_budget_applied": false,
-      "failed_section_labels": [
-        "Authentication",
-        "Authorization",
-        "Document Access Control",
-        "Phishing",
-        "Rate Limits",
-        "Signed Sessions"
-      ]
+      "global_linking_attempted": true,
+      "global_linking_succeeded": true,
+      "failed_section_labels": []
     }
   },
   "data-reliability.pdf": {
     "pdf_sha256": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
     "extraction": {
-      "nodes": [],
-      "relationships": [],
+      "nodes": [
+        {
+          "id": "database_transaction",
+          "name": "Database Transaction",
+          "type": "Concept",
+          "description": "Groups related changes into a unit that commits or rolls back.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:1:0",
+          "normalized_name": "databasetransaction",
+          "document_name": "data-reliability.pdf",
+          "page_number": 1,
+          "section_heading": "Transactions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:1:0"
+          ],
+          "page_numbers": [
+            1
+          ],
+          "section_headings": [
+            "Transactions"
+          ]
+        },
+        {
+          "id": "idempotency",
+          "name": "Idempotency",
+          "type": "Concept",
+          "description": "Property where an operation can be applied multiple times without changing the result beyond the initial application.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:1:0",
+          "normalized_name": "idempotency",
+          "document_name": "data-reliability.pdf",
+          "page_number": 1,
+          "section_heading": "Transactions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:3:0"
+          ],
+          "page_numbers": [
+            1,
+            2,
+            3
+          ],
+          "section_headings": [
+            "Transactions",
+            "Idempotency",
+            "Safe Retries"
+          ]
+        },
+        {
+          "id": "safe_retries",
+          "name": "Safe Retries",
+          "type": "Concept",
+          "description": "Retrying operations safely without unintended side effects.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:1:0",
+          "normalized_name": "saferetries",
+          "document_name": "data-reliability.pdf",
+          "page_number": 1,
+          "section_heading": "Transactions",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:1:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:3:0"
+          ],
+          "page_numbers": [
+            1,
+            2,
+            3
+          ],
+          "section_headings": [
+            "Transactions",
+            "Idempotency",
+            "Safe Retries"
+          ]
+        },
+        {
+          "id": "deterministic_chunk_identifiers",
+          "name": "Deterministic Chunk Identifiers",
+          "type": "technique",
+          "description": "Identifiers used to prevent repeated ingestion attempts from creating duplicate vectors.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0",
+          "normalized_name": "deterministicchunkidentifiers",
+          "document_name": "data-reliability.pdf",
+          "page_number": 2,
+          "section_heading": "Idempotency",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "Idempotency"
+          ]
+        },
+        {
+          "id": "upserts",
+          "name": "Upserts",
+          "type": "technique",
+          "description": "Operations that can prevent a repeated ingestion attempt from creating duplicate vectors.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0",
+          "normalized_name": "upserts",
+          "document_name": "data-reliability.pdf",
+          "page_number": 2,
+          "section_heading": "Idempotency",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0"
+          ],
+          "page_numbers": [
+            2
+          ],
+          "section_headings": [
+            "Idempotency"
+          ]
+        },
+        {
+          "id": "transactions",
+          "name": "Transactions",
+          "type": "concept",
+          "description": "A prerequisite for studying idempotency in this workflow.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0",
+          "normalized_name": "transactions",
+          "document_name": "data-reliability.pdf",
+          "page_number": 2,
+          "section_heading": "Idempotency",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:2:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:3:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:1:0"
+          ],
+          "page_numbers": [
+            2,
+            3,
+            1
+          ],
+          "section_headings": [
+            "Idempotency",
+            "Safe Retries",
+            "Transactions"
+          ]
+        },
+        {
+          "id": "deterministic_identifiers",
+          "name": "Deterministic Identifiers",
+          "type": "concept",
+          "description": "Identifiers that ensure repeated attempts remain safe when an earlier write may have already succeeded.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:3:0",
+          "normalized_name": "deterministicidentifiers",
+          "document_name": "data-reliability.pdf",
+          "page_number": 3,
+          "section_heading": "Safe Retries",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:3:0"
+          ],
+          "page_numbers": [
+            3
+          ],
+          "section_headings": [
+            "Safe Retries"
+          ]
+        },
+        {
+          "id": "compensating_cleanup",
+          "name": "Compensating Cleanup",
+          "type": "concept",
+          "description": "Removes partial derived artifacts after a workflow fails across services.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0",
+          "normalized_name": "compensatingcleanup",
+          "document_name": "data-reliability.pdf",
+          "page_number": 4,
+          "section_heading": "Compensating Cleanup",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Compensating Cleanup"
+          ]
+        },
+        {
+          "id": "partial_derived_artifacts",
+          "name": "Partial Derived Artifacts",
+          "type": "concept",
+          "description": "Artifacts left behind after a workflow failure across services.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0",
+          "normalized_name": "partialderivedartifacts",
+          "document_name": "data-reliability.pdf",
+          "page_number": 4,
+          "section_heading": "Compensating Cleanup",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Compensating Cleanup"
+          ]
+        },
+        {
+          "id": "workflow_failure",
+          "name": "Workflow Failure",
+          "type": "concept",
+          "description": "Failure of a workflow across services.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0",
+          "normalized_name": "workflowfailure",
+          "document_name": "data-reliability.pdf",
+          "page_number": 4,
+          "section_heading": "Compensating Cleanup",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Compensating Cleanup"
+          ]
+        },
+        {
+          "id": "postgresql_rollback",
+          "name": "PostgreSQL Rollback",
+          "type": "concept",
+          "description": "A database rollback that cannot erase points already written to Qdrant.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0",
+          "normalized_name": "postgresqlrollback",
+          "document_name": "data-reliability.pdf",
+          "page_number": 4,
+          "section_heading": "Compensating Cleanup",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Compensating Cleanup"
+          ]
+        },
+        {
+          "id": "idempotent_operations",
+          "name": "Idempotent Operations",
+          "type": "concept",
+          "description": "Operations that can be applied multiple times without changing the result beyond the initial application.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0",
+          "normalized_name": "idempotentoperations",
+          "document_name": "data-reliability.pdf",
+          "page_number": 4,
+          "section_heading": "Compensating Cleanup",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:4:0"
+          ],
+          "page_numbers": [
+            4
+          ],
+          "section_headings": [
+            "Compensating Cleanup"
+          ]
+        },
+        {
+          "id": "vector_search",
+          "name": "Vector Search",
+          "type": "Concept",
+          "description": "Compares numeric embeddings to locate passages with similar meaning.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0",
+          "normalized_name": "vectorsearch",
+          "document_name": "data-reliability.pdf",
+          "page_number": 5,
+          "section_heading": "Vector Search",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Vector Search"
+          ]
+        },
+        {
+          "id": "numeric_embeddings",
+          "name": "Numeric Embeddings",
+          "type": "Data",
+          "description": "Used in vector search to represent passages and compare meaning.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0",
+          "normalized_name": "numericembeddings",
+          "document_name": "data-reliability.pdf",
+          "page_number": 5,
+          "section_heading": "Vector Search",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Vector Search"
+          ]
+        },
+        {
+          "id": "similarity_score",
+          "name": "Similarity Score",
+          "type": "Metric",
+          "description": "Score that measures similarity but does not prove a passage supports the answer.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0",
+          "normalized_name": "similarityscore",
+          "document_name": "data-reliability.pdf",
+          "page_number": 5,
+          "section_heading": "Vector Search",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Vector Search"
+          ]
+        },
+        {
+          "id": "reranking",
+          "name": "Reranking",
+          "type": "Process",
+          "description": "Compares the question and each candidate more carefully.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0",
+          "normalized_name": "reranking",
+          "document_name": "data-reliability.pdf",
+          "page_number": 5,
+          "section_heading": "Vector Search",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Vector Search"
+          ]
+        },
+        {
+          "id": "evidence_threshold",
+          "name": "Evidence Threshold",
+          "type": "Mechanism",
+          "description": "Can reject weak matches.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0",
+          "normalized_name": "evidencethreshold",
+          "document_name": "data-reliability.pdf",
+          "page_number": 5,
+          "section_heading": "Vector Search",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0"
+          ],
+          "page_numbers": [
+            5
+          ],
+          "section_headings": [
+            "Vector Search"
+          ]
+        },
+        {
+          "id": "concept_graph",
+          "name": "Concept Graph",
+          "type": "Data Structure",
+          "description": "Stores explicit typed relationships such as prerequisites.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0",
+          "normalized_name": "conceptgraph",
+          "document_name": "data-reliability.pdf",
+          "page_number": 5,
+          "section_heading": "Vector Search",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:5:0",
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:6:0"
+          ],
+          "page_numbers": [
+            5,
+            6
+          ],
+          "section_headings": [
+            "Vector Search",
+            "Readiness"
+          ]
+        },
+        {
+          "id": "readiness",
+          "name": "Readiness",
+          "type": "concept",
+          "description": "Decides whether a service can accept useful traffic.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:6:0",
+          "normalized_name": "readiness",
+          "document_name": "data-reliability.pdf",
+          "page_number": 6,
+          "section_heading": "Readiness",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Readiness"
+          ]
+        },
+        {
+          "id": "required_dependencies",
+          "name": "Required Dependencies",
+          "type": "concept",
+          "description": "Dependencies such as the authoritative database that must work.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:6:0",
+          "normalized_name": "requireddependencies",
+          "document_name": "data-reliability.pdf",
+          "page_number": 6,
+          "section_heading": "Readiness",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Readiness"
+          ]
+        },
+        {
+          "id": "rate_limit_failures",
+          "name": "Rate-Limit Failures",
+          "type": "concept",
+          "description": "Failures requiring different operator responses compared to readiness.",
+          "source_chunk_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:6:0",
+          "normalized_name": "rate-limitfailures",
+          "document_name": "data-reliability.pdf",
+          "page_number": 6,
+          "section_heading": "Readiness",
+          "upload_id": "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2",
+          "source_chunk_ids": [
+            "ablation-9fc2f2e6-2bf7-44c8-b7fc-01d719b034f4-2:6:0"
+          ],
+          "page_numbers": [
+            6
+          ],
+          "section_headings": [
+            "Readiness"
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "source_node_id": "database_transaction",
+          "target_node_id": "idempotency",
+          "relation_type": "PREREQUISITE_OF"
+        },
+        {
+          "source_node_id": "idempotency",
+          "target_node_id": "safe_retries",
+          "relation_type": "PREREQUISITE_OF"
+        },
+        {
+          "source_node_id": "deterministic_chunk_identifiers",
+          "target_node_id": "idempotency",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "upserts",
+          "target_node_id": "idempotency",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "transactions",
+          "target_node_id": "idempotency",
+          "relation_type": "PREREQUISITE_OF"
+        },
+        {
+          "source_node_id": "deterministic_identifiers",
+          "target_node_id": "safe_retries",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "compensating_cleanup",
+          "target_node_id": "partial_derived_artifacts",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "workflow_failure",
+          "target_node_id": "partial_derived_artifacts",
+          "relation_type": "CAUSES"
+        },
+        {
+          "source_node_id": "compensating_cleanup",
+          "target_node_id": "idempotent_operations",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "numeric_embeddings",
+          "target_node_id": "vector_search",
+          "relation_type": "APPLIES_TO"
+        },
+        {
+          "source_node_id": "vector_search",
+          "target_node_id": "similarity_score",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "evidence_threshold",
+          "target_node_id": "reranking",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "vector_search",
+          "target_node_id": "concept_graph",
+          "relation_type": "RELATED_TO"
+        },
+        {
+          "source_node_id": "required_dependencies",
+          "target_node_id": "readiness",
+          "relation_type": "PREREQUISITE_OF"
+        }
+      ],
       "sections_total": 6,
-      "sections_succeeded": 0,
-      "sections_failed": 6,
+      "sections_succeeded": 6,
+      "sections_failed": 0,
       "batches_total": 6,
-      "batches_succeeded": 0,
-      "batches_failed": 1,
-      "batches_skipped": 5,
-      "provider_limited": true,
+      "batches_succeeded": 6,
+      "batches_failed": 0,
+      "batches_skipped": 0,
+      "provider_limited": false,
       "extraction_budget_applied": false,
-      "failed_section_labels": [
-        "Compensating Cleanup",
-        "Idempotency",
-        "Readiness",
-        "Safe Retries",
-        "Transactions",
-        "Vector Search"
-      ]
+      "global_linking_attempted": true,
+      "global_linking_succeeded": true,
+      "failed_section_labels": []
     }
   }
 }

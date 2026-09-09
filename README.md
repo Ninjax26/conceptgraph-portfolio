@@ -21,7 +21,7 @@ ConceptGraph turns course PDFs into a searchable concept graph, grounded answers
 - Polyglot persistence with a clear owner for each kind of data.
 - Durable background processing on a small single-service deployment.
 - Evidence gating, citations, source-page provenance, and honest empty/partial graph states.
-- Provider quota resilience with Groq-to-Cerebras failover and grounded degradation.
+- Provider quota resilience with Groq-to-Gemini failover, circuit breaking, and grounded degradation.
 - Data lifecycle management: retry, retention, full deletion, and partial-write compensation.
 - Measured retrieval results and failure-focused tests instead of an unverified “it works” claim.
 
@@ -30,20 +30,20 @@ ConceptGraph turns course PDFs into a searchable concept graph, grounded answers
 | Area | Implemented behavior |
 | --- | --- |
 | Dashboard presentation | Non-overlapping protected-session bar, answers directly under questions, Markdown answer rendering, clearer confidence/citation cards, collapsible processing details, responsive graph layout |
-| PDF ingestion | Type/signature/size/password checks, SHA-256 deduplication, private content-addressed object storage, durable upload record before background dispatch |
-| Processing reliability | Bounded in-process queue, PostgreSQL leases, heartbeats, task-token fencing, startup recovery, three-attempt cap, safe public error categories |
-| Graph quality | Section-aware beginning/middle/end sampling, bounded multi-batch extraction, six allowed relationship types, endpoint validation, normalized concept deduplication, partial/empty graph detection |
+| PDF ingestion | Type/signature/size/password checks, SHA-256 deduplication, conditional OCR, layout-aware headings, private content-addressed object storage, durable upload record before background dispatch |
+| Processing reliability | Bounded in-process queue, PostgreSQL leases, heartbeats, task-token fencing, startup recovery, separate failure/graph-continuation limits, safe public error categories |
+| Graph quality | Section-aware beginning/middle/end sampling, resumable per-batch checkpoints, one bounded cross-section linking pass, six allowed relationship types, endpoint validation, normalized concept deduplication, partial/empty graph detection |
 | Provenance | Upload ID, PDF filename, page, section, and source chunk retained on graph concepts; graph nodes open the original source page |
 | Retrieval and answers | READY-only course filtering, graph-assisted Qdrant retrieval, Cohere/local reranking, evidence thresholds, grounded refusal, citations, formatted answers |
-| LLM resilience | Groq primary, optional Cerebras failover for graphs/answers/exams, five-minute circuit-breaker cooldown, evidence-only answer fallback |
+| LLM resilience | Groq primary, Gemini failover for graphs/answers/exams, optional legacy Cerebras support, five-minute circuit-breaker cooldown, evidence-only answer fallback |
 | Demo security | One reviewer code, signed expiring HttpOnly session cookie, post-login session verification, exact CORS configuration, protected expensive routes, rate limits |
 | Public access | One pre-uploaded read-only sample course and source previews without exposing upload/query/exam controls |
 | Data cleanup | Manual deletion across PostgreSQL, Qdrant, Neo4j, and R2; automatic demo retention; sample-course exclusion; shared-object protection |
 | Evaluation | Fifteen manually annotated questions, committed baseline results, top-five document/page checks, citation/refusal checks, latency measurement |
-| Verification | 125 focused backend tests plus Python compilation, TypeScript checking, Vite production build, and Docker Compose validation |
-| Scanned PDFs | Detected and rejected with an OCR-required message; OCR itself is intentionally listed as future work |
+| Verification | 161 focused backend tests plus Python compilation, TypeScript checking, Vite production build, and Docker Compose validation |
+| Scanned PDFs | Sparse pages fall back to bounded local Tesseract OCR with page provenance and confidence reporting |
 
-The commit history records these improvements as separate, explainable phases: dashboard polish, answer formatting, cross-site sessions, complete deletion, demo hardening/public sample/retention, evaluation, graph quality and provenance, complex-PDF batching, quota-safe degradation, and Cerebras failover.
+The commit history records these improvements as separate phases: dashboard polish, answer formatting, cross-site sessions, complete deletion, demo hardening/public sample/retention, evaluation, graph quality and provenance, complex-PDF batching, checkpointed continuation, quota-safe degradation, and provider failover.
 
 ## Architecture
 
@@ -55,7 +55,7 @@ flowchart LR
   API --> N[(Neo4j Aura\nconcept graph)]
   API --> R2[(Private R2 bucket\nsource PDFs)]
   API --> LLM[Groq primary\ngraph extraction + answers]
-  LLM -. quota or timeout .-> CB[Cerebras failover]
+  LLM -. quota, timeout, or invalid structure .-> CB[Gemini failover]
   API --> RR[Cohere\nreranking]
   API --> C[Bounded in-process coordinator]
   C --> PG
@@ -90,7 +90,7 @@ sequenceDiagram
   participant O as R2 / MinIO
   participant W as Coordinator
   participant Q as Qdrant
-  participant G as Groq / Cerebras
+  participant G as Groq / Gemini
   participant N as Neo4j
 
   U->>API: Upload PDF + course ID
@@ -103,8 +103,10 @@ sequenceDiagram
   W->>O: Read source bytes
   W->>W: Extract text, sections, and overlapping chunks
   W->>Q: Store all chunk embeddings
-  W->>G: Extract bounded concept-graph batches
+  W->>G: Extract missing concept-graph batches
   G-->>W: Schema-constrained nodes + relationships
+  W->>PG: Checkpoint each validated batch
+  W->>G: Run one bounded cross-section linking pass
   W->>N: Store validated graph + provenance
   W->>PG: Mark GRAPH_BUILT then READY
 ```
@@ -115,10 +117,10 @@ Important behavior:
 2. It takes a PostgreSQL advisory transaction lock, normalizes the course name, checks the `(course, SHA-256)` duplicate, and enforces the installation limit.
 3. The source object uses `courses/{course_uuid}/documents/{sha256}.pdf`; the durable database row is committed before queue submission.
 4. A worker claims the row with a lease and task token. Every state transition must still match both values, preventing a stale worker from completing a newer retry.
-5. PyMuPDF extracts the text layer. Text is split by detected headings, then into roughly 500-word chunks with 50-word overlap. Page, section, filename, upload, and execution metadata travel with every chunk.
-6. Every chunk must reach Qdrant before the graph stage starts. If no text exists, the PDF fails with an OCR-required message and no partial derived data remains.
-7. Graph extraction runs with a bounded request budget. Successful batches are preserved, validated, merged, and written to Neo4j.
-8. `READY` is permitted only after the source still exists, all vectors are committed, graph construction has an explicit quality result, and counts are positive.
+5. PyMuPDF extracts the native text layer. Pages with fewer than the configured number of readable characters are rendered at a bounded DPI and passed to local Tesseract OCR. Native text is retained whenever OCR does not recover more content.
+6. Native pages use block/line/span layout data to score headings from relative font size, boldness, length, numbering, capitalization, punctuation, and surrounding whitespace. Repeated running headers and footers are removed. OCR pages retain the text-only heading fallback because scanned images contain no PDF font metadata.
+8. Graph extraction runs with a bounded request budget. Successful batches are preserved, validated, merged, and written to Neo4j.
+9. `READY` is permitted only after the source still exists, all vectors are committed, graph construction has an explicit quality result, and counts are positive.
 
 ### 2. Graph construction for complex PDFs
 
@@ -128,10 +130,12 @@ The graph pipeline intentionally avoids a complicated agent system:
 2. Sample the beginning, middle, and end of each section.
 3. Select batches fairly across the document (`4` chunks per batch, up to `6` batches by default).
 4. Ask for no more than `8` concepts and `10` relationships per batch.
-5. Attempt strict JSON Schema, then one smaller JSON-object compatibility request.
+5. Ask the configured provider for strict JSON Schema; optional same-provider JSON repair is disabled by default to protect quota.
 6. Validate every node, endpoint, relationship type, and source-chunk reference locally.
 7. Normalize concept identity using lowercase plus whitespace removal and deterministically merge batches.
-8. Record section/batch coverage so the UI can distinguish complete, partial, and missing graphs.
+8. Commit each validated batch to a PostgreSQL checkpoint, so later continuation attempts skip completed work.
+9. Run one optional, bounded pass over representative excerpts from different successful sections to discover evidence-backed cross-section relationships.
+10. Record local scanning, checkpoint, and graph-contribution counts separately so the UI can distinguish searchable chunks from partial graph coverage.
 
 Allowed relationships are `PREREQUISITE_OF`, `PART_OF`, `EXPLAINS`, `RELATED_TO`, `CAUSES`, and `APPLIES_TO`.
 
@@ -154,7 +158,7 @@ flowchart LR
   Evidence -- No --> Refuse[Grounded refusal]
   Evidence -- Yes --> Sources[Build up to 5 citations]
   Sources --> Primary[Groq synthesis]
-  Primary -. quota / timeout .-> Secondary[Cerebras synthesis]
+  Primary -. quota / timeout .-> Secondary[Gemini synthesis]
   Secondary -. unavailable .-> Passages[Return retrieved evidence]
 ```
 
@@ -166,15 +170,17 @@ The answer prompt contains only bounded graph context and retrieved course passa
 
 ### 4. Exam generation
 
-The exam service retrieves chunks only from the selected READY course, balances source passages across available documents, and asks for a strict JSON multiple-choice exam. Each question must have four options, an answer copied exactly from those options, an explanation, a topic, and at least one valid source ID. Questions with invented or missing citations are discarded. Groq-to-Cerebras failover uses the same cooldown policy as graph extraction and answer synthesis.
+The exam service retrieves chunks only from the selected READY course, balances source passages across available documents, and asks for a strict JSON multiple-choice exam. Each question must have four options, an answer copied exactly from those options, an explanation, a topic, and at least one valid source ID. Questions with invented or missing citations are discarded. Groq-to-Gemini failover uses the same cooldown policy as graph extraction and answer synthesis.
 
 ### 5. Retry, crash recovery, and compensation
 
 - Queue saturation leaves the PostgreSQL row in `UPLOADED`; it is deferred, not falsely failed.
 - Workers heartbeat while synchronous parsing and provider calls run in threads.
 - On restart, expired leases become auditable failed attempts and receive a new task token when retry budget remains.
-- Manual and automatic recovery share the global three-attempt maximum.
-- Before every execution, old Qdrant/Neo4j artifacts for that upload are removed, making retries idempotent.
+- Failed executions and crash recovery use a three-attempt maximum; READY partial graphs can be continued for up to eight total attempts.
+- Before every execution, old vectors for that upload are removed and deterministically rebuilt. Validated graph batches remain in PostgreSQL checkpoints.
+- A graph continuation recomputes deterministic batch keys, skips matching checkpoints, and spends the current request budget only on missing batches.
+- Before publishing the merged result, only the upload's old Neo4j projection is replaced, preserving an idempotent final graph.
 - A failed execution removes partial vectors and graph entities before recording its safe failure category.
 
 ### 6. Authentication, public sample, and data sharing
@@ -214,7 +220,7 @@ UPLOADED -> EXTRACTING -> EXTRACTED -> CHUNKING -> CHUNKED
 
 `READY` is committed only when the source object still exists, every chunk has been stored, graph construction has completed, provenance is present, the graph has an explicit quality status, and the document has a positive chunk count. Graph extraction runs in bounded section batches under a configurable free-tier request budget, retries strict-schema failures once with locally validated JSON, preserves successful batches, and deterministically merges concepts by normalized name. Provider quota exhaustion stops graph calls without discarding searchable vectors or completed graph sections. Incomplete coverage is reported as `GRAPH_PARTIAL`; zero validated concepts is reported as `READY_WITHOUT_GRAPH`. A failed execution removes vectors and graph nodes scoped to that upload/execution before it records `FAILED`.
 
-Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page. At query time, Neo4j contributes separate bounded one-hop and two-hop prerequisite sets to semantic retrieval while retaining all valid relationship types for visualization. Groq is the primary LLM, while an optional Cerebras key enables automatic failover for graph extraction, answers, and exams. A shared cooldown temporarily bypasses a provider after a quota response or timeout instead of repeating requests that are expected to fail.
+Graph extraction samples the beginning, middle, and end of each detected PDF section. The application accepts only six relationship types, validates relationship endpoints, deduplicates lowercase whitespace-free concept names, and requires every retained concept to cite a real sampled chunk. Each accepted batch is checkpointed before processing continues, and one optional cross-section pass uses representative source excerpts to add only evidence-backed links. Neo4j concepts keep PDF, page, section, and upload provenance; clicking a dashboard concept opens its source page. At query time, Neo4j contributes separate bounded one-hop and two-hop prerequisite sets to semantic retrieval while retaining all valid relationship types for visualization. Groq is the primary LLM and Gemini is the preferred failover; Cerebras remains an optional legacy provider. A shared cooldown temporarily bypasses a provider after a quota response or timeout instead of repeating requests that are expected to fail.
 
 Every worker-owned transition is fenced by both the current task token and lease owner. A stale task cannot advance or complete a newer attempt. The coordinator:
 
@@ -234,12 +240,12 @@ On startup and periodically, expired active rows are recovered. The interrupted 
 - Qdrant for vectors; Qdrant Cloud Inference in the low-memory profile
 - Neo4j for document-provenance-scoped concepts and relationships
 - S3-compatible private storage (Cloudflare R2 in production, MinIO locally)
-- Groq as the primary provider and Cerebras as the optional quota/timeout failover
+- Groq as the primary provider, Gemini as the preferred failover, and optional legacy Cerebras support
 - Cohere Rerank for the low-memory hosted profile
 
 ## Local development
 
-Requirements: Python 3.12, Node.js, Docker, and at least one configured LLM provider. The deployed profile uses Groq as primary and Cerebras as optional failover.
+Requirements: Python 3.12, Node.js, Docker, and at least one configured LLM provider. The deployed profile uses Groq as primary and Gemini as the preferred failover.
 
 ```bash
 cp .env.example .env
@@ -259,6 +265,8 @@ npm run dev -- --host 127.0.0.1
 ```
 
 Open `http://127.0.0.1:5173`. Local infrastructure includes PostgreSQL, Qdrant, Neo4j, and MinIO. There is no Redis container and no separate worker command.
+
+Scanned-page fallback requires Tesseract on the API host. The provided API Docker image installs the English language pack automatically. For direct macOS development, install it with `brew install tesseract`; on Debian or Ubuntu, use `sudo apt-get install tesseract-ocr tesseract-ocr-eng`.
 
 For the smaller hosted-provider environment, install `requirements.txt` instead and set:
 
@@ -294,8 +302,9 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `GEMINI_MODEL` | Gemini fallback model; default `gemini-3.5-flash-lite` |
 | `LLM_FAILOVER_COOLDOWN_SECONDS` | Minimum provider cooldown after quota/timeout; default `300`. Longer `Retry-After` headers are respected. State is process-local and resets on restart. |
 | `GRAPH_BATCH_SIZE` | Chunks per graph request; default `4` |
-| `GRAPH_MAX_BATCHES` | Maximum graph batches per PDF; default `6`. Each batch can call Groq and Cerebras once (up to 12 generation requests per PDF with default repair disabled). |
-| `GRAPH_JSON_REPAIR_ENABLED` | Default `false`. Opting into JSON repair allows another call per provider per batch (up to 24 requests with six batches). |
+| `GRAPH_MAX_BATCHES` | Maximum missing section batches attempted per processing run; default `6`. Validated batches are checkpointed and skipped by later continuations. |
+| `GRAPH_GLOBAL_LINKING_ENABLED` | Default `true`. Runs at most one additional bounded extraction over representative successful sections to discover cross-section links. |
+| `GRAPH_JSON_REPAIR_ENABLED` | Default `false`. Opting in permits one additional same-provider compatibility call after malformed strict output, increasing quota use. |
 | `ALLOWED_ORIGINS` | Exact deployed frontend origin; comma-separated if necessary |
 | `DEMO_ACCESS_TOKEN` | Secret reviewer code of at least 24 characters; configure it only in the hosting dashboard |
 | `REQUIRE_UPLOAD_AUTH` | `true` for public deployments |
@@ -307,6 +316,12 @@ Copy `.env.example`; it contains every supported setting. Important production s
 | `PROCESSING_QUEUE_CAPACITY` | In-memory admission buffer; durable overflow remains in PostgreSQL |
 | `MAX_PDF_SIZE_MB` | Default `10` |
 | `MAX_PDFS_PER_INSTALLATION` | Default `50` |
+| `OCR_ENABLED` | Enable local Tesseract fallback for pages with sparse native text; default `true` |
+| `OCR_LANGUAGE` | Installed Tesseract language pack; default `eng` |
+| `OCR_DPI` | Sparse-page render resolution, bounded to `150..300`; default `200` |
+| `OCR_MIN_NATIVE_CHARACTERS` | OCR pages below this alphanumeric-character threshold; default `40` |
+| `OCR_MAX_PAGES_PER_DOCUMENT` | CPU-safety limit for OCR attempts in one PDF; default `50` |
+| `OCR_PAGE_TIMEOUT_SECONDS` | Per-page Tesseract timeout; default `20` |
 
 Cerebras is retained as an optional backup, while Gemini is now the recommended
 free-tier backup. A valid API key does not guarantee generation access: a successful
@@ -454,7 +469,9 @@ python scripts/run_fixture_ablation.py --reference-graph --repeats 3 \
 
 The reference graph is intentionally authored and labelled as such. A normal provider-backed attempt writes [`evaluation/fixture-graphs.json`](evaluation/fixture-graphs.json). Neo4j connectivity failure produces a [`status: blocked`](evaluation/ablation-provider-limited.md) report. If extraction produces no traversable graph, the runner records `incomplete_no_graph` and exits unsuccessfully: the resulting vector scores do not establish graph improvement.
 
-The [provider-generated run on 6 September 2026](evaluation/ablation-provider-2026-09-06.md) completed 66 retrieval requests (22 questions × 3 modes), with zero request errors. Extraction produced 8 nodes and 7 edges for the web PDF, then provider quota limits left the other two graphs empty. All modes found every required source after reranking for 17/17 supported questions; all retained complete evidence after the evidence gate for 13/17 and refused 5/5 unsupported questions. Average retrieval latency was 0.05s / 0.32s / 0.28s for vector / one hop / two hops. No two-hop expansion terms were used in this run, so it does not establish the benefit of deeper traversal. These measurements cover retrieval on a small synthetic corpus with partial graph coverage, not generated-answer quality or hosted HTTP performance.
+The [provider-generated run on 6 September 2026](evaluation/ablation-provider-2026-09-06.md) completed 66 retrieval requests (22 questions × 3 modes), with zero request errors. Extraction produced 8 nodes and 7 edges for the web PDF, then provider quota limits left the other two graphs empty. All modes found every required source after reranking for 17/17 supported questions; all retained complete evidence after the evidence gate for 13/17 and refused 5/5 unsupported questions. Average retrieval latency was 0.05s / 0.32s / 0.28s for vector / one hop / two hops. No two-hop expansion terms were used in that run, so it does not establish the benefit of deeper traversal. The latest provider-backed report, when available, is committed as [`evaluation/ablation-provider-current.md`](evaluation/ablation-provider-current.md); a blocked or partial report remains evidence of the actual dependency/quota state rather than being relabelled as a successful comparison.
+
+The [current provider-generated run on 9 September 2026](evaluation/ablation-provider-current.md) produced 61 validated concepts and 44 relationships across all three PDFs, then completed all 66 retrieval requests without errors or graph fallbacks. Graph expansion improved raw all-required-source recall from 16/17 to 17/17 for both graph modes, but the evidence gate remained 12/17 in every mode. Average retrieval latency was 0.06s / 0.48s / 0.41s for vector / one hop / two hops, and three questions used two-hop terms. The result supports a narrow claim: graph expansion helped one raw multi-source retrieval case in this fixture, while adding latency and not improving the final evidence-gated outcome.
 
 Interpret the result conservatively: one-hop or two-hop is useful only when it improves labelled retrieval enough to justify its latency. Equal scores are also meaningful—they show that the graph adds explainability for those questions but not retrieval accuracy. This small single-course set is portfolio evidence, not a claim of statistical significance.
 
@@ -495,6 +512,7 @@ The graph improved raw multi-source recall on this small fixture (48→51) but d
 | `app/services/provider_failover.py` | Thread-safe provider cooldown circuit breaker |
 | `app/services/exam_service.py` | Citation-validated course MCQ generation |
 | `app/services/upload_service.py` | Durable records, attempts, leases, retries, completion gates, deletion metadata |
+| `app/models/document_upload.py` | PostgreSQL course/upload/attempt records and resumable graph-batch checkpoints |
 | `ENGINEERING_HANDBOOK.md` | Runtime invariants and safe-change rules |
 | `evaluation/` and `scripts/run_evaluation.py` | Human-labelled dataset, baseline, and repeatable evaluation runner |
 | `render.yaml` | API/static-site Blueprint and secret placeholders |
@@ -503,20 +521,20 @@ The graph improved raw multi-source recall on this small fixture (48→51) but d
 
 These are intentional portfolio boundaries, not hidden claims:
 
-- **No OCR yet.** Image-only PDFs are detected and rejected. A practical next step is page rendering plus OCR only when native text density is below a threshold, retaining page coordinates and marking OCR-derived evidence.
+- **OCR is text-focused.** Sparse and image-only pages use local Tesseract with page provenance and confidence reporting. Layout-aware font scoring applies to native PDF text; OCR pages use textual heading heuristics. Complex tables, diagrams, handwriting, and equation-to-LaTeX conversion remain outside the current scope.
 - **Shared data model.** One reviewer code grants access to one shared workspace. Real multi-user support needs user identities, tenant ownership on every PostgreSQL row, Qdrant payload, Neo4j entity, and object key, plus authorization checks on every query and cleanup path.
 - **Process-local rate limits and circuit breaker.** They match the single Render API instance. Horizontal scaling needs Redis or another shared coordination store.
 - **Single bounded worker by default.** This protects memory and free provider quotas but limits throughput. Scale only after measuring parse memory, provider budgets, and database connection pools.
-- **Small evaluation set.** Fifteen questions are enough to demonstrate measurement, not to claim general academic QA quality. Expand across subjects, layouts, scanned PDFs, and adversarial unsupported questions.
+- **Small evaluation sets.** The original 15-question course baseline and 22-question multi-document ablation demonstrate measurement, not general academic QA quality. Expand across subjects, layouts, scanned PDFs, and adversarial unsupported questions.
 - **Graph entity resolution is deliberately simple.** Lowercase/whitespace normalization is explainable but will not merge synonyms or disambiguate homonyms. More advanced entity resolution belongs after a labelled graph-quality benchmark exists.
 - **Free-tier cold starts and quotas.** The demo can be slow after inactivity and no free provider offers a production SLA. Durable recovery and failover reduce impact but cannot create capacity that every provider has exhausted.
 - **No collaborative isolation or audit identity.** Attempts are auditable at the processing level, but actions are not attributed to individual people.
 
 Recommended next phases, in order:
 
-1. OCR fallback with page-level provenance and OCR-confidence reporting.
-2. Expand the labelled evaluation dataset and run it in CI against deterministic fixtures.
-3. Add provider metrics: selected provider, fallback count, latency, quota errors, and per-operation token use without logging prompts or keys.
+1. Expand the labelled evaluation dataset and run it in CI against deterministic fixtures, including scanned-page cases.
+2. Add provider metrics: selected provider, fallback count, latency, quota errors, and per-operation token use without logging prompts or keys.
+3. Add optional table reconstruction only after measuring OCR and layout quality on representative academic PDFs.
 4. Add real authentication and tenant-scoped storage only if the project becomes a shared product.
 5. Move workers/rate limits to shared infrastructure only when traffic justifies the extra operational complexity.
 
@@ -534,7 +552,7 @@ Recommended next phases, in order:
 
 ## Verification
 
-Latest local verification: **125 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
+Latest local verification: **161 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
 
 ```bash
 source .venv/bin/activate
@@ -545,7 +563,7 @@ npm run build
 docker compose config -q
 ```
 
-Tests focus on system boundaries and failure behavior: durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY deletion, demo retention, empty graphs, relationship validation, provider timeouts/rate limits, Gemini/Cerebras request compatibility and circuit-breaker failover, scanned PDFs without text, READY gating, graph sampling and provenance, hosted inference/reranking, object storage, PDF byte ranges and citation links, verified auth sessions, public sample isolation, evidence refusal, and readiness-sensitive course behavior.
+Tests focus on system boundaries and failure behavior: durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY deletion, demo retention, empty graphs, resumable graph checkpoints, cross-section linking, relationship validation, provider timeouts/rate limits, Gemini/Cerebras request compatibility and circuit-breaker failover, scanned PDFs without text, READY gating, graph sampling and provenance, hosted inference/reranking, object storage, PDF byte ranges and citation links, verified auth sessions, public sample isolation, evidence refusal, and readiness-sensitive course behavior.
 
 ## API surface
 

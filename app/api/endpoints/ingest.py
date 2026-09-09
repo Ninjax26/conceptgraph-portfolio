@@ -263,7 +263,10 @@ async def retry_upload(
     if not upload_service.can_reprocess(existing):
         raise HTTPException(
             status_code=409,
-            detail="Only retryable failures or documents without a graph can be reprocessed.",
+            detail=(
+                "Only retryable failures, partial graphs, or documents without a graph "
+                "can be reprocessed."
+            ),
         )
 
     task_id = str(uuid4())

@@ -724,7 +724,10 @@ export default function Dashboard(): JSX.Element {
                         </button>
                       ) : null}
                       {(job.status === "failed" && job.retryable) ||
-                      (job.status === "ready" && job.graph_status === "READY_WITHOUT_GRAPH") ? (
+                      (job.status === "ready" &&
+                        (job.graph_status === "READY_WITHOUT_GRAPH" ||
+                          job.graph_status === "GRAPH_PARTIAL") &&
+                        job.attempt_count < 8) ? (
                         <button
                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                           disabled={retryingUploadId === job.upload_id}
@@ -732,7 +735,11 @@ export default function Dashboard(): JSX.Element {
                           type="button"
                         >
                           {retryingUploadId === job.upload_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                          {job.status === "ready" ? "Rebuild graph" : "Retry"}
+                          {job.status === "ready"
+                            ? job.graph_status === "GRAPH_PARTIAL"
+                              ? "Continue graph"
+                              : "Build graph"
+                            : "Retry"}
                         </button>
                       ) : null}
                       {job.status === "ready" || job.status === "failed" ? (
@@ -770,9 +777,19 @@ export default function Dashboard(): JSX.Element {
                           {graphCoverageLabel(job.result_json)}
                         </span>
                       ) : null}
+                      {chunkCoverageLabel(job.result_json) ? (
+                        <span className="text-[10px] font-medium text-slate-500">
+                          {chunkCoverageLabel(job.result_json)}
+                        </span>
+                      ) : null}
                       {graphLimitLabel(job.result_json) ? (
                         <span className="text-[10px] font-medium text-amber-700">
                           {graphLimitLabel(job.result_json)}
+                        </span>
+                      ) : null}
+                      {ocrSummaryLabel(job.result_json) ? (
+                        <span className="text-[10px] font-medium text-blue-700">
+                          {ocrSummaryLabel(job.result_json)}
                         </span>
                       ) : null}
                     </div>
@@ -817,7 +834,7 @@ export default function Dashboard(): JSX.Element {
               ) : null}
               {selectedCourse && selectedCourse.graph_sections_total > 0 ? (
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600">
-                  {selectedCourse.graph_sections_succeeded} of {selectedCourse.graph_sections_total} sections represented
+                  {selectedCourse.graph_sections_total} sections scanned locally · {selectedCourse.graph_sections_succeeded} contributed to graph
                 </span>
               ) : null}
             </div>
@@ -931,13 +948,27 @@ function graphCoverageLabel(resultJson: Record<string, unknown> | null | undefin
   ) {
     return null;
   }
-  return `${represented} of ${total} sections represented`;
+  return `${total} sections scanned locally · ${represented} contributed to graph`;
+}
+
+function chunkCoverageLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
+  if (!resultJson) return null;
+  const indexed = resultJson.chunks_indexed;
+  const total = resultJson.chunks_total;
+  if (typeof indexed !== "number" || indexed <= 0) return null;
+  if (typeof total === "number" && total > 0) {
+    return `${indexed} of ${total} chunks searchable`;
+  }
+  return `${indexed} chunks searchable`;
 }
 
 function graphLimitLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
   if (!resultJson) return null;
   if (resultJson.graph_provider_limited === true) {
-    return "Provider quota reached; completed graph data was preserved";
+    const completed = resultJson.graph_checkpointed_batches;
+    return typeof completed === "number"
+      ? `Provider quota reached; ${completed} validated batches checkpointed`
+      : "Provider quota reached; validated graph progress was checkpointed";
   }
   if (resultJson.graph_extraction_budget_applied === true) {
     const total = resultJson.graph_batches_total;
@@ -948,11 +979,22 @@ function graphLimitLabel(resultJson: Record<string, unknown> | null | undefined)
         ? succeeded + failed
         : null;
     if (typeof total === "number" && attempted !== null) {
-      return `Free-demo graph sampling: ${attempted} of ${total} batches attempted; all PDF chunks remain searchable`;
+      return `Free-demo graph budget: ${attempted} of ${total} batches checkpointed or attempted; use Continue graph for the next set`;
     }
     return "Free-demo graph sampling applied; all PDF chunks remain searchable";
   }
   return null;
+}
+
+function ocrSummaryLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
+  if (!resultJson) return null;
+  const pages = resultJson.ocr_pages;
+  if (typeof pages !== "number" || pages <= 0) return null;
+  const confidence = resultJson.ocr_average_confidence;
+  const pageLabel = `${pages} ${pages === 1 ? "page" : "pages"}`;
+  return typeof confidence === "number"
+    ? `OCR recovered ${pageLabel} · ${Math.round(confidence)}% avg confidence`
+    : `OCR recovered ${pageLabel}`;
 }
 
 function statusClass(status: UploadStatusResponse["status"]): string {

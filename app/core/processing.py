@@ -62,6 +62,7 @@ class FailureCategory(StrEnum):
 
 
 MAX_PROCESSING_ATTEMPTS = 3
+MAX_GRAPH_PROCESSING_ATTEMPTS = 8
 
 
 def normalize_course_name(value: str) -> str:
@@ -70,6 +71,18 @@ def normalize_course_name(value: str) -> str:
 
 def classify_failure(exc: Exception) -> tuple[FailureCategory, bool, str]:
     message = str(exc).lower()
+    if "ocr engine" in message or "tesseract" in message:
+        return (
+            FailureCategory.CONFIGURATION_ERROR,
+            False,
+            "OCR is required for this scanned PDF, but the server OCR engine is unavailable.",
+        )
+    if "ocr page limit" in message:
+        return (
+            FailureCategory.DOCUMENT_ERROR,
+            False,
+            "This scanned PDF exceeds the OCR page limit. Split it into smaller PDFs and try again.",
+        )
     if "model" in message and any(
         term in message
         for term in ("does not exist", "model_not_found", "not found", "do not have access")

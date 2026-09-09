@@ -61,6 +61,20 @@ services:
         value: "4"
       - key: GRAPH_MAX_BATCHES
         value: "6"
+      - key: GRAPH_GLOBAL_LINKING_ENABLED
+        value: "true"
+      - key: OCR_ENABLED
+        value: "true"
+      - key: OCR_LANGUAGE
+        value: eng
+      - key: OCR_DPI
+        value: "200"
+      - key: OCR_MIN_NATIVE_CHARACTERS
+        value: "40"
+      - key: OCR_MAX_PAGES_PER_DOCUMENT
+        value: "50"
+      - key: OCR_PAGE_TIMEOUT_SECONDS
+        value: "20"
       - key: OBJECT_STORAGE_BACKEND
         value: s3
       - key: S3_BUCKET

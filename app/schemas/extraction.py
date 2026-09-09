@@ -60,6 +60,8 @@ class GraphExtractionResponse(BaseModel):
     batches_skipped: int = Field(default=0, ge=0)
     provider_limited: bool = False
     extraction_budget_applied: bool = False
+    global_linking_attempted: bool = False
+    global_linking_succeeded: bool = False
     failed_section_labels: list[StrictStr] = Field(default_factory=list)
 
     @model_validator(mode="after")
