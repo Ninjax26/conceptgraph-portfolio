@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-09-09T09:38:44.535579+00:00",
+  "api_base": "https://conceptgraph-api.onrender.com/api/v1",
+  "checks": {
+    "health": {
+      "passed": true,
+      "latency_ms": 691
+    },
+    "readiness": {
+      "passed": true,
+      "latency_ms": 842,
+      "degraded_services": []
+    },
+    "authenticated_provider_status": {
+      "passed": true
+    },
+    "authenticated_course_discovery": {
+      "passed": true
+    },
+    "grounded_query": {
+      "passed": true,
+      "latency_ms": 2566,
+      "source_count": 1,
+      "confidence": "low",
+      "provider_used": "groq",
+      "failover_used": false,
+      "requested_mode": null,
+      "actual_mode": "vector_only"
+    },
+    "telemetry_incremented": {
+      "passed": true
+    }
+  },
+  "provider_configuration": [
+    {
+      "name": "groq",
+      "configured": true,
+      "available": true,
+      "last_outcome": "success"
+    },
+    {
+      "name": "gemini",
+      "configured": true,
+      "available": true,
+      "last_outcome": null
+    },
+    {
+      "name": "cerebras",
+      "configured": true,
+      "available": true,
+      "last_outcome": null
+    }
+  ],
+  "observed_query_delta": {
+    "provider_attempts": 1,
+    "successful_attempts": 1,
+    "failed_attempts": 0,
+    "failover_attempts": 0,
+    "rate_limit_errors": 0,
+    "evidence_fallbacks": 0,
+    "estimated_input_tokens": 230,
+    "estimated_output_tokens": 19
+  },
+  "process_totals_after_test": {
+    "provider_attempts": 1,
+    "successful_attempts": 1,
+    "failed_attempts": 0,
+    "failover_attempts": 0,
+    "rate_limit_errors": 0,
+    "evidence_fallbacks": 0,
+    "estimated_input_tokens": 230,
+    "estimated_output_tokens": 19,
+    "average_latency_ms": 1052,
+    "p95_latency_ms": 1052
+  },
+  "privacy": "No access code, prompt, answer, document ID, filename, or provider key is included.",
+  "limitations": "Token counts are character-based estimates; provider billing dashboards remain authoritative. Metrics reset whenever the API process restarts.",
+  "passed": true
+}
