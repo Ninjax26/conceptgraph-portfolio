@@ -51,6 +51,7 @@ from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.parser_service import DocumentChunk
 from app.services.provider_failover import provider_circuit_breaker
+from app.services.provider_metrics import provider_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -327,21 +328,36 @@ class IngestionService:
     async def extract_graph_from_text(self, text: str) -> GraphExtractionResponse:
         provider = settings.llm_provider.lower()
         if provider == "gemini":
-            extraction = await asyncio.to_thread(self._extract_with_gemini, text)
-            return self._validate_provider_graph(extraction, text)
+            return await asyncio.to_thread(
+                provider_metrics.observe,
+                "gemini",
+                "graph_extraction",
+                lambda: self._validate_provider_graph(self._extract_with_gemini(text), text),
+                input_characters=len(text),
+            )
         if provider == "groq":
             return await self._extract_with_failover(text)
         if provider == "cerebras":
-            extraction = await asyncio.to_thread(self._extract_with_cerebras, text)
-            return self._validate_provider_graph(extraction, text)
+            return await asyncio.to_thread(
+                provider_metrics.observe,
+                "cerebras",
+                "graph_extraction",
+                lambda: self._validate_provider_graph(self._extract_with_cerebras(text), text),
+                input_characters=len(text),
+            )
         raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
 
     async def _extract_with_failover(self, text: str) -> GraphExtractionResponse:
         primary_error: Exception | None = None
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
-                result = await asyncio.to_thread(self._extract_with_groq, text)
-                result = self._validate_provider_graph(result, text)
+                result = await asyncio.to_thread(
+                    provider_metrics.observe,
+                    "groq",
+                    "graph_extraction",
+                    lambda: self._validate_provider_graph(self._extract_with_groq(text), text),
+                    input_characters=len(text),
+                )
                 provider_circuit_breaker.record_success("groq")
                 return result
             except (
@@ -369,8 +385,14 @@ class IngestionService:
 
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
-                result = await asyncio.to_thread(self._extract_with_cerebras, text)
-                result = self._validate_provider_graph(result, text)
+                result = await asyncio.to_thread(
+                    provider_metrics.observe,
+                    "cerebras",
+                    "graph_extraction",
+                    lambda: self._validate_provider_graph(self._extract_with_cerebras(text), text),
+                    input_characters=len(text),
+                    failover=True,
+                )
                 provider_circuit_breaker.record_success("cerebras")
                 return result
             except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
@@ -386,8 +408,14 @@ class IngestionService:
 
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
-                result = await asyncio.to_thread(self._extract_with_gemini, text)
-                result = self._validate_provider_graph(result, text)
+                result = await asyncio.to_thread(
+                    provider_metrics.observe,
+                    "gemini",
+                    "graph_extraction",
+                    lambda: self._validate_provider_graph(self._extract_with_gemini(text), text),
+                    input_characters=len(text),
+                    failover=True,
+                )
                 provider_circuit_breaker.record_success("gemini")
                 return result
             except GraphStructureError as exc:

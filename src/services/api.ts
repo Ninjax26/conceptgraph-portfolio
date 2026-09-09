@@ -99,6 +99,58 @@ export interface ProviderStatusResponse {
     last_failure_category: string | null;
     last_checked_at: string | null;
   }>;
+  metrics: {
+    scope: "current_api_process";
+    started_at: string;
+    generated_at: string;
+    retained_event_limit: number;
+    totals: {
+      provider_attempts: number;
+      successful_attempts: number;
+      failed_attempts: number;
+      failover_attempts: number;
+      rate_limit_errors: number;
+      evidence_fallbacks: number;
+      estimated_input_tokens: number;
+      estimated_output_tokens: number;
+      average_latency_ms: number;
+      p95_latency_ms: number;
+    };
+    by_provider: Array<{
+      name: string;
+      attempts: number;
+      successful_attempts: number;
+      failed_attempts: number;
+      failover_attempts: number;
+      rate_limit_errors: number;
+      estimated_input_tokens: number;
+      estimated_output_tokens: number;
+      average_latency_ms: number;
+    }>;
+    by_operation: Array<{
+      name: string;
+      attempts: number;
+      successful_attempts: number;
+      failed_attempts: number;
+      failover_attempts: number;
+      rate_limit_errors: number;
+      estimated_input_tokens: number;
+      estimated_output_tokens: number;
+      average_latency_ms: number;
+    }>;
+    recent_events: Array<{
+      provider: string;
+      operation: string;
+      outcome: string;
+      latency_ms: number;
+      failover: boolean;
+      estimated_input_tokens: number;
+      estimated_output_tokens: number;
+      recorded_at: string;
+    }>;
+    privacy_note: string;
+    accuracy_note: string;
+  };
   note: string;
 }
 

@@ -25,6 +25,7 @@ from app.core.exceptions import (
 from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.provider_failover import provider_circuit_breaker
+from app.services.provider_metrics import provider_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,11 @@ class SynthesisService:
         if provider == "gemini":
             try:
                 answer = await asyncio.to_thread(
-                    self._synthesize_with_gemini, question, graph_context, sources
+                    provider_metrics.observe,
+                    "gemini",
+                    "answer_synthesis",
+                    lambda: self._synthesize_with_gemini(question, graph_context, sources),
+                    input_characters=self._prompt_character_count(question, graph_context, sources),
                 )
                 provider_circuit_breaker.record_success("gemini")
                 return GenerationResult(answer, "gemini")
@@ -90,10 +95,11 @@ class SynthesisService:
         if provider == "cerebras":
             try:
                 answer = await asyncio.to_thread(
-                    self._synthesize_with_cerebras,
-                    question,
-                    graph_context,
-                    sources,
+                    provider_metrics.observe,
+                    "cerebras",
+                    "answer_synthesis",
+                    lambda: self._synthesize_with_cerebras(question, graph_context, sources),
+                    input_characters=self._prompt_character_count(question, graph_context, sources),
                 )
                 provider_circuit_breaker.record_success("cerebras")
                 return GenerationResult(answer, "cerebras")
@@ -104,6 +110,7 @@ class SynthesisService:
                 logger.warning(
                     "Cerebras answer synthesis is unavailable; returning retrieved evidence"
                 )
+                provider_metrics.record_evidence_fallback()
                 return GenerationResult(
                     self._grounded_evidence_fallback(sources),
                     "evidence_fallback",
@@ -133,10 +140,11 @@ class SynthesisService:
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
                 answer = await asyncio.to_thread(
-                    self._synthesize_with_groq,
-                    question,
-                    graph_context,
-                    sources,
+                    provider_metrics.observe,
+                    "groq",
+                    "answer_synthesis",
+                    lambda: self._synthesize_with_groq(question, graph_context, sources),
+                    input_characters=self._prompt_character_count(question, graph_context, sources),
                 )
                 provider_circuit_breaker.record_success("groq")
                 return GenerationResult(answer, "groq")
@@ -164,10 +172,12 @@ class SynthesisService:
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
                 answer = await asyncio.to_thread(
-                    self._synthesize_with_cerebras,
-                    question,
-                    graph_context,
-                    sources,
+                    provider_metrics.observe,
+                    "cerebras",
+                    "answer_synthesis",
+                    lambda: self._synthesize_with_cerebras(question, graph_context, sources),
+                    input_characters=self._prompt_character_count(question, graph_context, sources),
+                    failover=True,
                 )
                 provider_circuit_breaker.record_success("cerebras")
                 return GenerationResult(answer, "cerebras", True, primary_failure)
@@ -182,7 +192,12 @@ class SynthesisService:
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
                 answer = await asyncio.to_thread(
-                    self._synthesize_with_gemini, question, graph_context, sources
+                    provider_metrics.observe,
+                    "gemini",
+                    "answer_synthesis",
+                    lambda: self._synthesize_with_gemini(question, graph_context, sources),
+                    input_characters=self._prompt_character_count(question, graph_context, sources),
+                    failover=True,
                 )
                 provider_circuit_breaker.record_success("gemini")
                 return GenerationResult(answer, "gemini", True, primary_failure)
@@ -193,6 +208,7 @@ class SynthesisService:
         logger.warning(
             "All answer synthesis providers are unavailable; returning retrieved evidence"
         )
+        provider_metrics.record_evidence_fallback()
         return GenerationResult(
             self._grounded_evidence_fallback(sources),
             "evidence_fallback",
@@ -270,6 +286,17 @@ class SynthesisService:
                 self._user_prompt(question, graph_context, sources),
             ],
             max_output_tokens=1_200,
+        )
+
+    @staticmethod
+    def _prompt_character_count(
+        question: str,
+        graph_context: list[dict[str, Any]],
+        sources: list[dict[str, Any]],
+    ) -> int:
+        """Estimate billable input size without retaining any request content."""
+        return len(question) + len(json.dumps(graph_context, default=str)) + sum(
+            len(str(source.get("supporting_passage") or "")) for source in sources
         )
 
     @staticmethod

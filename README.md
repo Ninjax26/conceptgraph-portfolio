@@ -21,7 +21,7 @@ ConceptGraph turns course PDFs into a searchable concept graph, grounded answers
 - Polyglot persistence with a clear owner for each kind of data.
 - Durable background processing on a small single-service deployment.
 - Evidence gating, citations, source-page provenance, and honest empty/partial graph states.
-- Provider quota resilience with Groq-to-Gemini failover, circuit breaking, and grounded degradation.
+- Provider quota resilience with Groq-to-Gemini failover, circuit breaking, grounded degradation, and privacy-safe runtime telemetry.
 - Data lifecycle management: retry, retention, full deletion, and partial-write compensation.
 - Measured retrieval results and failure-focused tests instead of an unverified “it works” claim.
 
@@ -36,11 +36,12 @@ ConceptGraph turns course PDFs into a searchable concept graph, grounded answers
 | Provenance | Upload ID, PDF filename, page, section, and source chunk retained on graph concepts; graph nodes open the original source page |
 | Retrieval and answers | READY-only course filtering, graph-assisted Qdrant retrieval, Cohere/local reranking, evidence thresholds, grounded refusal, citations, formatted answers |
 | LLM resilience | Groq primary, Gemini failover for graphs/answers/exams, optional legacy Cerebras support, five-minute circuit-breaker cooldown, evidence-only answer fallback |
+| Provider observability | Per-provider and per-operation attempts, failures, failovers, quota errors, average/p95 latency, and estimated tokens; no prompts, answers, document identifiers, or keys retained |
 | Demo security | One reviewer code, signed expiring HttpOnly session cookie, post-login session verification, exact CORS configuration, protected expensive routes, rate limits |
 | Public access | One pre-uploaded read-only sample course and source previews without exposing upload/query/exam controls |
 | Data cleanup | Manual deletion across PostgreSQL, Qdrant, Neo4j, and R2; automatic demo retention; sample-course exclusion; shared-object protection |
 | Evaluation | Fifteen manually annotated questions, committed baseline results, top-five document/page checks, citation/refusal checks, latency measurement |
-| Verification | 161 focused backend tests plus Python compilation, TypeScript checking, Vite production build, and Docker Compose validation |
+| Verification | 165 focused backend tests plus Python compilation, TypeScript checking, Vite production build, and Docker Compose validation |
 | Scanned PDFs | Sparse pages fall back to bounded local Tesseract OCR with page provenance and confidence reporting |
 
 The commit history records these improvements as separate phases: dashboard polish, answer formatting, cross-site sessions, complete deletion, demo hardening/public sample/retention, evaluation, graph quality and provenance, complex-PDF batching, checkpointed continuation, quota-safe degradation, and provider failover.
@@ -199,6 +200,12 @@ READY or FAILED uploads can be deleted. Cleanup is ordered to avoid orphaned use
 4. delete PostgreSQL attempt/upload metadata and remove an empty course row.
 
 Active documents cannot be deleted while a worker may own them. In protected-demo mode, the same deletion path automatically removes old reviewer uploads after the configured retention period; the public sample course is excluded.
+
+### 8. Provider observability
+
+Every real Groq, Gemini, or Cerebras attempt is measured at the provider-call boundary for graph extraction, answer synthesis, and exam generation. The protected provider-status endpoint and dashboard report attempts, successes, failures, failover attempts, quota errors, evidence-only fallbacks, average/p95 latency, and estimated input/output tokens. A failed primary call and the succeeding backup call therefore appear as two separate events, making failover behavior verifiable.
+
+Telemetry is intentionally privacy-safe and bounded: it stores only provider name, operation, outcome category, duration, a failover flag, token estimates, and timestamp. It never stores prompts, answers, filenames, document IDs, API keys, or raw provider errors. Counts are in-memory for the current API process and reset on deploy; token counts use the transparent approximation of four characters per token, so provider billing consoles remain authoritative.
 
 ## What changed from the distributed edition
 
@@ -510,11 +517,13 @@ The graph improved raw multi-source recall on this small fixture (48→51) but d
 | `app/services/gemini_service.py` | Lightweight Gemini REST client and normalized provider errors |
 | `app/services/cerebras_service.py` | OpenAI-compatible Cerebras client and normalized provider errors |
 | `app/services/provider_failover.py` | Thread-safe provider cooldown circuit breaker |
+| `app/services/provider_metrics.py` | Bounded, privacy-safe provider call metrics and aggregation |
 | `app/services/exam_service.py` | Citation-validated course MCQ generation |
 | `app/services/upload_service.py` | Durable records, attempts, leases, retries, completion gates, deletion metadata |
 | `app/models/document_upload.py` | PostgreSQL course/upload/attempt records and resumable graph-batch checkpoints |
 | `ENGINEERING_HANDBOOK.md` | Runtime invariants and safe-change rules |
 | `evaluation/` and `scripts/run_evaluation.py` | Human-labelled dataset, baseline, and repeatable evaluation runner |
+| `scripts/run_production_smoke.py` | Authenticated production health/query/provider-telemetry smoke test |
 | `render.yaml` | API/static-site Blueprint and secret placeholders |
 
 ## Known limitations and honest roadmap
@@ -523,7 +532,7 @@ These are intentional portfolio boundaries, not hidden claims:
 
 - **OCR is text-focused.** Sparse and image-only pages use local Tesseract with page provenance and confidence reporting. Layout-aware font scoring applies to native PDF text; OCR pages use textual heading heuristics. Complex tables, diagrams, handwriting, and equation-to-LaTeX conversion remain outside the current scope.
 - **Shared data model.** One reviewer code grants access to one shared workspace. Real multi-user support needs user identities, tenant ownership on every PostgreSQL row, Qdrant payload, Neo4j entity, and object key, plus authorization checks on every query and cleanup path.
-- **Process-local rate limits and circuit breaker.** They match the single Render API instance. Horizontal scaling needs Redis or another shared coordination store.
+- **Process-local rate limits, circuit breaker, and provider metrics.** They match the single Render API instance and reset on restart. Horizontal scaling or durable historical analytics needs Redis/OpenTelemetry or another shared telemetry store.
 - **Single bounded worker by default.** This protects memory and free provider quotas but limits throughput. Scale only after measuring parse memory, provider budgets, and database connection pools.
 - **Small evaluation sets.** The original 15-question course baseline and 22-question multi-document ablation demonstrate measurement, not general academic QA quality. Expand across subjects, layouts, scanned PDFs, and adversarial unsupported questions.
 - **Graph entity resolution is deliberately simple.** Lowercase/whitespace normalization is explainable but will not merge synonyms or disambiguate homonyms. More advanced entity resolution belongs after a labelled graph-quality benchmark exists.
@@ -533,7 +542,7 @@ These are intentional portfolio boundaries, not hidden claims:
 Recommended next phases, in order:
 
 1. Expand the labelled evaluation dataset and run it in CI against deterministic fixtures, including scanned-page cases.
-2. Add provider metrics: selected provider, fallback count, latency, quota errors, and per-operation token use without logging prompts or keys.
+2. Export provider metrics to durable OpenTelemetry only if multi-instance scaling or long-term cost analysis becomes necessary.
 3. Add optional table reconstruction only after measuring OCR and layout quality on representative academic PDFs.
 4. Add real authentication and tenant-scoped storage only if the project becomes a shared product.
 5. Move workers/rate limits to shared infrastructure only when traffic justifies the extra operational complexity.
@@ -552,7 +561,7 @@ Recommended next phases, in order:
 
 ## Verification
 
-Latest local verification: **161 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
+Latest local verification: **165 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
 
 ```bash
 source .venv/bin/activate
@@ -563,12 +572,22 @@ npm run build
 docker compose config -q
 ```
 
+After deployment, an authenticated smoke test can verify health, dependency readiness, one real grounded query, and the corresponding provider-metric increment without printing or saving the reviewer access code:
+
+```bash
+python scripts/run_production_smoke.py \
+  --course CYBER \
+  --question "What is phishing?" \
+  --output evaluation/production-smoke-current.json
+```
+
 Tests focus on system boundaries and failure behavior: durable stage transitions, leases, fencing, expired-attempt recovery, bounded queue behavior, deferred admission, retry exhaustion, idempotent cleanup, READY deletion, demo retention, empty graphs, resumable graph checkpoints, cross-section linking, relationship validation, provider timeouts/rate limits, Gemini/Cerebras request compatibility and circuit-breaker failover, scanned PDFs without text, READY gating, graph sampling and provenance, hosted inference/reranking, object storage, PDF byte ranges and citation links, verified auth sessions, public sample isolation, evidence refusal, and readiness-sensitive course behavior.
 
 ## API surface
 
 - `GET /api/v1/health` — PostgreSQL liveness
 - `GET /api/v1/ready` — PostgreSQL, Qdrant, Neo4j, object storage, and coordinator readiness
+- `GET /api/v1/providers/status` — protected routing state and privacy-safe current-process provider metrics
 - `POST|GET|DELETE /api/v1/auth/session`
 - `GET /api/v1/public/sample` — rate-limited read-only sample graph
 - `GET /api/v1/public/sample/uploads/{upload_id}/preview` — sample-only PDF preview

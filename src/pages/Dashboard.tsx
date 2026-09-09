@@ -432,17 +432,33 @@ export default function Dashboard(): JSX.Element {
           <button type="button" onClick={() => setIsUploadModalOpen(true)} className="shrink-0 rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800">Add PDF</button>
         </div>
         {providerStatus ? (
-          <div className="border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-600" role="status">
-            <span className="font-semibold text-slate-700">AI routing:</span>{" "}
-            {providerStatus.primary} primary
-            {providerStatus.fallback_order.length ? ` → ${providerStatus.fallback_order.join(" → ")} fallback` : " · no fallback configured"}
-            <span className="ml-2 inline-flex flex-wrap gap-1.5">
-              {providerStatus.providers.filter((provider) => provider.name === providerStatus.primary || providerStatus.fallback_order.includes(provider.name)).map((provider) => (
-                <span key={provider.name} className={`rounded-full px-2 py-0.5 font-semibold ${provider.configured && provider.available ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                  {provider.name}: {!provider.configured ? "not configured" : provider.available ? (provider.last_outcome === "success" ? "last call passed" : "configured") : `cooling down ${provider.cooldown_seconds}s`}
+          <div className="space-y-2 border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-600" role="status">
+            <div>
+              <span className="font-semibold text-slate-700">AI routing:</span>{" "}
+              {providerStatus.primary} primary
+              {providerStatus.fallback_order.length ? ` → ${providerStatus.fallback_order.join(" → ")} fallback` : " · no fallback configured"}
+              <span className="ml-2 inline-flex flex-wrap gap-1.5">
+                {providerStatus.providers.filter((provider) => provider.name === providerStatus.primary || providerStatus.fallback_order.includes(provider.name)).map((provider) => (
+                  <span key={provider.name} className={`rounded-full px-2 py-0.5 font-semibold ${provider.configured && provider.available ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                    {provider.name}: {!provider.configured ? "not configured" : provider.available ? (provider.last_outcome === "success" ? "last call passed" : "configured") : `cooling down ${provider.cooldown_seconds}s`}
+                  </span>
+                ))}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500" title="In-memory measurements for the current API process; token values are estimates.">
+              <span className="font-semibold text-slate-600">Measured usage</span>
+              <span>{providerStatus.metrics.totals.provider_attempts} calls</span>
+              <span>{providerStatus.metrics.totals.failover_attempts} failovers</span>
+              <span>{providerStatus.metrics.totals.rate_limit_errors} quota errors</span>
+              <span>avg {providerStatus.metrics.totals.average_latency_ms} ms</span>
+              <span>p95 {providerStatus.metrics.totals.p95_latency_ms} ms</span>
+              <span>~{(providerStatus.metrics.totals.estimated_input_tokens + providerStatus.metrics.totals.estimated_output_tokens).toLocaleString()} tokens</span>
+              {providerStatus.metrics.by_provider.map((provider) => (
+                <span key={provider.name} className="rounded-full bg-slate-100 px-2 py-0.5">
+                  {provider.name} {provider.successful_attempts}/{provider.attempts}
                 </span>
               ))}
-            </span>
+            </div>
           </div>
         ) : null}
         <form className="border-b border-slate-200 p-4" onSubmit={handleSubmit}>

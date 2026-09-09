@@ -38,6 +38,7 @@ from app.services.course_service import ReadyCourseContext
 from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.provider_failover import provider_circuit_breaker
+from app.services.provider_metrics import provider_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +262,11 @@ class ExamService:
         provider = settings.llm_provider.lower()
         if provider == "gemini":
             return await asyncio.to_thread(
-                self._generate_with_gemini, context_text, num_questions, sources,
+                provider_metrics.observe,
+                "gemini",
+                "exam_generation",
+                lambda: self._generate_with_gemini(context_text, num_questions, sources),
+                input_characters=len(context_text),
             )
         if provider == "groq":
             return await self._generate_with_failover(
@@ -269,7 +274,11 @@ class ExamService:
             )
         if provider == "cerebras":
             return await asyncio.to_thread(
-                self._generate_with_cerebras, context_text, num_questions, sources,
+                provider_metrics.observe,
+                "cerebras",
+                "exam_generation",
+                lambda: self._generate_with_cerebras(context_text, num_questions, sources),
+                input_characters=len(context_text),
             )
         raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
 
@@ -283,7 +292,11 @@ class ExamService:
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
                 result = await asyncio.to_thread(
-                    self._generate_with_groq, context_text, num_questions, sources,
+                    provider_metrics.observe,
+                    "groq",
+                    "exam_generation",
+                    lambda: self._generate_with_groq(context_text, num_questions, sources),
+                    input_characters=len(context_text),
                 )
                 provider_circuit_breaker.record_success("groq")
                 return result
@@ -308,7 +321,12 @@ class ExamService:
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
                 result = await asyncio.to_thread(
-                    self._generate_with_cerebras, context_text, num_questions, sources,
+                    provider_metrics.observe,
+                    "cerebras",
+                    "exam_generation",
+                    lambda: self._generate_with_cerebras(context_text, num_questions, sources),
+                    input_characters=len(context_text),
+                    failover=True,
                 )
                 provider_circuit_breaker.record_success("cerebras")
                 return result
@@ -322,7 +340,12 @@ class ExamService:
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
                 result = await asyncio.to_thread(
-                    self._generate_with_gemini, context_text, num_questions, sources,
+                    provider_metrics.observe,
+                    "gemini",
+                    "exam_generation",
+                    lambda: self._generate_with_gemini(context_text, num_questions, sources),
+                    input_characters=len(context_text),
+                    failover=True,
                 )
                 provider_circuit_breaker.record_success("gemini")
                 return result

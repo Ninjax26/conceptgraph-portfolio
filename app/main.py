@@ -20,6 +20,7 @@ from app.services.document_processing_service import document_processing_service
 from app.services.demo_retention_service import demo_retention_service
 from app.services.storage_service import storage_service
 from app.services.provider_failover import provider_circuit_breaker
+from app.services.provider_metrics import provider_metrics
 from sqlalchemy import text
 
 LOCAL_DEV_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
@@ -98,6 +99,7 @@ async def provider_status() -> dict:
         "primary": settings.llm_provider.lower(),
         "fallback_order": fallback_order,
         "providers": providers,
+        "metrics": provider_metrics.snapshot(),
         "note": "Configured means the server loaded a key; last outcome comes from a real generation request in this process.",
     }
 
