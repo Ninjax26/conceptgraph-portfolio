@@ -563,6 +563,25 @@ Recommended next phases, in order:
 
 Latest local verification: **165 backend tests passing** (`python -m unittest`), production frontend build passing, and Python compilation passing. CI configuration is included for repeatable checks; hosted results depend on the configured services and secrets.
 
+### Verified release metrics
+
+The following checks were run on **September 9, 2026** for commit [`5247ec6`](https://github.com/Ninjax26/conceptgraph-portfolio/commit/5247ec6fcfc5569990bbea2323c16ede472f36c0). Results distinguish deterministic tests, direct provider checks, and deployed checks so local evidence is not misrepresented as production traffic.
+
+| Check | Observed result | Environment |
+| --- | --- | --- |
+| Backend regression suite | 165/165 passed | Local, provider calls mocked except where stated |
+| Groq credential/model smoke request | Passed; non-empty result; 877 ms | Direct provider request using uncommitted local key |
+| Gemini credential/model smoke request | Passed; non-empty result; 1,172 ms | Direct provider request using uncommitted local key |
+| Forced Groq quota → Gemini route | Passed for graph, answer, and exam paths | Deterministic automated tests |
+| Telemetry privacy | Prompts and answers absent from snapshots | Automated tests |
+| Frontend production build | Passed; dashboard 58.84 KiB gzip, lazy graph bundle 146.44 KiB gzip | Local Vite production build |
+| Render API deployment | Live on `5247ec6`; `/health` returned `healthy` | Production |
+| Render dependency readiness | `ready`; queue depth 0; no degraded services; graph available | Production |
+| Render frontend | HTTP 200 on `/dashboard`, matching `5247ec6` | Production |
+| Provider telemetry boundary | Unauthenticated request returned HTTP 401 | Production security check |
+
+The authenticated production-query metric delta is deliberately **not claimed** in this snapshot because the uncommitted local environment did not contain the deployment's separate `DEMO_ACCESS_TOKEN`. Add the same reviewer token locally and run `scripts/run_production_smoke.py` to generate the final secret-free report. The script passes only when health, readiness, authentication, a grounded query, and the provider-attempt counter all succeed.
+
 ```bash
 source .venv/bin/activate
 python -m compileall -q app tests
