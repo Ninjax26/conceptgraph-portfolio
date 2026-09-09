@@ -565,7 +565,7 @@ Latest local verification: **165 backend tests passing** (`python -m unittest`),
 
 ### Verified release metrics
 
-The following checks were run on **September 9, 2026** for commit [`5247ec6`](https://github.com/Ninjax26/conceptgraph-portfolio/commit/5247ec6fcfc5569990bbea2323c16ede472f36c0). Results distinguish deterministic tests, direct provider checks, and deployed checks so local evidence is not misrepresented as production traffic.
+The following checks were run on **September 9, 2026** for provider-observability commit [`5247ec6`](https://github.com/Ninjax26/conceptgraph-portfolio/commit/5247ec6fcfc5569990bbea2323c16ede472f36c0), published in release `061d4a6`. Results distinguish deterministic tests, direct provider checks, and deployed checks so local evidence is not misrepresented as production traffic.
 
 | Check | Observed result | Environment |
 | --- | --- | --- |
@@ -575,9 +575,9 @@ The following checks were run on **September 9, 2026** for commit [`5247ec6`](ht
 | Forced Groq quota → Gemini route | Passed for graph, answer, and exam paths | Deterministic automated tests |
 | Telemetry privacy | Prompts and answers absent from snapshots | Automated tests |
 | Frontend production build | Passed; dashboard 58.84 KiB gzip, lazy graph bundle 146.44 KiB gzip | Local Vite production build |
-| Render API deployment | Live on `5247ec6`; `/health` returned `healthy` | Production |
+| Render API deployment | Live on `061d4a6`; `/health` returned `healthy` | Production |
 | Render dependency readiness | `ready`; queue depth 0; no degraded services; graph available | Production |
-| Render frontend | HTTP 200 on `/dashboard`, matching `5247ec6` | Production |
+| Render frontend | HTTP 200 on `/dashboard`, matching `061d4a6` | Production |
 | Provider telemetry boundary | Unauthenticated request returned HTTP 401 | Production security check |
 
 The authenticated production-query metric delta is deliberately **not claimed** in this snapshot because the uncommitted local environment did not contain the deployment's separate `DEMO_ACCESS_TOKEN`. Add the same reviewer token locally and run `scripts/run_production_smoke.py` to generate the final secret-free report. The script passes only when health, readiness, authentication, a grounded query, and the provider-attempt counter all succeed.
