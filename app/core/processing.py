@@ -22,6 +22,12 @@ class GraphStatus(StrEnum):
     READY_WITHOUT_GRAPH = "READY_WITHOUT_GRAPH"
 
 
+def minimum_graph_relationships(node_count: int) -> int:
+    """A modest quality floor, not a demand that every concept be connected."""
+
+    return max(1, (node_count + 2) // 3)
+
+
 def assess_graph_status(
     node_count: int,
     relationship_count: int,
@@ -42,7 +48,7 @@ def assess_graph_status(
     )
     if (
         node_count < 2
-        or relationship_count <= 0
+        or relationship_count < minimum_graph_relationships(node_count)
         or batches_failed > 0
         or batches_skipped > 0
         or coverage_is_partial

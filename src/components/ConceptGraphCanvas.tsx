@@ -76,11 +76,8 @@ export default function ConceptGraphCanvas({
       ids.add(edge.source);
       ids.add(edge.target);
     });
-    nodes.forEach((node) => {
-      if (node.retrievalHop === 0) ids.add(node.id);
-    });
     return ids;
-  }, [edges, nodes]);
+  }, [edges]);
 
   const unlinkedCount = Math.max(0, nodes.length - connectedNodeIds.size);
   const visibleNodes = useMemo(
@@ -119,11 +116,25 @@ export default function ConceptGraphCanvas({
     )].sort(),
     [visibleEdges],
   );
-  const isHierarchy = visibleEdges.length > 0 && visibleEdges.every((edge) =>
-    ["PREREQUISITE_OF", "PART_OF"].includes(
-      edge.relationType || edge.label || "",
-    ),
-  );
+  const isHierarchy = useMemo(() => {
+    if (visibleEdges.length === 0 || visibleEdges.length !== visibleNodes.length - 1) return false;
+    if (!visibleEdges.every((edge) => ["PREREQUISITE_OF", "PART_OF"].includes(edge.relationType || edge.label || ""))) return false;
+
+    const neighbors = new Map(visibleNodes.map((node) => [node.id, new Set<string>()]));
+    visibleEdges.forEach((edge) => {
+      neighbors.get(edge.source)?.add(edge.target);
+      neighbors.get(edge.target)?.add(edge.source);
+    });
+    const seen = new Set<string>();
+    const pending = [visibleNodes[0].id];
+    while (pending.length > 0) {
+      const id = pending.pop()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      neighbors.get(id)?.forEach((neighbor) => pending.push(neighbor));
+    }
+    return seen.size === visibleNodes.length;
+  }, [visibleEdges, visibleNodes]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -462,6 +473,12 @@ export default function ConceptGraphCanvas({
           </GraphControl>
         </div>
       </div>
+
+      {edges.length > 0 && edges.length < Math.max(1, Math.ceil(nodes.length / 3)) ? (
+        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Sparse graph: only {edges.length} source-backed {edges.length === 1 ? "relationship" : "relationships"} for {nodes.length} concepts. Unlinked concepts are hidden by default; you can show them above.
+        </p>
+      ) : null}
 
       <div className="relative min-h-0 flex-1 bg-[radial-gradient(circle_at_1px_1px,_#dbe5ea_1px,_transparent_0)] [background-size:22px_22px]">
         <div

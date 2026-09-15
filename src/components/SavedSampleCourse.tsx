@@ -39,7 +39,7 @@ export default function SavedSampleCourse() {
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-white/10 dark:bg-[#15151b]">
       <span className="text-xs font-semibold uppercase tracking-wide text-teal-700">Explore without a login</span>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Explore Computing Foundations</h2>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Explore Computing Foundations</h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Three source PDFs, saved answers, and clickable source pages. These editorial examples and illustrated graphs are prepared in advance; selecting one makes no AI request.</p>
       {error ? <p role="alert" className="mt-4 text-sm text-red-700">The saved sample could not load. Refresh to try again.</p> : null}
       {!course && !error ? <p role="status" className="mt-4 text-sm text-slate-500">Loading saved examples…</p> : null}
@@ -55,7 +55,7 @@ export default function SavedSampleCourse() {
       {example ? (
         <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]" aria-live="polite">
           <div className="min-w-0 rounded-xl bg-slate-50 p-4 dark:bg-white/5">
-          <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">{example.question}</h3>
+          <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">{example.question}</h2>
           <p className="text-xs font-semibold uppercase text-teal-700">Saved editorial answer</p>
           <p className="mt-2 text-sm leading-7 text-slate-700 dark:text-slate-200">{example.answer}</p>
           <div className="mt-3 grid gap-2">
@@ -68,7 +68,7 @@ export default function SavedSampleCourse() {
           </div>
           </div>
           <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">How the concepts connect</h3>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">How the concepts connect</h2>
           <p className="mb-3 mt-1 text-xs leading-5 text-slate-500">Prepared illustration from the source lessons. Select a concept, then open its source page.</p>
           <div className="h-[400px] min-w-0">
             <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading illustrated graph…</p>}>

@@ -99,9 +99,16 @@ async def initialize_database_schema() -> None:
             text(
                 "UPDATE document_uploads SET graph_status = CASE "
                 "WHEN graph_node_count <= 0 THEN 'READY_WITHOUT_GRAPH' "
-                "WHEN graph_edge_count <= 0 THEN 'GRAPH_PARTIAL' "
+                "WHEN graph_edge_count < GREATEST(1, (graph_node_count + 2) / 3) THEN 'GRAPH_PARTIAL' "
                 "ELSE 'GRAPH_READY' END "
                 "WHERE stage = 'READY' AND graph_status IS NULL"
+            )
+        )
+        await conn.execute(
+            text(
+                "UPDATE document_uploads SET graph_status = 'GRAPH_PARTIAL' "
+                "WHERE stage = 'READY' AND graph_status = 'GRAPH_READY' "
+                "AND graph_edge_count < GREATEST(1, (graph_node_count + 2) / 3)"
             )
         )
 

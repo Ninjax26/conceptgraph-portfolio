@@ -28,6 +28,7 @@ import {
   UploadStatusResponse,
   getUploadStatus,
   getProviderStatus,
+  getReadiness,
   listCourses,
   listUploads,
   retryUpload,
@@ -74,6 +75,7 @@ export default function Dashboard(): JSX.Element {
     previewUrl: string;
   } | null>(null);
   const [providerStatus, setProviderStatus] = useState<ProviderStatusResponse | null>(null);
+  const [graphAvailable, setGraphAvailable] = useState<boolean | null>(null);
 
   const graphElements = useMemo(
     () => buildGraphElements(response?.graph_context ?? []),
@@ -128,7 +130,15 @@ export default function Dashboard(): JSX.Element {
   useEffect(() => {
     void refreshUploads();
     void getProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null));
-    return () => { requestVersion.current += 1; };
+    const refreshReadiness = () => {
+      void getReadiness().then((status) => setGraphAvailable(status.graph_available)).catch(() => setGraphAvailable(null));
+    };
+    refreshReadiness();
+    const readinessInterval = window.setInterval(refreshReadiness, 60_000);
+    return () => {
+      window.clearInterval(readinessInterval);
+      requestVersion.current += 1;
+    };
   }, []);
 
   useEffect(() => {
@@ -363,6 +373,11 @@ export default function Dashboard(): JSX.Element {
 
   return (
     <main className="mx-auto grid min-h-[calc(100vh-104px)] w-full max-w-[1800px] grid-cols-1 gap-4 bg-slate-50/60 p-4 lg:grid-cols-[minmax(360px,420px)_1fr] lg:p-6 xl:grid-cols-[minmax(380px,440px)_1fr]">
+      {graphAvailable === false ? (
+        <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 lg:col-span-2">
+          <span className="font-semibold">Graph database unavailable.</span> Existing graph views and new graph builds may fail. PDF passage search can still work. Check the Neo4j service and its connection settings before retrying graph builds.
+        </div>
+      ) : null}
       <PdfPreviewModal
         isOpen={selectedPreview !== null}
         onClose={() => setSelectedPreview(null)}
@@ -429,7 +444,7 @@ export default function Dashboard(): JSX.Element {
             <h1 className="text-base font-semibold text-ink">Course workspace</h1>
             <p className="mt-1 text-xs text-slate-500">Choose a course, ask a question, and inspect its sources.</p>
           </div>
-          <button type="button" onClick={() => setIsUploadModalOpen(true)} className="shrink-0 rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800">Add PDF</button>
+          <button type="button" onClick={() => setIsUploadModalOpen(true)} disabled={graphAvailable === false} title={graphAvailable === false ? "Restore Neo4j before uploading a PDF" : undefined} className="shrink-0 rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400">Add PDF</button>
         </div>
         {providerStatus ? (
           <div className="space-y-2 border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-600" role="status">
@@ -743,10 +758,12 @@ export default function Dashboard(): JSX.Element {
                       (job.status === "ready" &&
                         (job.graph_status === "READY_WITHOUT_GRAPH" ||
                           job.graph_status === "GRAPH_PARTIAL") &&
+                        !graphRecoveryExhausted(job) &&
                         job.attempt_count < 8) ? (
                         <button
                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                          disabled={retryingUploadId === job.upload_id}
+                          disabled={retryingUploadId === job.upload_id || graphAvailable === false}
+                          title={graphAvailable === false ? "Restore Neo4j before retrying graph processing" : undefined}
                           onClick={() => void handleRetry(job)}
                           type="button"
                         >
@@ -869,7 +886,9 @@ export default function Dashboard(): JSX.Element {
           </div>
           <button
             onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex shrink-0 items-center gap-2 rounded-md bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-100 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50"
+            disabled={graphAvailable === false}
+            title={graphAvailable === false ? "Restore Neo4j before uploading a PDF" : undefined}
+            className="inline-flex shrink-0 items-center gap-2 rounded-md bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50"
           >
             <UploadCloud className="h-4 w-4" />
             Add PDF
@@ -903,14 +922,18 @@ export default function Dashboard(): JSX.Element {
               <div className="max-w-sm">
                 <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-lg font-bold text-teal-700">CG</div>
                 <p className="font-semibold text-ink">
-                  {response?.graph_metadata.retrieval_mode === "vector_only"
+                  {graphAvailable === false
+                    ? "Graph service offline"
+                    : response?.graph_metadata.retrieval_mode === "vector_only"
                     ? "Answering from PDF passages"
                     : selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
                     ? "No validated graph was produced"
                     : "Your course graph will appear here"}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  {response?.graph_metadata.retrieval_mode === "vector_only"
+                  {graphAvailable === false
+                    ? "Neo4j is unavailable right now. Existing relationships cannot load, and new graph builds should wait until the service is restored."
+                    : response?.graph_metadata.retrieval_mode === "vector_only"
                     ? (response.graph_metadata.fallback_reason
                       ? "The graph service is unavailable. Your answer and source citations are still available in the answer panel."
                       : "Vector mode does not retrieve a graph. Choose One hop or Two hops and run your question to explore concept connections.")
@@ -951,6 +974,19 @@ function graphStatusStyle(status: GraphStatus): string {
   if (status === "GRAPH_READY") return "bg-emerald-50 text-emerald-700";
   if (status === "GRAPH_PARTIAL") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function graphRecoveryExhausted(job: UploadStatusResponse): boolean {
+  const result = job.result_json;
+  if (!result) return false;
+  const noBatchesRemaining = result.graph_batches_skipped === 0 && result.graph_batches_failed === 0;
+  if (!noBatchesRemaining) return false;
+  if (result.graph_relationship_pass_version === 2 && result.graph_global_linking_succeeded === true) return true;
+  return (job.graph_node_count < 2 || job.processed_chunk_count === 1)
+    && typeof result.graph_batches_total === "number"
+    && result.graph_batches_total > 0
+    && typeof result.graph_batches_succeeded === "number"
+    && result.graph_batches_succeeded >= result.graph_batches_total;
 }
 
 function graphCoverageLabel(resultJson: Record<string, unknown> | null | undefined): string | null {

@@ -33,6 +33,7 @@ from qdrant_client.models import (
 
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
+from app.core.processing import minimum_graph_relationships
 from app.core.exceptions import (
     GraphStructureError,
     LLMConfigurationError,
@@ -261,16 +262,32 @@ class IngestionService:
             settings.graph_global_linking_enabled
             and not provider_limited
             and len(merged.nodes) >= 2
-            and len(represented_sections) >= 2
+            and (
+                len(represented_sections) >= 2
+                or len(merged.relationships) < minimum_graph_relationships(len(merged.nodes))
+            )
         ):
             global_batch = self._global_linking_batch(completed_section_batches)
             if global_batch is not None:
                 global_attempted = True
                 linked = completed_batches.get(global_batch.batch_key)
                 if linked is None:
+                    source_chunk_ids = {chunk.id for chunk in global_batch.chunks}
+                    candidate_names = [
+                        node.name for node in merged.nodes
+                        if node.source_chunk_id in source_chunk_ids
+                    ][: self.MAX_CONCEPTS_PER_BATCH]
+                    if not candidate_names:
+                        candidate_names = [
+                            node.name for node in merged.nodes[: self.MAX_CONCEPTS_PER_BATCH]
+                        ]
                     context = (
-                        "Cross-section linking pass. Extract only concepts and relationships "
-                        "that are explicitly supported across these representative excerpts.\n\n"
+                        "Relationship recovery pass. These concepts were already extracted "
+                        "from the source excerpts: "
+                        + ", ".join(candidate_names)
+                        + ". Return only relationships directly supported by the excerpts. "
+                        "Use the allowed relationship types and exact source chunk IDs. "
+                        "Do not connect concepts merely because they share a section.\n\n"
                         + "\n\n".join(
                             self._format_graph_excerpt(chunk)
                             for chunk in global_batch.chunks
@@ -281,7 +298,7 @@ class IngestionService:
                         linked = self._attach_provenance(
                             extraction, global_batch.chunks
                         )
-                        if on_batch_completed is not None:
+                        if on_batch_completed is not None and linked.nodes:
                             await on_batch_completed(global_batch, linked)
                     except (
                         RateLimitError,
@@ -298,7 +315,7 @@ class IngestionService:
                         GraphStructureError,
                     ):
                         logger.warning(
-                            "Optional cross-section graph linking pass was skipped; "
+                            "Optional graph relationship pass was skipped; "
                             "the validated section graph remains usable"
                         )
                         linked = None
@@ -1065,29 +1082,42 @@ class IngestionService:
         cls,
         completed_batches: Sequence[GraphSectionBatch],
     ) -> GraphSectionBatch | None:
-        """Select one representative excerpt per section for one bounded linking call."""
+        """Select bounded evidence from distinct sections or one long section."""
 
         first_by_section: dict[str, GraphSectionBatch] = {}
         for batch in completed_batches:
             if batch.kind == "section" and batch.chunks:
                 first_by_section.setdefault(batch.section_key, batch)
         representatives = list(first_by_section.values())
-        if len(representatives) < 2:
-            return None
-        positions = cls._evenly_spaced_positions(
-            len(representatives),
-            min(cls.MAX_CONCEPTS_PER_BATCH, len(representatives)),
-        )
-        selected = [representatives[position].chunks[0] for position in positions]
+        if len(representatives) >= 2:
+            positions = cls._evenly_spaced_positions(
+                len(representatives),
+                min(cls.MAX_CONCEPTS_PER_BATCH, len(representatives)),
+            )
+            selected = [representatives[position].chunks[0] for position in positions]
+        else:
+            unique_chunks = list(dict.fromkeys(
+                chunk.id for batch in completed_batches for chunk in batch.chunks
+            ))
+            chunks_by_id = {
+                chunk.id: chunk for batch in completed_batches for chunk in batch.chunks
+            }
+            if len(unique_chunks) < 2:
+                return None
+            positions = cls._evenly_spaced_positions(
+                len(unique_chunks),
+                min(cls.MAX_CONCEPTS_PER_BATCH, len(unique_chunks)),
+            )
+            selected = [chunks_by_id[unique_chunks[position]] for position in positions]
         digest = hashlib.sha256()
         for chunk in selected:
             digest.update(chunk.id.encode("utf-8"))
             digest.update(b"\0")
             digest.update(chunk.text.encode("utf-8"))
         return GraphSectionBatch(
-            batch_key=f"global:{digest.hexdigest()}",
+            batch_key=f"global:v2:{digest.hexdigest()}",
             section_key="__global__",
-            section_label="Cross-section linking",
+            section_label="Relationship recovery",
             chunks=tuple(selected),
             kind="global",
         )

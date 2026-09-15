@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
   motion,
+  useReducedMotion,
   useScroll,
   useTransform,
   type MotionValue,
@@ -47,32 +48,31 @@ export function MacbookScroll({
     target: ref,
     offset: ["start start", "end start"],
   });
-  const [isMobile, setIsMobile] = useState(false);
+  const reducedMotion = useReducedMotion();
 
-  useEffect(() => {
-    const updateViewport = (): void => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    updateViewport();
-    window.addEventListener("resize", updateViewport);
-    return () => window.removeEventListener("resize", updateViewport);
-  }, []);
-
-  const scaleX = useTransform(scrollYProgress, [0, 0.3], [1.2, isMobile ? 1 : 1.5]);
-  const scaleY = useTransform(scrollYProgress, [0, 0.3], [0.6, isMobile ? 1 : 1.5]);
-  const translate = useTransform(scrollYProgress, [0, 1], [0, 1500]);
+  const scaleX = useTransform(scrollYProgress, [0, 0.3], [1.2, 1.5]);
+  const scaleY = useTransform(scrollYProgress, [0, 0.3], [0.6, 1.5]);
+  const translate = useTransform(scrollYProgress, [0, 1], [0, -12]);
   const rotate = useTransform(scrollYProgress, [0.1, 0.12, 0.3], [-28, -28, 0]);
   const textTransform = useTransform(scrollYProgress, [0, 0.3], [0, 100]);
   const textOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
 
   return (
+    <>
+    <section className="mx-auto max-w-xl px-4 pb-14 pt-6 md:hidden">
+      <h2 className="mb-8 text-center text-2xl font-bold leading-tight text-neutral-900 dark:text-white">{title}</h2>
+      <div className="rounded-t-xl border-[7px] border-b-0 border-slate-900 bg-slate-900 shadow-xl">
+        <img src={src} alt="ConceptGraph dashboard preview" className="aspect-[16/9] w-full rounded-t-sm object-cover object-top" />
+      </div>
+      <div className="h-4 rounded-b-xl bg-gradient-to-b from-slate-300 to-slate-500 dark:from-slate-600 dark:to-slate-800" />
+      {badge ? <div className="mt-3">{badge}</div> : null}
+    </section>
     <section
       ref={ref}
-      className="flex min-h-[190vh] shrink-0 scale-[0.36] transform flex-col items-center justify-start py-0 [perspective:800px] sm:scale-50 md:scale-100 md:py-72"
+      className="hidden min-h-[160vh] shrink-0 flex-col items-center justify-start py-72 [perspective:800px] md:flex"
     >
       <motion.h2
-        style={{ translateY: textTransform, opacity: textOpacity }}
+        style={{ translateY: reducedMotion ? 0 : textTransform, opacity: reducedMotion ? 1 : textOpacity }}
         className="mb-20 max-w-4xl text-center text-3xl font-bold leading-tight text-neutral-900 dark:text-white md:text-5xl"
       >
         {title}
@@ -80,10 +80,10 @@ export function MacbookScroll({
 
       <Lid
         src={src}
-        scaleX={scaleX}
-        scaleY={scaleY}
-        rotate={rotate}
-        translate={translate}
+        scaleX={reducedMotion ? 1 : scaleX}
+        scaleY={reducedMotion ? 1 : scaleY}
+        rotate={reducedMotion ? 0 : rotate}
+        translate={reducedMotion ? 0 : translate}
       />
 
       <div className="relative -z-10 h-[22rem] w-[32rem] overflow-hidden rounded-2xl bg-gray-200 dark:bg-[#272729]">
@@ -109,6 +109,7 @@ export function MacbookScroll({
         {badge ? <div className="absolute bottom-4 left-4">{badge}</div> : null}
       </div>
     </section>
+    </>
   );
 }
 
@@ -119,10 +120,10 @@ export function Lid({
   translate,
   src,
 }: {
-  scaleX: MotionValue<number>;
-  scaleY: MotionValue<number>;
-  rotate: MotionValue<number>;
-  translate: MotionValue<number>;
+  scaleX: MotionValue<number> | number;
+  scaleY: MotionValue<number> | number;
+  rotate: MotionValue<number> | number;
+  translate: MotionValue<number> | number;
   src?: string;
 }): JSX.Element {
   return (

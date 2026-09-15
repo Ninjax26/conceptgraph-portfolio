@@ -1037,8 +1037,93 @@ class ProcessingRulesTests(unittest.TestCase):
 
     def test_graph_status_distinguishes_ready_partial_and_empty(self):
         self.assertEqual(assess_graph_status(4, 3), GraphStatus.GRAPH_READY)
+        self.assertEqual(assess_graph_status(13, 1), GraphStatus.GRAPH_PARTIAL)
         self.assertEqual(assess_graph_status(3, 0), GraphStatus.GRAPH_PARTIAL)
         self.assertEqual(assess_graph_status(0, 0), GraphStatus.READY_WITHOUT_GRAPH)
+
+    def test_sparse_single_section_gets_one_bounded_relationship_pass(self):
+        chunks = [
+            DocumentChunk(
+                id=f"chunk-{index}",
+                text=f"Concept {index} is part of the same explained process.",
+                metadata={
+                    "document_name": "lesson.pdf",
+                    "section_heading": "One section",
+                    "page_number": index + 1,
+                    "upload_id": "upload-1",
+                },
+            )
+            for index in range(3)
+        ]
+        local = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(id="left", name="Left", type="topic", source_chunk_id="chunk-0"),
+                ConceptNode(id="right", name="Right", type="topic", source_chunk_id="chunk-1"),
+            ]
+        )
+        linked = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(id="left-again", name="Left", type="topic", source_chunk_id="chunk-0"),
+                ConceptNode(id="right-again", name="Right", type="topic", source_chunk_id="chunk-1"),
+            ],
+            relationships=[
+                ConceptRelationship(
+                    source_node_id="left-again",
+                    target_node_id="right-again",
+                    relation_type="PART_OF",
+                )
+            ],
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(), vector_client=SimpleNamespace()
+        )
+        service.extract_graph_from_text = AsyncMock(side_effect=[local, linked])
+
+        with patch("app.services.ingestion_service.settings.graph_global_linking_enabled", True):
+            graph = asyncio.run(service.extract_graph_from_chunks(chunks))
+
+        self.assertTrue(graph.global_linking_attempted)
+        self.assertEqual(service.extract_graph_from_text.await_count, 2)
+        self.assertEqual(len(graph.relationships), 1)
+        self.assertIn("Relationship recovery pass", service.extract_graph_from_text.await_args.args[0])
+
+    def test_well_connected_single_section_avoids_extra_provider_call(self):
+        chunks = [
+            DocumentChunk(
+                id=f"chunk-{index}",
+                text=f"Concept {index}",
+                metadata={
+                    "document_name": "lesson.pdf",
+                    "section_heading": "One section",
+                    "page_number": 1,
+                    "upload_id": "upload-1",
+                },
+            )
+            for index in range(2)
+        ]
+        local = GraphExtractionResponse(
+            nodes=[
+                ConceptNode(id="left", name="Left", type="topic", source_chunk_id="chunk-0"),
+                ConceptNode(id="right", name="Right", type="topic", source_chunk_id="chunk-1"),
+            ],
+            relationships=[
+                ConceptRelationship(
+                    source_node_id="left",
+                    target_node_id="right",
+                    relation_type="PART_OF",
+                )
+            ],
+        )
+        service = IngestionService(
+            graph_driver=SimpleNamespace(), vector_client=SimpleNamespace()
+        )
+        service.extract_graph_from_text = AsyncMock(return_value=local)
+
+        with patch("app.services.ingestion_service.settings.graph_global_linking_enabled", True):
+            graph = asyncio.run(service.extract_graph_from_chunks(chunks))
+
+        self.assertFalse(graph.global_linking_attempted)
+        self.assertEqual(service.extract_graph_from_text.await_count, 1)
 
     def test_graph_sampling_takes_beginning_middle_and_end_of_each_section(self):
         chunks = [
@@ -2909,6 +2994,23 @@ class RetryEndpointTests(unittest.TestCase):
         )
 
         self.assertTrue(UploadService.can_reprocess(record))
+
+    def test_partial_graph_with_completed_linking_does_not_offer_noop_retry(self):
+        record = SimpleNamespace(
+            stage=ProcessingStage.READY.value,
+            graph_status=GraphStatus.GRAPH_PARTIAL.value,
+            retryable=False,
+            attempt_count=2,
+            graph_node_count=13,
+            result_json={
+                "graph_batches_skipped": 0,
+                "graph_batches_failed": 0,
+                "graph_global_linking_succeeded": True,
+                "graph_relationship_pass_version": 2,
+            },
+        )
+
+        self.assertFalse(UploadService.can_reprocess(record))
 
     def test_full_queue_defers_retry_without_marking_it_failed(self):
         with tempfile.NamedTemporaryFile(suffix=".pdf") as source:

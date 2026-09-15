@@ -42,7 +42,28 @@ class UploadService:
             }
         )
         if graph_rebuild:
-            return record.attempt_count < MAX_GRAPH_PROCESSING_ATTEMPTS
+            stored_result = getattr(record, "result_json", None)
+            result = stored_result if isinstance(stored_result, dict) else {}
+            no_batches_remaining = (
+                result.get("graph_batches_skipped", 0) == 0
+                and result.get("graph_batches_failed", 0) == 0
+            )
+            recovery_exhausted = no_batches_remaining and (
+                (
+                    result.get("graph_relationship_pass_version") == 2
+                    and result.get("graph_global_linking_succeeded") is True
+                )
+                or (
+                    (
+                        int(getattr(record, "graph_node_count", 0)) < 2
+                        or int(getattr(record, "processed_chunk_count", 0)) == 1
+                    )
+                    and result.get("graph_batches_total", 0) > 0
+                    and result.get("graph_batches_succeeded", 0)
+                    >= result.get("graph_batches_total", 0)
+                )
+            )
+            return not recovery_exhausted and record.attempt_count < MAX_GRAPH_PROCESSING_ATTEMPTS
         return failed_retry and record.attempt_count < MAX_PROCESSING_ATTEMPTS
 
     async def load_graph_checkpoints(

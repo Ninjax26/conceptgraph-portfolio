@@ -1,12 +1,11 @@
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { KeyRound, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
+import { ArrowRight, BookOpen, KeyRound, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
 
 import {
   createAuthSession,
   deleteAuthSession,
   getAuthSession,
 } from "@/services/api";
-import PublicSampleCourse from "@/components/PublicSampleCourse";
 
 type AccessState = "checking" | "locked" | "unlocked" | "error";
 
@@ -83,13 +82,12 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
 
   if (state === "checking") {
     return (
-      <div className="mx-auto max-w-5xl space-y-4 p-4 text-sm text-slate-500">
+      <main className="grid min-h-[calc(100vh-64px)] place-items-center bg-[#f8fafb] p-6 text-sm text-slate-600 dark:bg-[#0B0B0F] dark:text-slate-300">
         <span role="status" className="inline-flex items-center gap-2">
-          <LoaderCircle className="h-4 w-4 animate-spin" />
+          <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
           Verifying dashboard access...
         </span>
-        <PublicSampleCourse />
-      </div>
+      </main>
     );
   }
 
@@ -121,69 +119,68 @@ export default function DemoAccessGate({ children }: DemoAccessGateProps): JSX.E
   }
 
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-[radial-gradient(circle_at_top_left,_rgba(13,148,136,0.08),_transparent_35%)] px-4 py-10 dark:bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.09),_transparent_35%)]">
-      <div className="mx-auto w-full max-w-6xl space-y-5">
-      <PublicSampleCourse />
-      <section className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-white/10 dark:bg-[#15151b] dark:shadow-black/30">
-        <div className="mb-5 flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
-            <ShieldCheck className="h-5 w-5" />
+    <main className="min-h-[calc(100vh-64px)] bg-[#f8fafb] px-4 py-10 sm:py-16 dark:bg-[#0B0B0F]">
+      <div className="mx-auto grid w-full max-w-4xl items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7 dark:border-white/10 dark:bg-[#15151b]">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-300">
+            <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Reviewer access
           </div>
-          <div>
-            <h1 className="font-semibold text-ink dark:text-white">Shared portfolio demo</h1>
-            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-              Reviewers can enter the private access code for a temporary verified session. Public visitors can explore the prepared sample course.
-            </p>
-          </div>
-        </div>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink dark:text-white">Explore the live workspace</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            Enter the reviewer code to upload PDFs and use live AI features. This is one shared, temporary portfolio workspace, not a private account.
+          </p>
 
-        <form onSubmit={(event) => void unlock(event)} className="space-y-3">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" htmlFor="demo-access-code">
-            Access code
-          </label>
-          <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              id="demo-access-code"
-              type="password"
-              autoComplete="current-password"
-              value={accessCode}
-              onChange={(event) => setAccessCode(event.target.value)}
-              className="h-11 w-full rounded-md border border-slate-300 bg-white pl-10 pr-3 text-sm text-ink outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100 dark:border-white/15 dark:bg-black/20 dark:text-white dark:focus:border-teal-400 dark:focus:ring-teal-400/10"
-              placeholder="Deployment access code"
-              required
-              disabled={submitting}
-            />
-          </div>
-          {message && (
-            <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-300">
-              {message}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={submitting || !accessCode.trim()}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300"
-          >
-            {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
-            Unlock dashboard
-          </button>
-        </form>
+          <form onSubmit={(event) => void unlock(event)} className="mt-6 space-y-3">
+            <label className="block text-sm font-semibold text-ink dark:text-white" htmlFor="demo-access-code">Reviewer access code</label>
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <input
+                id="demo-access-code"
+                type="password"
+                autoComplete="current-password"
+                value={accessCode}
+                onChange={(event) => setAccessCode(event.target.value)}
+                aria-describedby={message ? "demo-access-error" : undefined}
+                className="h-12 w-full rounded-md border border-slate-300 bg-white pl-10 pr-3 text-base text-ink outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-100 dark:border-white/15 dark:bg-black/20 dark:text-white dark:focus:border-teal-400 dark:focus:ring-teal-400/10 dark:disabled:bg-white/5"
+                placeholder="Enter the code you were given"
+                required
+                disabled={submitting || state === "error"}
+              />
+            </div>
+            {message ? (
+              <p id="demo-access-error" role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-5 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-300">
+                {message}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              disabled={submitting || state === "error" || !accessCode.trim()}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200"
+            >
+              {submitting ? <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
+              Verify access
+            </button>
+          </form>
+          {state === "error" ? (
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 min-h-10 text-sm font-semibold text-teal-800 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 dark:text-teal-300">
+              Retry API connection
+            </button>
+          ) : null}
+          <p className="mt-5 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500 dark:border-white/10 dark:text-slate-400">
+            Reviewer uploads are visible to other reviewers and are automatically removed after a few days.
+          </p>
+        </section>
 
-        <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
-          Reviewer uploads are temporary and automatically removed after a few days. This is a controlled demo, not a multi-user account system.
-        </p>
-
-        {state === "error" && (
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-3 w-full text-center text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
-          >
-            Retry connection
-          </button>
-        )}
-      </section>
+        <aside className="rounded-xl border border-teal-100 bg-teal-50/60 p-5 sm:p-7 dark:border-teal-400/20 dark:bg-teal-400/5">
+          <BookOpen className="h-6 w-6 text-teal-700 dark:text-teal-300" aria-hidden="true" />
+          <h2 className="mt-4 text-xl font-semibold tracking-tight text-ink dark:text-white">No code? Start with the sample.</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            Explore saved answers, an illustrated concept path, and clickable source PDFs. It works without a login or live AI request.
+          </p>
+          <a href="/sample" className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-teal-800 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 dark:text-teal-300">
+            Explore public sample <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </a>
+        </aside>
       </div>
     </main>
   );

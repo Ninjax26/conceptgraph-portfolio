@@ -172,6 +172,13 @@ export interface PublicSampleResponse {
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
+export interface ReadinessStatus {
+  status: "ready";
+  processing_queue_depth: number;
+  degraded_services: string[];
+  graph_available: boolean;
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}) {
   const { timeout = 30000, ...requestOptions } = options;
   const controller = new AbortController();
@@ -296,6 +303,15 @@ export async function getProviderStatus(): Promise<ProviderStatusResponse> {
     timeout: 15000,
   });
   return response.json() as Promise<ProviderStatusResponse>;
+}
+
+export async function getReadiness(): Promise<ReadinessStatus> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/ready`, {
+    method: "GET",
+    cache: "no-store",
+    timeout: 12000,
+  });
+  return response.json() as Promise<ReadinessStatus>;
 }
 
 export interface MockQuestion {
