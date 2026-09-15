@@ -47,7 +47,7 @@ export default function App(): JSX.Element {
       <a href="#main-content" className="sr-only fixed left-3 top-2 z-[60] rounded-md bg-white px-3 py-2 text-sm font-semibold text-ink shadow-lg focus:not-sr-only focus:outline focus:outline-2 focus:outline-teal-700">
         Skip to content
       </a>
-      <nav aria-label="Primary" className="fixed inset-x-0 top-0 z-50 flex h-16 items-center border-b border-slate-200 bg-white/95 px-3 backdrop-blur sm:px-6 dark:border-white/10 dark:bg-[#0B0B0F]/95">
+      <nav aria-label="Primary" className="sticky top-0 z-50 flex h-16 items-center border-b border-slate-200 bg-white/95 px-3 backdrop-blur sm:px-6 dark:border-white/10 dark:bg-[#0B0B0F]/95">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2">
           <a href="/" onClick={(event) => followRoute(event, "home")} aria-label="ConceptGraph home" className="flex min-w-0 items-center gap-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink text-sm font-bold text-white dark:bg-teal-300 dark:text-slate-950">CG</span>
@@ -67,7 +67,7 @@ export default function App(): JSX.Element {
           </div>
         </div>
       </nav>
-      <div id="main-content" ref={mainRef} tabIndex={-1} className="pt-16">
+      <div id="main-content" ref={mainRef} tabIndex={-1}>
         <AppErrorBoundary>
           <Suspense fallback={<div className="grid min-h-[calc(100vh-64px)] place-items-center text-sm text-slate-500">Loading workspace...</div>}>
             {page === "home" && <Home navigate={navigate} />}
