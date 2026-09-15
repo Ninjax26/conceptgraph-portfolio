@@ -7,6 +7,7 @@ from app.core.exceptions import LLMProviderUnavailableError
 from app.schemas.extraction import ConceptNode, ConceptRelationship, GraphExtractionResponse
 from app.services.ingestion_service import IngestionService
 from app.services.parser_service import DocumentChunk
+from app.services.upload_service import UploadService
 
 
 def graph(names, *, connected=True, chunk="chunk"):
@@ -20,6 +21,17 @@ def graph(names, *, connected=True, chunk="chunk"):
 
 
 class GraphPipelineRegressions(unittest.TestCase):
+    def test_old_recovery_and_single_chunk_do_not_block_corrected_retry(self):
+        record = SimpleNamespace(
+            stage="READY", graph_status="GRAPH_PARTIAL", retryable=False,
+            attempt_count=1, graph_node_count=3, processed_chunk_count=1,
+            result_json={"graph_batches_skipped": 0, "graph_batches_failed": 0,
+                         "graph_batches_total": 1, "graph_batches_succeeded": 1,
+                         "graph_relationship_pass_version": 2,
+                         "graph_global_linking_succeeded": True},
+        )
+        self.assertTrue(UploadService.can_reprocess(record))
+
     def service(self):
         return IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
 

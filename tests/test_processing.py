@@ -3006,7 +3006,7 @@ class RetryEndpointTests(unittest.TestCase):
                 "graph_batches_skipped": 0,
                 "graph_batches_failed": 0,
                 "graph_global_linking_succeeded": True,
-                "graph_relationship_pass_version": 2,
+                "graph_relationship_pass_version": 3,
             },
         )
 

@@ -242,7 +242,7 @@ class DocumentProcessingService:
                 "graph_extraction_budget_applied": graph.extraction_budget_applied,
                 "graph_global_linking_attempted": graph.global_linking_attempted,
                 "graph_global_linking_succeeded": graph.global_linking_succeeded,
-                "graph_relationship_pass_version": 2 if graph.global_linking_attempted else 0,
+                "graph_relationship_pass_version": 3 if graph.global_linking_attempted else 0,
                 "graph_checkpointed_batches": graph.batches_succeeded,
                 "graph_failed_sections": graph.failed_section_labels,
                 **extraction_summary,

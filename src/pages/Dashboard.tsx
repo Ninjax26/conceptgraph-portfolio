@@ -981,8 +981,8 @@ function graphRecoveryExhausted(job: UploadStatusResponse): boolean {
   if (!result) return false;
   const noBatchesRemaining = result.graph_batches_skipped === 0 && result.graph_batches_failed === 0;
   if (!noBatchesRemaining) return false;
-  if (result.graph_relationship_pass_version === 2 && result.graph_global_linking_succeeded === true) return true;
-  return (job.graph_node_count < 2 || job.processed_chunk_count === 1)
+  if (result.graph_relationship_pass_version === 3 && result.graph_global_linking_succeeded === true) return true;
+  return job.graph_node_count < 2
     && typeof result.graph_batches_total === "number"
     && result.graph_batches_total > 0
     && typeof result.graph_batches_succeeded === "number"

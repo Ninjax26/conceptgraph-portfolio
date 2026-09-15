@@ -50,13 +50,12 @@ class UploadService:
             )
             recovery_exhausted = no_batches_remaining and (
                 (
-                    result.get("graph_relationship_pass_version") == 2
+                    result.get("graph_relationship_pass_version") == 3
                     and result.get("graph_global_linking_succeeded") is True
                 )
                 or (
                     (
                         int(getattr(record, "graph_node_count", 0)) < 2
-                        or int(getattr(record, "processed_chunk_count", 0)) == 1
                     )
                     and result.get("graph_batches_total", 0) > 0
                     and result.get("graph_batches_succeeded", 0)

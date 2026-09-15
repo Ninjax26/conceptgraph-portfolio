@@ -16,11 +16,15 @@
 5. **Timeout/quota skips were mislabelled as demo budget limits.** The budget flag
    now records the configured batch cap independently of later provider failures.
 
+6. **Retry eligibility blocked corrected recovery.** Single-chunk documents with
+   multiple concepts remain eligible. Version 2 recovery results can use the
+   corrected version 3 pass, within the existing attempt limit.
+
 ## Verification
 
-Six regression tests cover ID collisions, name merging, single-chunk recovery,
+Seven regression tests cover ID collisions, name merging, single-chunk recovery,
 empty recovery results, timeout accounting, and genuine batch limits. The full
-174-test Python suite passes, including existing OCR, processing, provider failover,
+175-test Python suite passes, including existing OCR, processing, provider failover,
 retrieval-mode, and security tests. These are automated tests with mocked service
 boundaries; they do not establish live provider accuracy or complete PDF coverage.
 
