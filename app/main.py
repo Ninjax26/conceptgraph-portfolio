@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -134,6 +135,7 @@ async def readiness_check() -> dict:
         )
     return {
         "status": "ready",
+        "revision": os.getenv("RENDER_GIT_COMMIT", "local"),
         "processing_queue_depth": processing_coordinator.queue_depth,
         "degraded_services": degraded,
         "graph_available": not degraded,

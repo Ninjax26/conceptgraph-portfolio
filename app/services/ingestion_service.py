@@ -170,6 +170,7 @@ class IngestionService:
         successful_batches = len(cached_by_key)
         failed_batches = 0
         skipped_batches = len(missing_batches) - len(batches)
+        budget_applied = skipped_batches > 0
         provider_limited = False
         consecutive_timeouts = 0
         partials: list[GraphExtractionResponse] = []
@@ -249,7 +250,7 @@ class IngestionService:
             batches_failed=failed_batches,
             batches_skipped=skipped_batches,
             provider_limited=provider_limited,
-            extraction_budget_applied=skipped_batches > 0,
+            extraction_budget_applied=budget_applied,
             failed_section_labels=sorted(
                 section_labels[key]
                 for key in failed_sections
@@ -285,7 +286,9 @@ class IngestionService:
                         "Relationship recovery pass. These concepts were already extracted "
                         "from the source excerpts: "
                         + ", ".join(candidate_names)
-                        + ". Return only relationships directly supported by the excerpts. "
+                        + ". Return a complete graph JSON with both nodes and relationships; "
+                        "include every relationship endpoint in the nodes array. "
+                        "Return only relationships directly supported by the excerpts. "
                         "Use the allowed relationship types and exact source chunk IDs. "
                         "Do not connect concepts merely because they share a section.\n\n"
                         + "\n\n".join(
@@ -320,7 +323,7 @@ class IngestionService:
                         )
                         linked = None
                 if linked is not None and linked.nodes:
-                    global_succeeded = True
+                    previous_relationship_count = len(merged.relationships)
                     merged = self._merge_graph_extractions(
                         [merged, linked],
                         sections_total=merged.sections_total,
@@ -334,6 +337,7 @@ class IngestionService:
                         extraction_budget_applied=merged.extraction_budget_applied,
                         failed_section_labels=merged.failed_section_labels,
                     )
+                    global_succeeded = len(merged.relationships) > previous_relationship_count
 
         return merged.model_copy(
             update={
@@ -1102,7 +1106,7 @@ class IngestionService:
             chunks_by_id = {
                 chunk.id: chunk for batch in completed_batches for chunk in batch.chunks
             }
-            if len(unique_chunks) < 2:
+            if not unique_chunks:
                 return None
             positions = cls._evenly_spaced_positions(
                 len(unique_chunks),
@@ -1115,7 +1119,7 @@ class IngestionService:
             digest.update(b"\0")
             digest.update(chunk.text.encode("utf-8"))
         return GraphSectionBatch(
-            batch_key=f"global:v2:{digest.hexdigest()}",
+            batch_key=f"global:v3:{digest.hexdigest()}",
             section_key="__global__",
             section_label="Relationship recovery",
             chunks=tuple(selected),
@@ -1253,6 +1257,7 @@ class IngestionService:
         """Merge section graphs by normalized name with stable first-seen IDs."""
 
         canonical_nodes: dict[str, ConceptNode] = {}
+        used_ids: set[str] = set()
         endpoint_maps: list[dict[str, str]] = []
 
         for extraction in extractions:
@@ -1263,10 +1268,19 @@ class IngestionService:
                     continue
                 existing = canonical_nodes.get(normalized_name)
                 if existing is None:
+                    # Provider IDs are unique only within one response. Different
+                    # sections frequently reuse IDs such as "1" for unrelated nodes.
+                    canonical_id = node.id
+                    if canonical_id in used_ids:
+                        suffix = hashlib.sha256(normalized_name.encode("utf-8")).hexdigest()[:16]
+                        canonical_id = f"{node.id}:{suffix}"
+                        while canonical_id in used_ids:
+                            canonical_id += ":1"
+                    used_ids.add(canonical_id)
                     canonical_nodes[normalized_name] = node.model_copy(
-                        update={"normalized_name": normalized_name}
+                        update={"id": canonical_id, "normalized_name": normalized_name}
                     )
-                    endpoint_map[node.id] = node.id
+                    endpoint_map[node.id] = canonical_id
                     continue
 
                 endpoint_map[node.id] = existing.id
