@@ -372,7 +372,7 @@ export default function Dashboard(): JSX.Element {
   }
 
   return (
-    <main className="mx-auto grid min-h-[calc(100vh-104px)] w-full max-w-[1800px] grid-cols-1 gap-4 bg-slate-50/60 p-4 lg:grid-cols-[minmax(360px,420px)_1fr] lg:p-6 xl:grid-cols-[minmax(380px,440px)_1fr]">
+    <main className="mx-auto grid min-h-[calc(100vh-104px)] w-full max-w-[1800px] grid-cols-1 content-start items-start gap-4 bg-slate-50/60 p-4 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] lg:p-6 xl:grid-cols-[minmax(380px,440px)_minmax(0,1fr)]">
       {graphAvailable === false ? (
         <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 lg:col-span-2">
           <span className="font-semibold">Graph database unavailable.</span> Existing graph views and new graph builds may fail. PDF passage search can still work. Check the Neo4j service and its connection settings before retrying graph builds.
@@ -390,12 +390,12 @@ export default function Dashboard(): JSX.Element {
         onUploaded={handleUploadCreated}
       />
       {deleteTarget ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm">
           <section
             aria-describedby="delete-document-description"
             aria-labelledby="delete-document-title"
             aria-modal="true"
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl"
+            className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl"
             role="dialog"
           >
             <div className="mb-4 grid h-10 w-10 place-items-center rounded-lg bg-red-50 text-red-600">

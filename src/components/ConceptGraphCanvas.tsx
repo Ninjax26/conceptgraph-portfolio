@@ -493,7 +493,7 @@ export default function ConceptGraphCanvas({
           </div>
         ) : null}
         {selectedNode ? (
-          <aside className="absolute bottom-3 left-3 right-3 z-10 max-h-[62%] overflow-auto rounded-xl border border-slate-200 bg-white/97 p-4 shadow-xl backdrop-blur sm:right-auto sm:w-[360px]">
+          <aside className="absolute bottom-3 left-3 right-3 z-10 max-h-[62%] overflow-auto rounded-xl border border-slate-200 bg-white/97 p-4 shadow-xl backdrop-blur sm:right-auto sm:w-[360px] sm:max-w-[calc(100%-1.5rem)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-ink">{selectedNode.label}</p>

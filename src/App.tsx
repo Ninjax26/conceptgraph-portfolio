@@ -48,7 +48,7 @@ export default function App(): JSX.Element {
         Skip to content
       </a>
       <nav aria-label="Primary" className="fixed inset-x-0 top-0 z-50 flex h-16 items-center border-b border-slate-200 bg-white/95 px-3 backdrop-blur sm:px-6 dark:border-white/10 dark:bg-[#0B0B0F]/95">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2">
+        <div className="flex w-full min-w-0 items-center justify-between gap-2">
           <a href="/" onClick={(event) => followRoute(event, "home")} aria-label="ConceptGraph home" className="flex min-w-0 items-center gap-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink text-sm font-bold text-white dark:bg-teal-300 dark:text-slate-950">CG</span>
             <span className="hidden min-w-0 text-left sm:block">

@@ -48,6 +48,20 @@ body,
   min-height: 100%;
 }
 
+html {
+  scroll-padding-top: 5rem;
+  scrollbar-gutter: stable;
+}
+
+#main-content {
+  min-width: 0;
+}
+
+/* Long filenames and generated text must fit their panel rather than widen it. */
+#main-content :where(p, h1, h2, h3, li) {
+  overflow-wrap: anywhere;
+}
+
 body {
   margin: 0;
   background: hsl(var(--background));

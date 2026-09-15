@@ -43,11 +43,12 @@ function Hero({ onTryDemo, onViewSample }: HeroProps): JSX.Element {
           <div className="flex max-w-4xl flex-col gap-5">
             <h1 className="text-5xl font-semibold tracking-normal text-foreground md:text-7xl">
               <span className="block">Academic RAG that is</span>
-              <span className="relative flex min-h-[1.25em] w-full justify-center overflow-hidden text-center text-signal dark:text-teal-300 md:pb-4 md:pt-1">
+              <span className="relative grid min-h-[1.25em] w-full overflow-hidden text-center text-signal dark:text-teal-300 md:pb-4 md:pt-1">
+                <span aria-hidden="true" className="invisible col-start-1 row-start-1">syllabus-bounded</span>
                 <AnimatePresence initial={false} mode="wait">
                   <motion.span
                     key={titles[titleNumber]}
-                    className="absolute inset-x-0"
+                    className="col-start-1 row-start-1"
                     initial={reducedMotion ? false : { opacity: 0, y: "-100%" }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={reducedMotion ? { opacity: 0 } : { y: "100%", opacity: 0 }}
