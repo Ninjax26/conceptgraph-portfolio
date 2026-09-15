@@ -69,11 +69,11 @@ export function MacbookScroll({
     </section>
     <section
       ref={ref}
-      className="hidden min-h-[160vh] shrink-0 flex-col items-center justify-start py-72 [perspective:800px] md:flex"
+      className="hidden min-h-[110vh] shrink-0 flex-col items-center justify-start pb-24 pt-20 [perspective:800px] md:flex"
     >
       <motion.h2
         style={{ translateY: reducedMotion ? 0 : textTransform, opacity: reducedMotion ? 1 : textOpacity }}
-        className="mb-20 max-w-4xl text-center text-3xl font-bold leading-tight text-neutral-900 dark:text-white md:text-5xl"
+        className="mb-14 max-w-4xl text-center text-3xl font-bold leading-tight text-neutral-900 dark:text-white md:text-5xl"
       >
         {title}
       </motion.h2>
