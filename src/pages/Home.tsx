@@ -88,7 +88,7 @@ export default function Home({ navigate }: HomeProps): JSX.Element {
           <div className="w-full overflow-hidden bg-white dark:bg-[#0B0B0F]">
             <MacbookScroll
               title={<span>Built with a multi-database architecture. Powered by Neo4j.</span>}
-              src="/dashboard-preview.webp"
+              src="/dashboard-network-preview.webp"
               showGradient={false}
             />
           </div>
