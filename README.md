@@ -24,6 +24,24 @@
 
 The API and providers run on quota-limited hosting. A cold start or exhausted free-tier quota can delay or limit live requests; the saved preview remains available.
 
+### Prepared public samples
+
+The `/sample` page offers two courses without authentication or live AI requests:
+
+- **Computing Foundations:** the original three-PDF course covering web protocols, identity/security, and data reliability.
+- **Equipment Documentation:** three fictional PDFs (specification, maintenance guide, inspection record), four saved questions, and explicit source-linked `PART_OF` / `APPLIES_TO` illustrations. Three questions require evidence from different documents; one demonstrates an unsupported motor-power refusal. One inspection page is image-only to exercise OCR. Document revisions and page/paragraph references are visible, but this is not automatic revision reconciliation or equipment operating advice.
+
+Select a course, open its cited pages, or download the source PDFs to try the actual ingestion pipeline in the protected reviewer workspace. `?course=technical` selects the equipment sample directly. Saved answer text and graph edges are **manually authored references**, not cached live retrieval results, measured LLM performance, or a claim that every upload will produce the illustrated graph.
+
+Regenerate and check fixtures locally:
+
+~~~bash
+python scripts/build_sample_course.py
+python scripts/verify_public_samples.py
+~~~
+
+Use `--technical-only` when rebuilding only the equipment files. Verification requires local Tesseract English data and checks actual native/OCR extraction plus source references. The [recorded check](evaluation/public-samples-verification.json) recovered all authored reference paragraphs on **24/24 pages**, including the image-only page. That page's 95.7/100 engine confidence is not an accuracy percentage. This small authored-English check does not measure retrieval, answer correctness, graph extraction, or real-world scanned documents. These additions remain local until deployed.
+
 ## Architecture
 
 ~~~mermaid
@@ -35,7 +53,7 @@ flowchart LR
   API --> G[(Neo4j: concepts and edges)]
   API --> Rank[Cohere or local reranker]
   API --> AI[Groq primary / Gemini fallback]
-  API --> Worker[Bounded in-process processor]
+  API -. combined mode .-> Worker[Ingestion worker: combined or separate]
   Worker --> PG
   Worker --> Store
   Worker --> V
@@ -64,22 +82,29 @@ Upload → validate/deduplicate → store PDF → extract text/OCR
        → READY + GRAPH_READY / GRAPH_PARTIAL / READY_WITHOUT_GRAPH
 ~~~
 
-Native text is preferred. OCR runs only on pages with too little readable native text, and its output is retained only when it recovers more content. For native pages, heading detection scores font size, weight, numbering, length, and spacing; scanned pages use a text-only fallback. Graph extraction samples across sections, preserves valid completed batches, and stops at a configured request budget so one large PDF cannot consume unlimited provider quota.
+Native text is preferred. OCR can recover sparse or corrupted text layers and supplement readable pages containing scanned text in large image regions. Output must pass text-quality and engine-confidence checks; more characters alone are insufficient. Orientation-aware OCR and one optional alternate pass share a page deadline and rendering budget. The dashboard flags pages needing review. Native heading detection uses font size, weight, numbering, length, and spacing; scanned text uses a text-only fallback. Graph extraction samples across sections, preserves completed batches, and stops at a configured budget.
 
 A document can be **READY** for vector search even when no valid graph was produced. The graph status is displayed separately; an empty graph is not presented as a successful extraction.
+
+Processing details distinguish malformed output, invalid relationships, unverified sources, truncated responses, quota, and timeouts. Explicit empty responses are checkpointed and reported separately from failures. Structural failures may use one additional bounded repair call after provider failover (`GRAPH_JSON_REPAIR_ENABLED`, enabled by default); that call still passes source and schema validation. Repair attempts appear in provider metrics.
 
 ### Query path
 
 ~~~text
 Question + READY course
   → optional scoped Neo4j prerequisite traversal (0, 1, or 2 hops)
-  → Qdrant passage search → rerank → evidence threshold
+  → Qdrant passage search + optional scoped identifier lookup
+  → bounded rerank windows → evidence/identifier checks
   → grounded refusal OR answer with page-level citations
 ~~~
 
 Graph traversal is bounded and uses parameterized, read-only queries; the LLM does not write Cypher. If Neo4j is unavailable, graph-assisted modes fall back to vector retrieval. Provider quota errors and timeouts trigger a cooldown and a Groq-to-Gemini attempt where configured. If generation is unavailable but usable evidence exists, the answer path can return the retrieved passages rather than fabricate prose. Provider status records attempt counts, outcomes, latency, and estimated tokens **without storing prompts, answers, document names, or keys**.
 
+Retrieval keeps a configurable, bounded shortlist (10 by default). Questions containing identifiers can supplement dense search with a READY-scoped keyword lookup and rank fusion, without another embedding or LLM call. Named identifiers must be verified in the cited passages before generation; high similarity alone cannot justify answering about nonexistent equipment. Question-focused windows avoid always cutting citations and rerank input at the start of a long chunk. Legacy uploads remain vector-searchable and gain identifier payload data when reprocessed.
+
 ## Measured results
+
+The dashboard distinguishes a graph timeout, an unavailable graph service, and recorded graph counts with no matching projection in the selected Neo4j database. Vector fallback preserves the actual retrieval mode and citations. Query diagnostics now split collection checks, local query embedding, dense search, identifier lookup, reranking, and generation; hosted embedding executes inside dense search and is labelled accordingly. These timings do not record prompts or document text.
 
 The latest [provider-generated retrieval ablation](evaluation/ablation-provider-current.md) ran **22 labelled questions across three authored PDFs**: 17 supported and 5 unsupported. It produced 61 validated concepts and 44 relationships and made 66 retrieval requests. Answer generation was deliberately excluded so the comparison measures retrieval rather than LLM wording.
 
@@ -93,6 +118,12 @@ The latest [provider-generated retrieval ablation](evaluation/ablation-provider-
 **Interpretation:** Graph expansion improved one raw multi-source retrieval case, but did **not** improve the final evidence-gated score in this small fixture. It added latency. Two-hop terms were used in only three questions, so this is not evidence that deeper traversal is generally better. The [15-question single-course baseline](evaluation/baseline-2026-08-30.json), [multi-document labels](evaluation/questions-multidoc.json), and [full ablation report](evaluation/ablation-provider-current.md) preserve the misses and methodology.
 
 A separate [authenticated production smoke result](evaluation/production-smoke-current.json) checked health, dependency readiness, course discovery, one grounded query, and the matching provider-attempt increment on a deployed release. It exercised the healthy Groq route; **production failover was not forced** merely to burn through a quota. Graph, answer, and exam failover are covered by deterministic tests. A smoke test is not a load test or an answer-quality benchmark.
+
+The [local OCR check](evaluation/ocr-quality-current.md) compares the previous extractor with the updated pipeline on eight authored English fixtures using real Tesseract. Upside-down, mixed-content, and corrupted-hidden-text fixtures improved; native and other scanned fixtures retained their results. Timings vary with layout and runtime conditions; the report lists each fixture's measured cost, not a general speedup claim. This small synthetic check does not establish accuracy on customer scans, Japanese text, handwriting, tables, or drawings. Reproduce it with `python scripts/evaluate_ocr.py --baseline 5996dce03ec3d4e43b86b3afc1837dbbcf2f1870`.
+
+The [retrieval scaling check](evaluation/retrieval-scaling-current.md) runs 45 authored questions against 10, 50, and 100 PDF corpora with competing document identifiers. It measures retrieval, reranking, and evidence selection separately, including MRR@5, source recall, page-label precision, refusals, and stage latency. Development and diagnostic validation cases are distinguished from fresh authored held-out cases. It uses cached local models and in-memory Qdrant, with no LLM generation or production writes. These results do not establish hosted ANN performance, concurrent-user capacity, or an increased production upload limit. Reproduce it with `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python scripts/evaluate_retrieval_scaling.py`.
+
+Increasing the dense shortlist from 10 to 20 did not improve evidence completeness in that fixture and increased local reranking time, so the default remains 10. Identifier enrichment recovered one multi-source miss in the larger corpora; identifier verification refused unsupported equipment queries that otherwise passed the evidence gate. Six supported questions still lacked all labelled sources after filtering. The evidence threshold remains unchanged; these small synthetic results do not calibrate hosted Cohere or prove answer correctness.
 
 ## Reliability and security boundaries
 
@@ -139,12 +170,71 @@ Do not commit .env or paste credentials into an issue, screenshot, README, or VI
 
 The Render API uses a low-memory hosted inference profile. Free plans and provider quotas can change or pause; this deployment is not an uptime or cost SLA. See the [engineering handbook](ENGINEERING_HANDBOOK.md) for implementation invariants and the [Blueprint](render.yaml) for exact service settings.
 
+## Scaling profile — local implementation
+
+The scalable profile keeps the existing PostgreSQL jobs, leases, task-token fencing, and graph checkpoints. It introduces no Redis or Celery dependency. `PROCESSING_ROLE=combined` preserves the original single-process deployment; `api` accepts durable uploads without processing them, and `worker` runs ingestion separately. Multiple workers use independent instance IDs and PostgreSQL row locks to claim work safely. All updates to a current attempt hold its row lock through the transaction, and concurrent schema initialization is serialized.
+
+Upload admission checks pages, reserved chunks, source PDF bytes, and pending jobs under the existing installation advisory lock. Actual chunks reconcile the reservation **before** vector indexing. Chunk generation streams through word boundaries and stops at the document limit instead of building an unbounded chunk list. Ordinary pipeline stages, eligibility of READY documents, retry checkpoints, and compensating deletion remain unchanged.
+
+| Setting | Default | Meaning |
+| --- | ---: | --- |
+| `MAX_PAGES_PER_DOCUMENT` / `MAX_PAGES_PER_INSTALLATION` | 500 / 10,000 | Per-PDF and retained-corpus page budgets |
+| `MAX_CHUNKS_PER_DOCUMENT` / `MAX_CHUNKS_PER_INSTALLATION` | 2,000 / 50,000 | Per-PDF and installation chunk reservations |
+| `CHUNK_RESERVATION_PER_PAGE` | 32 | Initial estimate, reconciled before indexing |
+| `MAX_STORAGE_MB` | 1,024 | Source PDF byte budget; not total database/vector/graph storage |
+| `MAX_PENDING_DOCUMENTS` | 32 | Durable accepted jobs waiting or processing |
+| `PROCESSING_CONCURRENCY` / `PROCESSING_QUEUE_CAPACITY` | 1 / 8 | Per-worker execution and dispatch bounds |
+| `GRAPH_DISPLAY_MAX_NODES` / `GRAPH_DISPLAY_MAX_EDGES` | 100 / 200 | Unique nodes/edges in the returned visual subset |
+
+The legacy `MAX_PDFS_PER_INSTALLATION=50` remains an optional compatibility guard. Set it to **0** to rely on resource budgets; the local launcher does so without editing `.env`. OCR/rendering and graph-batch budgets still apply. These are application admission/work bounds, not a hard operating-system memory sandbox or a guarantee of a hosting plan's capacity.
+
+Split operation requires `SHARED_PROVIDER_LIMITS_ENABLED=true` on API and workers. Active graph, answer, and exam calls reserve application-wide per-provider request capacity in PostgreSQL using database time: defaults are **10/minute and 300/UTC day** for each generation provider. Use the same database, `SHARED_PROVIDER_SCOPE`, provider configuration, and budget settings across processes. Failed or cancelled reservations consume capacity conservatively. A shared-application limit is distinguished from an actual vendor-quota error in processing details. These guards do **not** meter provider tokens/billing, Cohere/Qdrant inference, or usage of the same keys in another project/database. Existing HTTP/login rate limits remain process-local: this profile supports one protected API with additional workers, not unrestricted public API replication.
+
+The dashboard loads 25 documents per page, with Previous/Next controls and page-local filters/counts. The original array-returning upload endpoint remains compatible. The new keyset endpoint deduplicates canonical records in SQL; it bounds client memory but its ranking step can still scan the corpus. Graph display limits do not make every Neo4j traversal constant-time.
+
+Run separate local processes, using the existing local PostgreSQL and Neo4j containers:
+
+~~~bash
+python scripts/start_local.py --role api --local-neo4j --port 8001
+# In another terminal:
+python scripts/start_local.py --role worker --local-neo4j
+# Frontend terminal:
+VITE_API_BASE_URL=http://127.0.0.1:8001/api/v1 npm run dev -- --host 127.0.0.1 --port 5174
+~~~
+
+The launcher binds the API to loopback, refuses a remote PostgreSQL database, uses the existing local Neo4j credential only in process memory, and leaves `.env` unchanged. Other backing services still use `.env`; this is not automatically a fully offline stack. For a conventional deployment, set the same role/shared-budget variables and run `python -m uvicorn app.main:app` or `python -m app.worker`. No hosting resources or production configuration have been changed for this profile.
+
+Changing the Neo4j target does not copy previously stored graphs. Existing READY rows may still describe a graph in another Neo4j instance; verify the projection in the selected instance before treating those counts as a local graph check. Rebuilds are explicit operations, not an automatic migration performed by the launcher.
+
+`GET /api/v1/ready` reports worker availability. An offline worker degrades ingestion while existing READY queries remain usable; accepted jobs remain durable. Protected `GET /api/v1/ingest/resources` reports usage/limits. Unknown legacy page/byte metadata is counted conservatively. Inspect it without AI/index writes using `python scripts/refresh_resource_inventory.py`; `--apply` fills metadata only in local PostgreSQL. Review the dry run first.
+
+The [ingestion scaling report](evaluation/ingestion-scaling-current.md) measures 10/50/100 authored PDFs, including pages, chunks, source bytes, queue wait, indexing, retrieval, admission backpressure, pagination, restart/checkpoint recovery, stale-attempt fencing, shared request reservations, and deletion cleanup. Reproduce it with:
+
+| Fixture PDFs | Pages / chunks | Ingestion wall time | Queue wait p95 | Warm vector retrieval p95 |
+| ---: | ---: | ---: | ---: | ---: |
+| 10 | 20 / 20 | 30.333 s | 17.748 s | 350.9 ms |
+| 50 | 100 / 100 | 101.913 s | 62.141 s | 121.7 ms |
+| 100 | 200 / 200 | 204.029 s | 87.813 s | 592.8 ms |
+
+All fixture uploads eventually became READY, with zero duplicate executions. Admission backpressure produced retryable HTTP 429 responses (274 at 50 PDFs and 1,175 at 100 PDFs); the runner retried those admissions. These are deliberately small two-page PDFs, not arbitrary large documents. Five warm retrieval samples are too few to infer a latency improvement as the corpus grows. The longer queue wait is the main measured ingestion bottleneck in this run. This latest run was slower than an earlier local run; host contention and cold-start conditions are not controlled, so the timings are observations rather than a speed or capacity guarantee.
+
+~~~bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python scripts/evaluate_ingestion_scaling.py --documents 10 50 100 --workers 2
+~~~
+
+The benchmark uses isolated local PostgreSQL, the real ASGI upload/delete handlers, cached CPU embeddings, and in-memory Qdrant. Worker coordinators share a Python process; storage and graph generation/projection are test doubles. Graph-provider calls are **zero because generation is disabled**, not because graphs are free. It does not establish real Neo4j/R2 consistency under hard kills, hosted ANN performance, actual OS-process memory use, live AI throughput, or production capacity. Private workspace ownership is a separate next phase; reviewer data remains shared.
+
+The [local verification record](evaluation/scaling-validation.md) lists the 297 passing backend tests, eight frontend status tests, build checks, browser checks, and unverified production boundaries. Private workspaces are deliberately deferred; the reviewer demo remains shared.
+
 ## Verify
+
+The local launcher selects CPU inference with bounded CPU threading for reproducibility. Manual starts keep `LOCAL_MODEL_DEVICE=auto` by default; select `cpu` or `mps` explicitly if needed. Hosted Qdrant/Cohere inference is unaffected. Device selection is configuration, not an assertion that a specific accelerator caused an observed stall.
 
 ~~~bash
 python -m compileall -q app tests
 python -m unittest discover -s tests -v
 npm ci
+npm run test:frontend
 npm run build
 docker compose config -q
 ~~~

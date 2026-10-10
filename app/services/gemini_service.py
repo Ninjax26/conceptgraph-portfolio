@@ -9,6 +9,7 @@ from app.core.exceptions import (
     LLMProviderRateLimitError,
     LLMProviderRequestError,
     LLMProviderUnavailableError,
+    LLMProviderTruncatedResponseError,
 )
 from app.services.provider_failover import retry_after_seconds
 
@@ -32,6 +33,7 @@ class GeminiService:
         json_mode: bool = False,
         response_schema: dict[str, Any] | None = None,
         max_output_tokens: int = 1_200,
+        require_complete: bool = False,
     ) -> str:
         if not settings.gemini_api_key:
             raise LLMConfigurationError("GEMINI_API_KEY is not configured")
@@ -87,8 +89,11 @@ class GeminiService:
 
         try:
             body = response.json()
-            parts = body["candidates"][0]["content"]["parts"]
-            content = "".join(part.get("text", "") for part in parts)
+            candidate = body["candidates"][0]
+            if require_complete and candidate.get("finishReason") == "MAX_TOKENS":
+                raise LLMProviderTruncatedResponseError("The structured response was truncated.")
+            parts = candidate["content"]["parts"]
+            content = "".join(part.get("text", "") for part in parts if not part.get("thought"))
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise LLMProviderUnavailableError(
                 "Gemini returned an invalid completion response"

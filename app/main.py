@@ -29,12 +29,17 @@ LOCAL_DEV_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    if settings.processing_role == "worker":
+        raise RuntimeError("Use python -m app.worker for the worker role.")
+    if settings.processing_role == "api" and not settings.shared_provider_limits_enabled:
+        raise RuntimeError("Split-process operation requires SHARED_PROVIDER_LIMITS_ENABLED=true.")
     await initialize_database_schema()
     await asyncio.to_thread(
         document_processing_service.ingestion_service.validate_qdrant_collection
     )
-    await processing_coordinator.start()
-    await demo_retention_service.start()
+    if settings.processing_role == "combined":
+        await processing_coordinator.start()
+        await demo_retention_service.start()
     try:
         yield
     finally:
@@ -96,11 +101,17 @@ async def provider_status() -> dict:
             **runtime,
         })
     fallback_order = ["gemini"] if configured["gemini"] else (["cerebras"] if configured["cerebras"] else [])
+    from app.services.shared_provider_service import shared_provider_status
+    try:
+        shared_budget = await shared_provider_status()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Shared provider budget status is unavailable.") from exc
     return {
         "primary": settings.llm_provider.lower(),
         "fallback_order": fallback_order,
         "providers": providers,
         "metrics": provider_metrics.snapshot(),
+        "shared_budget": shared_budget,
         "note": "Configured means the server loaded a key; last outcome comes from a real generation request in this process.",
     }
 
@@ -126,7 +137,16 @@ async def readiness_check() -> dict:
         await asyncio.to_thread(storage_service.check_ready)
     except Exception:
         unavailable.append("object_storage")
-    if not processing_coordinator.started:
+    worker_count = None
+    if settings.processing_role == "api":
+        from app.services.worker_presence_service import active_worker_count
+        try:
+            worker_count = await active_worker_count()
+            if worker_count == 0:
+                degraded.append("ingestion_worker")
+        except Exception:
+            unavailable.append("worker_registry")
+    elif not processing_coordinator.started:
         unavailable.append("processing_coordinator")
     if unavailable:
         raise HTTPException(
@@ -138,5 +158,8 @@ async def readiness_check() -> dict:
         "revision": os.getenv("RENDER_GIT_COMMIT", "local"),
         "processing_queue_depth": processing_coordinator.queue_depth,
         "degraded_services": degraded,
-        "graph_available": not degraded,
+        "graph_available": "neo4j" not in degraded,
+        "ingestion_available": settings.processing_role == "combined" or bool(worker_count),
+        "active_workers": worker_count,
+        "processing_role": settings.processing_role,
     }

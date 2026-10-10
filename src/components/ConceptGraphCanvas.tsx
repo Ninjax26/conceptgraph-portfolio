@@ -42,6 +42,7 @@ interface ConceptGraphCanvasProps {
   nodes: GraphCanvasNode[];
   edges: GraphCanvasEdge[];
   onOpenSource?: (node: GraphCanvasNode) => void;
+  layoutMode?: "auto" | "breadthfirst";
 }
 
 const RELATION_COLORS: Record<string, string> = {
@@ -64,6 +65,7 @@ export default function ConceptGraphCanvas({
   nodes,
   edges,
   onOpenSource,
+  layoutMode = "auto",
 }: ConceptGraphCanvasProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
@@ -338,7 +340,11 @@ export default function ConceptGraphCanvas({
     let resizeFrame = 0;
     const resizeObserver = new ResizeObserver(() => {
       cancelAnimationFrame(resizeFrame);
-      resizeFrame = requestAnimationFrame(() => cy.resize());
+      resizeFrame = requestAnimationFrame(() => {
+        if (cy.destroyed()) return;
+        cy.resize();
+        cy.fit(undefined, 56);
+      });
     });
     resizeObserver.observe(containerRef.current);
 
@@ -382,7 +388,7 @@ export default function ConceptGraphCanvas({
     cy.add(elements);
     cy.resize();
     const layout = cy.layout(
-      isHierarchy
+      isHierarchy || layoutMode === "breadthfirst"
         ? {
           name: "breadthfirst",
           animate: false,
@@ -397,8 +403,9 @@ export default function ConceptGraphCanvas({
         : visibleEdges.length > 0
         ? {
           name: "cose",
-          animate: visibleNodes.length <= 24,
-          animationDuration: 420,
+          // CoSE's animated loop can refresh a destroyed core after stop().
+          // Finish the bounded layout synchronously before React can unmount it.
+          animate: false,
           componentSpacing: 110,
           fit: true,
           gravity: 0.35,
@@ -421,7 +428,7 @@ export default function ConceptGraphCanvas({
         },
     );
     layout.run();
-  }, [connectedNodeIds, isHierarchy, visibleEdges, visibleNodes]);
+  }, [connectedNodeIds, isHierarchy, layoutMode, visibleEdges, visibleNodes]);
 
   const clearSelection = (): void => {
     setSelectedNode(null);
@@ -583,7 +590,7 @@ function GraphControl({
   return (
     <button
       aria-label={label}
-      className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800"
+      className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-teal-800 transition hover:border-teal-300 hover:bg-teal-50"
       onClick={onClick}
       title={label}
       type="button"

@@ -208,7 +208,7 @@ class ProviderQuotaTests(unittest.TestCase):
         self.assertIs(result, expected)
         backup.assert_called_once()
 
-    def test_empty_groq_graph_triggers_gemini_failover(self):
+    def test_explicit_empty_groq_graph_does_not_spend_a_failover_call(self):
         service = IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
         expected = GraphExtractionResponse(nodes=[
             ConceptNode(id="network", name="Network", type="concept", source_chunk_id="upload:1:0")
@@ -219,8 +219,9 @@ class ProviderQuotaTests(unittest.TestCase):
              patch.object(service, "_extract_with_groq", return_value=GraphExtractionResponse()), \
              patch.object(service, "_extract_with_gemini", return_value=expected) as backup:
             result = asyncio.run(service._extract_with_failover(source))
-        self.assertIs(result, expected)
-        backup.assert_called_once()
+        self.assertEqual(result.nodes, [])
+        self.assertTrue(result.empty_extraction)
+        backup.assert_not_called()
 
     def test_graph_with_invented_source_ids_triggers_gemini_failover(self):
         service = IngestionService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())

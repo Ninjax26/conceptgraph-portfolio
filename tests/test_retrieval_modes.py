@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, Mock, patch
 
 from fastapi import HTTPException
 from pydantic import ValidationError
+from app.core.config import settings
 from app.services.rag_service import RetrievalService
 from app.api.endpoints import query
 from scripts.run_evaluation import score_retrieval_result, summarize_retrieval
@@ -42,7 +43,8 @@ class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["chunks"], [{"text": "PDF evidence"}])
             self.assertEqual(result["graph_metadata"]["requested_mode"], "one_hop")
             self.assertEqual(result["graph_metadata"]["retrieval_mode"], "vector_only")
-            service.search_qdrant.assert_called_once_with("Question", [], [], ["allowed"], 10)
+            self.assertEqual(result["graph_metadata"]["fallback_reason"], "graph_timeout" if isinstance(error, TimeoutError) else "graph_unavailable")
+            service.search_qdrant.assert_called_once_with("Question", [], [], ["allowed"], settings.retrieval_candidate_limit, metadata=ANY)
 
     async def test_vector_failures_are_not_hidden_by_graph_fallback(self):
         service = RetrievalService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
@@ -50,6 +52,23 @@ class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
         service.search_qdrant = Mock(side_effect=RuntimeError("vector offline"))
         with self.assertRaisesRegex(RuntimeError, "vector offline"):
             await service.retrieve("Question", SimpleNamespace(document_ids=["allowed"], graph_status="GRAPH_READY"))
+
+    async def test_missing_projection_is_distinguished_from_a_valid_empty_extraction(self):
+        for recorded_nodes, projected_nodes in ((15, 0), (0, 0), (15, 15)):
+            with self.subTest(recorded_nodes=recorded_nodes, projected_nodes=projected_nodes):
+                session = AsyncMock()
+                records = AsyncMock()
+                records.__aiter__.return_value = []
+                session.run.return_value = records
+                context = SimpleNamespace(document_ids=["ready-only"], graph_course_ids=["course"],
+                    graph_status="GRAPH_PARTIAL", documents=(SimpleNamespace(graph_node_count=recorded_nodes),))
+                service = RetrievalService(graph_driver=SimpleNamespace(session=Mock(return_value=session)), vector_client=SimpleNamespace())
+                service._fetch_course_graph = AsyncMock(return_value=[])
+                service._fetch_graph_totals = AsyncMock(return_value={"total_nodes": projected_nodes, "total_edges": 0})
+                result = await service.execute_graph_retrieval("Question", context)
+                self.assertEqual(result.metadata.get("projection_missing", False), recorded_nodes > 0 and projected_nodes == 0)
+                self.assertEqual(result.one_hop_prerequisite_names, [])
+                service._fetch_course_graph.assert_awaited_once_with(session.__aenter__.return_value, ["course"], ["ready-only"])
 
     async def test_cancellation_does_not_start_fallback(self):
         service = RetrievalService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
@@ -71,8 +90,7 @@ class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
         )))
         with patch.object(query.CourseService, "get_ready_context", AsyncMock(return_value=context)), \
              patch.object(query, "get_rerank_service", return_value=SimpleNamespace(rerank=AsyncMock(return_value=[]))), \
-             patch.object(query, "assess_evidence", return_value=([], {"level": "high", "score": .9, "evidence_count": 1, "reason": "test"})), \
-             patch.object(query, "build_sources", return_value=[{"source_id": "source-1"}]), \
+             patch.object(query, "prepare_evidence", return_value=([{"source_id": "source-1"}], {"level": "high", "score": .9, "evidence_count": 1, "reason": "test"})), \
              patch.object(query, "get_synthesis_service", return_value=synthesis):
             await query.query_conceptgraph(query.QueryRequest(question="Question", course_id="course", retrieval_mode="vector_only"), retrieval, None)
         self.assertEqual(retrieval.retrieve.await_args.kwargs["retrieval_mode"], "vector_only")

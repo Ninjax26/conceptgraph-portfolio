@@ -59,17 +59,18 @@ class CourseSummary:
 class CourseService:
     async def list_summaries(self, session: AsyncSession) -> list[CourseSummary]:
         courses = list((await session.execute(select(Course).order_by(Course.display_name))).scalars())
-        documents = list(
-            (
-                await session.execute(
-                    select(DocumentUpload).order_by(DocumentUpload.updated_at.desc())
-                )
-            ).scalars()
-        )
+        documents = (
+            await session.execute(
+                select(DocumentUpload).order_by(DocumentUpload.updated_at.desc())
+            )
+        ).scalars()
+        documents_by_course: dict[str | None, list[DocumentUpload]] = {}
+        for document in documents:
+            documents_by_course.setdefault(document.course_uuid, []).append(document)
         summaries: list[CourseSummary] = []
         status_rank = {"ready": 0, "active": 1, "failed": 2, "cancelled": 3}
         for course in courses:
-            records = [document for document in documents if document.course_uuid == course.id]
+            records = documents_by_course.get(course.id, [])
             canonical: dict[str, DocumentUpload] = {}
             for document in sorted(
                 records,

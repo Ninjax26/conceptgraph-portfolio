@@ -69,6 +69,7 @@ async def get_db() -> AsyncGenerator[DatabaseClients, None]:
 
 async def initialize_database_schema() -> None:
     async with postgres_engine.begin() as conn:
+        await conn.execute(text("SELECT pg_advisory_xact_lock(hashtext('conceptgraph:schema'))"))
         await conn.run_sync(Base.metadata.create_all)
         migrations = [
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS course_uuid VARCHAR(64)",
@@ -82,6 +83,9 @@ async def initialize_database_schema() -> None:
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS lease_owner VARCHAR(128)",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS processed_chunk_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS source_bytes BIGINT",
+            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS page_count INTEGER",
+            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS reserved_chunk_count INTEGER",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_node_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_edge_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_status VARCHAR(32)",
@@ -90,6 +94,7 @@ async def initialize_database_schema() -> None:
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_stage ON document_uploads (stage)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_graph_status ON document_uploads (graph_status)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_lease_expires_at ON document_uploads (lease_expires_at)",
+            "CREATE INDEX IF NOT EXISTS ix_document_uploads_created_upload ON document_uploads (created_at DESC, upload_id DESC)",
             "ALTER TABLE processing_attempts ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ",
         ]
         for statement in migrations:

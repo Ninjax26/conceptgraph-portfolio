@@ -45,7 +45,7 @@ async def run(args):
     from app.services.ingestion_service import IngestionService
     from app.services.rag_service import RetrievalService
     from app.services.rerank_service import RerankService
-    from app.services.citation_service import assess_evidence, build_sources
+    from app.services.citation_service import prepare_evidence
     from app.schemas.extraction import GraphExtractionResponse, ConceptNode, ConceptRelationship
 
     torch.set_num_threads(2)
@@ -159,8 +159,7 @@ async def run(args):
                         if not candidates:
                             raise RuntimeError("Fixture has no indexed candidates")
                         ranked = await reranker.rerank(case["question"], candidates)
-                        evidence, confidence = assess_evidence(ranked)
-                        sources = build_sources(evidence)
+                        sources, confidence = prepare_evidence(case["question"], ranked)
                     except Exception as exc:
                         error = type(exc).__name__
                     scored = score_retrieval_result(case, sources=sources, confidence=confidence,
@@ -185,7 +184,9 @@ async def run(args):
                 "graph_snapshot_reused": args.reuse_graphs, "repeats": args.repeats,
                 "latency": "Warm models, rotated mode order; includes Neo4j network round trips; excludes PDF indexing, extraction and synthesis",
                 "embedding": settings.embedding_model_name, "reranker": settings.rerank_model_name,
-                "evidence_min_score": settings.evidence_min_score, "candidate_count": 10, "scored_top_k": 5,
+                "evidence_min_score": settings.evidence_min_score, "candidate_count": settings.retrieval_candidate_limit, "scored_top_k": 5,
+                "identifier_lookup": settings.retrieval_identifier_lookup,
+                "identifier_verification": settings.retrieval_verify_identifiers,
                 "platform": platform.platform(), "python": platform.python_version(),
                 "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "working_tree_changes": True,

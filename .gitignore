@@ -26,3 +26,6 @@ dist/
 
 # Personal interview preparation stays local and is never published.
 local-notes/
+
+# Local UI-assistant settings are not application assets.
+.impeccable/

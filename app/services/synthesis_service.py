@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -26,6 +25,7 @@ from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.provider_failover import provider_circuit_breaker
 from app.services.provider_metrics import provider_metrics
+from app.services.shared_provider_service import observe_provider_call
 
 
 logger = logging.getLogger(__name__)
@@ -74,8 +74,7 @@ class SynthesisService:
         provider = settings.llm_provider.lower()
         if provider == "gemini":
             try:
-                answer = await asyncio.to_thread(
-                    provider_metrics.observe,
+                answer = await observe_provider_call(
                     "gemini",
                     "answer_synthesis",
                     lambda: self._synthesize_with_gemini(question, graph_context, sources),
@@ -94,8 +93,7 @@ class SynthesisService:
             )
         if provider == "cerebras":
             try:
-                answer = await asyncio.to_thread(
-                    provider_metrics.observe,
+                answer = await observe_provider_call(
                     "cerebras",
                     "answer_synthesis",
                     lambda: self._synthesize_with_cerebras(question, graph_context, sources),
@@ -139,8 +137,7 @@ class SynthesisService:
         primary_failure: str | None = None
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
-                answer = await asyncio.to_thread(
-                    provider_metrics.observe,
+                answer = await observe_provider_call(
                     "groq",
                     "answer_synthesis",
                     lambda: self._synthesize_with_groq(question, graph_context, sources),
@@ -150,6 +147,8 @@ class SynthesisService:
                 return GenerationResult(answer, "groq")
             except (
                 RateLimitError,
+                LLMProviderRateLimitError,
+                LLMProviderUnavailableError,
                 AuthenticationError,
                 PermissionDeniedError,
                 BadRequestError,
@@ -171,8 +170,7 @@ class SynthesisService:
 
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
-                answer = await asyncio.to_thread(
-                    provider_metrics.observe,
+                answer = await observe_provider_call(
                     "cerebras",
                     "answer_synthesis",
                     lambda: self._synthesize_with_cerebras(question, graph_context, sources),
@@ -191,8 +189,7 @@ class SynthesisService:
 
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
-                answer = await asyncio.to_thread(
-                    provider_metrics.observe,
+                answer = await observe_provider_call(
                     "gemini",
                     "answer_synthesis",
                     lambda: self._synthesize_with_gemini(question, graph_context, sources),

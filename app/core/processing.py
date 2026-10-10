@@ -34,6 +34,7 @@ def assess_graph_status(
     *,
     sections_total: int = 0,
     sections_succeeded: int | None = None,
+    sections_empty: int = 0,
     batches_failed: int = 0,
     batches_skipped: int = 0,
 ) -> GraphStatus:
@@ -44,7 +45,7 @@ def assess_graph_status(
     coverage_is_partial = (
         sections_total > 0
         and sections_succeeded is not None
-        and sections_succeeded < sections_total
+        and sections_succeeded + sections_empty < sections_total
     )
     if (
         node_count < 2
@@ -76,7 +77,12 @@ def normalize_course_name(value: str) -> str:
 
 
 def classify_failure(exc: Exception) -> tuple[FailureCategory, bool, str]:
+    from app.services.resource_budget_service import ResourceBudgetExceeded
+    if isinstance(exc, ResourceBudgetExceeded):
+        return FailureCategory.DOCUMENT_ERROR, exc.retryable, str(exc)
     message = str(exc).lower()
+    if "ocr" in message and ("timeout" in message or "timed out" in message):
+        return FailureCategory.TIMEOUT_ERROR, True, "OCR timed out while reading this PDF. Retry or split it into smaller files."
     if "ocr engine" in message or "tesseract" in message:
         return (
             FailureCategory.CONFIGURATION_ERROR,

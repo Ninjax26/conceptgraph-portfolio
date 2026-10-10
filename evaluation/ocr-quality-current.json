@@ -1,0 +1,194 @@
+{
+  "generated_at": "2026-10-10T15:19:22.882374+00:00",
+  "tesseract": "tesseract 5.5.2",
+  "baseline_revision": "HEAD",
+  "fixture_count": 8,
+  "normalization": "casefold and collapse whitespace; punctuation retained",
+  "scope": "Authored English fixtures; not a real-document or retrieval-quality benchmark.",
+  "results": [
+    {
+      "fixture": "native",
+      "baseline": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.005,
+        "extraction_methods": [
+          "native_text"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.004,
+        "extraction_methods": [
+          "native_text"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    },
+    {
+      "fixture": "clean_scan",
+      "baseline": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.548,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.493,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    },
+    {
+      "fixture": "rotated_90_scan",
+      "baseline": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.494,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.492,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    },
+    {
+      "fixture": "rotated_180_scan",
+      "baseline": {
+        "cer": 0.8441,
+        "wer": 1.0,
+        "seconds": 0.51,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.491,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    },
+    {
+      "fixture": "low_resolution_scan",
+      "baseline": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.437,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.493,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    },
+    {
+      "fixture": "slightly_skewed_scan",
+      "baseline": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.516,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.515,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    },
+    {
+      "fixture": "mixed_native_image",
+      "baseline": {
+        "cer": 0.8837,
+        "wer": 0.8992,
+        "seconds": 0.004,
+        "extraction_methods": [
+          "native_text"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.518,
+        "extraction_methods": [
+          "native_text+ocr"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    },
+    {
+      "fixture": "corrupted_hidden_text",
+      "baseline": {
+        "cer": 0.9973,
+        "wer": 1.0,
+        "seconds": 0.005,
+        "extraction_methods": [
+          "native_text"
+        ],
+        "warnings": [],
+        "error": null
+      },
+      "current": {
+        "cer": 0.0,
+        "wer": 0.0,
+        "seconds": 0.568,
+        "extraction_methods": [
+          "ocr"
+        ],
+        "warnings": [],
+        "error": null
+      }
+    }
+  ]
+}

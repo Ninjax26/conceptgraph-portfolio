@@ -1,0 +1,29 @@
+{
+  "name": "Authored retrieval scaling fixtures v1",
+  "annotation_note": "The existing computing questions are development cases. The additional questions below are validation/regression cases used to diagnose identifier failures. Fresh authored held-out questions are stored separately. This is a synthetic evaluation, not independently annotated user data.",
+  "development_questions": "questions-multidoc.json",
+  "held_out_questions": "questions-scaling-heldout.json",
+  "documents": [
+    {"id": "PMP-101", "pressure": "12.5", "interval": 30},
+    {"id": "PMP-102", "pressure": "14.0", "interval": 45},
+    {"id": "PMP-103", "pressure": "9.5", "interval": 15},
+    {"id": "PMP-104", "pressure": "11.0", "interval": 60},
+    {"id": "PMP-105", "pressure": "16.0", "interval": 90},
+    {"id": "PMP-106", "pressure": "8.0", "interval": 7}
+  ],
+  "questions": [
+    {"id": "h01", "question": "What pressure limit applies to PMP-104?", "category": "identifier", "expected_document": "equipment-PMP-104.pdf", "expected_page": 1, "expected_passage_fragments": ["11.0 bar"], "should_refuse": false},
+    {"id": "h02", "question": "What is the inspection interval for PMP-101?", "category": "identifier", "expected_document": "equipment-PMP-101.pdf", "expected_page": 2, "expected_passage_fragments": ["30 days"], "should_refuse": false},
+    {"id": "h03", "question": "What is the approved maximum pressure for PMP-102?", "category": "identifier", "expected_document": "equipment-PMP-102.pdf", "expected_page": 1, "expected_passage_fragments": ["14.0 bar"], "should_refuse": false},
+    {"id": "h04", "question": "How often should PMP-103 be inspected?", "category": "identifier", "expected_document": "equipment-PMP-103.pdf", "expected_page": 2, "expected_passage_fragments": ["15 days"], "should_refuse": false},
+    {"id": "h05", "question": "Find the operating pressure limit of PMP-105.", "category": "identifier", "expected_document": "equipment-PMP-105.pdf", "expected_page": 1, "expected_passage_fragments": ["16.0 bar"], "should_refuse": false},
+    {"id": "h06", "question": "Find the inspection frequency specified for PMP-106.", "category": "identifier", "expected_document": "equipment-PMP-106.pdf", "expected_page": 2, "expected_passage_fragments": ["7 days"], "should_refuse": false},
+    {"id": "h07", "question": "For PMP-103, give both the pressure limit and the inspection interval.", "category": "identifier_multisource", "expected_sources": [{"document_name": "equipment-PMP-103.pdf", "page_number": 1}, {"document_name": "equipment-PMP-103.pdf", "page_number": 2}], "expected_passage_fragments": ["9.5 bar", "15 days"], "should_refuse": false},
+    {"id": "h08", "question": "How do the inspection intervals of PMP-104 and PMP-106 compare?", "category": "identifier_multisource", "expected_sources": [{"document_name": "equipment-PMP-104.pdf", "page_number": 2}, {"document_name": "equipment-PMP-106.pdf", "page_number": 2}], "expected_passage_fragments": ["60 days", "7 days"], "should_refuse": false},
+    {"id": "h09", "question": "How does an idempotent upload prevent duplicated data after a network failure?", "category": "general", "expected_sources": [{"document_name": "data-reliability.pdf", "page_number": 2}, {"document_name": "data-reliability.pdf", "page_number": 3}], "should_refuse": false},
+    {"id": "h10", "question": "Why does a signed login session still need authorization checks for each document?", "category": "general", "expected_sources": [{"document_name": "identity-security.pdf", "page_number": 1}, {"document_name": "identity-security.pdf", "page_number": 2}, {"document_name": "identity-security.pdf", "page_number": 3}], "should_refuse": false},
+    {"id": "h11", "question": "What pressure limit applies to PMP-99999?", "category": "unsupported_identifier", "should_refuse": true},
+    {"id": "h12", "question": "What inspection interval applies to PMP-88888?", "category": "unsupported_identifier", "should_refuse": true},
+    {"id": "h13", "question": "Which country won the football World Cup in 1990?", "category": "unsupported", "should_refuse": true}
+  ]
+}

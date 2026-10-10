@@ -1,0 +1,16 @@
+{
+  "name": "Authored final retrieval check v1",
+  "annotation_note": "Created after the identifier-verification rule and candidate budget were fixed. Do not use these cases for choosing thresholds. Labels refer to authored fixture pages, not independent real-world documents.",
+  "questions": [
+    {"id": "t01", "question": "How many days can pass between required inspections of PMP-102?", "category": "identifier", "expected_document": "equipment-PMP-102.pdf", "expected_page": 2, "expected_passage_fragments": ["45 days"], "should_refuse": false},
+    {"id": "t02", "question": "Find the maximum operating pressure stated for PMP-106.", "category": "identifier", "expected_document": "equipment-PMP-106.pdf", "expected_page": 1, "expected_passage_fragments": ["8.0 bar"], "should_refuse": false},
+    {"id": "t03", "question": "Which pressure limit must an operator use for PMP-101?", "category": "identifier", "expected_document": "equipment-PMP-101.pdf", "expected_page": 1, "expected_passage_fragments": ["12.5 bar"], "should_refuse": false},
+    {"id": "t04", "question": "How frequently does the procedure require inspection of PMP-105?", "category": "identifier", "expected_document": "equipment-PMP-105.pdf", "expected_page": 2, "expected_passage_fragments": ["90 days"], "should_refuse": false},
+    {"id": "t05", "question": "What should an operator do if PMP-104 exceeds its approved pressure limit?", "category": "identifier", "expected_document": "equipment-PMP-104.pdf", "expected_page": 1, "expected_passage_fragments": ["Stop operation"], "should_refuse": false},
+    {"id": "t06", "question": "Compare the approved pressure limits of PMP-101 and PMP-105.", "category": "identifier_multisource", "expected_sources": [{"document_name": "equipment-PMP-101.pdf", "page_number": 1}, {"document_name": "equipment-PMP-105.pdf", "page_number": 1}], "expected_passage_fragments": ["12.5 bar", "16.0 bar"], "should_refuse": false},
+    {"id": "t07", "question": "Why must a server check who owns a PDF before allowing it to be downloaded?", "category": "general", "expected_document": "identity-security.pdf", "expected_page": 2, "should_refuse": false},
+    {"id": "t08", "question": "Which parts of an HTTP response describe its status and metadata?", "category": "general", "expected_document": "web-foundations.pdf", "expected_page": 1, "should_refuse": false},
+    {"id": "t09", "question": "What pressure limit is specified for PMP-77777?", "category": "unsupported_identifier", "should_refuse": true},
+    {"id": "t10", "question": "How many moons does Jupiter currently have?", "category": "unsupported", "should_refuse": true}
+  ]
+}

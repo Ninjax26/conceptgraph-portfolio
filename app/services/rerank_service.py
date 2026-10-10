@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.services.retrieval_candidates import passage_excerpt
 
 
 class RerankService:
@@ -46,7 +47,7 @@ class RerankService:
                 json={
                     "model": settings.rerank_model_name,
                     "query": query,
-                    "documents": [str(chunk.get("text", "")) for chunk in chunks],
+                    "documents": [passage_excerpt(str(chunk.get("text", "")), query, 1600) for chunk in chunks],
                     "top_n": len(chunks),
                 },
             )
@@ -59,13 +60,18 @@ class RerankService:
         ranked_chunks: list[dict[str, Any]] = []
         seen: set[int] = set()
         for result in results:
-            index = int(result["index"])
+            index = result["index"]
+            if type(index) is not int:
+                raise RuntimeError("Cohere returned an invalid rerank result index.")
             if index < 0 or index >= len(chunks) or index in seen:
                 raise RuntimeError("Cohere returned an invalid rerank result index.")
             seen.add(index)
+            relevance = float(result["relevance_score"])
+            if not math.isfinite(relevance) or not 0 <= relevance <= 1:
+                raise RuntimeError("Cohere returned an invalid relevance score.")
             probability = max(
                 1e-6,
-                min(1.0 - 1e-6, float(result["relevance_score"])),
+                min(1.0 - 1e-6, relevance),
             )
             ranked_chunk = dict(chunks[index])
             # Citation scoring applies a sigmoid to local cross-encoder logits.
@@ -81,10 +87,12 @@ class RerankService:
         query: str,
         chunks: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        pairs = [(query, str(chunk.get("text", ""))) for chunk in chunks]
+        pairs = [(query, passage_excerpt(str(chunk.get("text", "")), query, 1600)) for chunk in chunks]
         scores = self.model.predict(pairs)
         ranked_chunks: list[dict[str, Any]] = []
         for chunk, score in zip(chunks, scores, strict=True):
+            if not math.isfinite(float(score)):
+                raise RuntimeError("The local reranker returned an invalid score.")
             ranked_chunk = dict(chunk)
             ranked_chunk["rerank_score"] = float(score)
             ranked_chunks.append(ranked_chunk)
@@ -111,8 +119,5 @@ class RerankService:
 
     @staticmethod
     def _resolve_device() -> str:
-        import torch
-
-        if torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
+        from app.core.model_runtime import local_model_device
+        return local_model_device()

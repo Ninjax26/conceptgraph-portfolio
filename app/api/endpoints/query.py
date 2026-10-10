@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import lru_cache
 from typing import Any, Literal
 
@@ -10,7 +11,7 @@ from app.core.exceptions import LLMConfigurationError
 from app.services.rag_service import RetrievalMode, RetrievalService
 from app.services.rerank_service import RerankService
 from app.services.synthesis_service import SynthesisService
-from app.services.citation_service import assess_evidence, build_sources
+from app.services.citation_service import prepare_evidence
 from app.services.course_service import CourseNotFoundError, CourseNotReadyError, CourseService
 from app.core.database import get_postgres_session
 
@@ -70,6 +71,7 @@ async def query_conceptgraph(
     retrieval_service: RetrievalService = Depends(get_retrieval_service),
     db: AsyncSession = Depends(get_postgres_session),
 ) -> QueryResponse:
+    query_started = time.perf_counter()
     try:
         course_context = await CourseService().get_ready_context(db, request.course_id)
     except CourseNotFoundError as exc:
@@ -77,6 +79,7 @@ async def query_conceptgraph(
     except CourseNotReadyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    retrieval_started = time.perf_counter()
     try:
         retrieval_result = await retrieval_service.retrieve(
             question=request.question,
@@ -89,6 +92,9 @@ async def query_conceptgraph(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Course retrieval is temporarily unavailable. Please try again.",
         ) from exc
+    timings = retrieval_result["graph_metadata"].setdefault("timings", {})
+    timings["course_resolution_ms"] = round((retrieval_started - query_started) * 1000, 2)
+    timings["retrieval_total_ms"] = round((time.perf_counter() - retrieval_started) * 1000, 2)
     if not retrieval_result["chunks"]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -99,6 +105,7 @@ async def query_conceptgraph(
         )
 
     rerank_service = get_rerank_service()
+    rerank_started = time.perf_counter()
     try:
         ranked_chunks = await rerank_service.rerank(
             request.question,
@@ -110,9 +117,13 @@ async def query_conceptgraph(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Result ranking is temporarily unavailable. Please try again.",
         ) from exc
-    evidence_chunks, confidence = assess_evidence(ranked_chunks)
-    sources = build_sources(evidence_chunks)
+    timings["rerank_ms"] = round((time.perf_counter() - rerank_started) * 1000, 2)
+    evidence_started = time.perf_counter()
+    sources, confidence = prepare_evidence(request.question, ranked_chunks)
+    timings["evidence_ms"] = round((time.perf_counter() - evidence_started) * 1000, 2)
+    timings["generation_ms"] = 0.0
     if not sources:
+        timings["query_processing_ms"] = round((time.perf_counter() - query_started) * 1000, 2)
         return QueryResponse(
             answer="I could not find enough reliable course content to answer this confidently.",
             sources=[],
@@ -122,6 +133,7 @@ async def query_conceptgraph(
             generation_metadata=GenerationMetadata(provider_used="not_attempted"),
         )
     synthesis_service = get_synthesis_service()
+    generation_started = time.perf_counter()
     try:
         generation = await synthesis_service.synthesize_with_metadata(
             question=request.question,
@@ -141,6 +153,8 @@ async def query_conceptgraph(
             detail="Answer generation is temporarily unavailable. Please try again.",
         ) from exc
 
+    timings["generation_ms"] = round((time.perf_counter() - generation_started) * 1000, 2)
+    timings["query_processing_ms"] = round((time.perf_counter() - query_started) * 1000, 2)
     return QueryResponse(
         answer=generation.answer,
         sources=sources,

@@ -1,7 +1,9 @@
 import re
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
+
+from app.core.exceptions import GraphFailureReason
 
 
 ALLOWED_RELATIONSHIP_TYPES = frozenset(
@@ -46,6 +48,20 @@ class ConceptRelationship(BaseModel):
     relation_type: Annotated[StrictStr, Field(min_length=1)]
 
 
+class GraphBatchDiagnostic(BaseModel):
+    """Authenticated upload metadata; never contains provider output or error text."""
+
+    section_label: str
+    kind: Literal["section", "global"] = "section"
+    outcome: Literal["failed", "empty", "skipped", "filtered"]
+    category: GraphFailureReason | Literal[
+        "no_concepts", "quota", "provider_unavailable", "configuration",
+        "provider_request", "budget", "no_new_relationships", "application_budget",
+    ]
+    discarded_nodes: int = Field(default=0, ge=0)
+    discarded_relationships: int = Field(default=0, ge=0)
+
+
 class GraphExtractionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -54,6 +70,10 @@ class GraphExtractionResponse(BaseModel):
     sections_total: int = Field(default=0, ge=0)
     sections_succeeded: int = Field(default=0, ge=0)
     sections_failed: int = Field(default=0, ge=0)
+    sections_processed: int = Field(default=0, ge=0)
+    sections_empty: int = Field(default=0, ge=0)
+    batches_empty: int = Field(default=0, ge=0)
+    empty_extraction: bool = False
     batches_total: int = Field(default=0, ge=0)
     batches_succeeded: int = Field(default=0, ge=0)
     batches_failed: int = Field(default=0, ge=0)
@@ -62,7 +82,9 @@ class GraphExtractionResponse(BaseModel):
     extraction_budget_applied: bool = False
     global_linking_attempted: bool = False
     global_linking_succeeded: bool = False
+    global_linking_processed: bool = False
     failed_section_labels: list[StrictStr] = Field(default_factory=list)
+    batch_diagnostics: list[GraphBatchDiagnostic] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_graph_integrity(self) -> "GraphExtractionResponse":

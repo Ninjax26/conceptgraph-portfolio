@@ -38,7 +38,7 @@ from app.services.course_service import ReadyCourseContext
 from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.provider_failover import provider_circuit_breaker
-from app.services.provider_metrics import provider_metrics
+from app.services.shared_provider_service import observe_provider_call
 
 logger = logging.getLogger(__name__)
 
@@ -261,8 +261,7 @@ class ExamService:
         """Dispatch to the configured LLM provider."""
         provider = settings.llm_provider.lower()
         if provider == "gemini":
-            return await asyncio.to_thread(
-                provider_metrics.observe,
+            return await observe_provider_call(
                 "gemini",
                 "exam_generation",
                 lambda: self._generate_with_gemini(context_text, num_questions, sources),
@@ -273,8 +272,7 @@ class ExamService:
                 context_text, num_questions, sources
             )
         if provider == "cerebras":
-            return await asyncio.to_thread(
-                provider_metrics.observe,
+            return await observe_provider_call(
                 "cerebras",
                 "exam_generation",
                 lambda: self._generate_with_cerebras(context_text, num_questions, sources),
@@ -291,8 +289,7 @@ class ExamService:
         primary_error: Exception | None = None
         if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
             try:
-                result = await asyncio.to_thread(
-                    provider_metrics.observe,
+                result = await observe_provider_call(
                     "groq",
                     "exam_generation",
                     lambda: self._generate_with_groq(context_text, num_questions, sources),
@@ -302,6 +299,8 @@ class ExamService:
                 return result
             except (
                 RateLimitError,
+                LLMProviderRateLimitError,
+                LLMProviderUnavailableError,
                 AuthenticationError,
                 PermissionDeniedError,
                 BadRequestError,
@@ -320,8 +319,7 @@ class ExamService:
 
         if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
             try:
-                result = await asyncio.to_thread(
-                    provider_metrics.observe,
+                result = await observe_provider_call(
                     "cerebras",
                     "exam_generation",
                     lambda: self._generate_with_cerebras(context_text, num_questions, sources),
@@ -339,8 +337,7 @@ class ExamService:
 
         if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
             try:
-                result = await asyncio.to_thread(
-                    provider_metrics.observe,
+                result = await observe_provider_call(
                     "gemini",
                     "exam_generation",
                     lambda: self._generate_with_gemini(context_text, num_questions, sources),

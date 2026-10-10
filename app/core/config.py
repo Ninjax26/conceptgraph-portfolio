@@ -68,6 +68,20 @@ class Settings(BaseSettings):
         le=4,
         alias="PROCESSING_CONCURRENCY",
     )
+    processing_role: str = Field(default="combined", pattern=r"^(combined|api|worker)$", alias="PROCESSING_ROLE")
+    max_pages_per_document: int = Field(default=500, ge=1, le=10_000, alias="MAX_PAGES_PER_DOCUMENT")
+    max_pages_per_installation: int = Field(default=10_000, ge=1, alias="MAX_PAGES_PER_INSTALLATION")
+    max_chunks_per_document: int = Field(default=2_000, ge=1, alias="MAX_CHUNKS_PER_DOCUMENT")
+    max_chunks_per_installation: int = Field(default=50_000, ge=1, alias="MAX_CHUNKS_PER_INSTALLATION")
+    chunk_reservation_per_page: int = Field(default=32, ge=1, alias="CHUNK_RESERVATION_PER_PAGE")
+    max_storage_mb: int = Field(default=1_024, ge=1, alias="MAX_STORAGE_MB")
+    max_pending_documents: int = Field(default=32, ge=1, alias="MAX_PENDING_DOCUMENTS")
+    graph_display_max_nodes: int = Field(default=100, ge=5, le=500, alias="GRAPH_DISPLAY_MAX_NODES")
+    graph_display_max_edges: int = Field(default=200, ge=1, le=1000, alias="GRAPH_DISPLAY_MAX_EDGES")
+    shared_provider_limits_enabled: bool = Field(default=False, alias="SHARED_PROVIDER_LIMITS_ENABLED")
+    shared_provider_scope: str = Field(default="conceptgraph", min_length=1, max_length=80, alias="SHARED_PROVIDER_SCOPE")
+    provider_requests_per_minute: int = Field(default=10, ge=1, alias="PROVIDER_REQUESTS_PER_MINUTE")
+    provider_requests_per_day: int = Field(default=300, ge=1, alias="PROVIDER_REQUESTS_PER_DAY")
     processing_queue_capacity: int = Field(
         default=8,
         ge=1,
@@ -95,7 +109,7 @@ class Settings(BaseSettings):
     max_pdf_size_mb: int = Field(default=10, ge=1, le=100, alias="MAX_PDF_SIZE_MB")
     max_pdfs_per_installation: int = Field(
         default=50,
-        ge=1,
+        ge=0,
         le=10_000,
         alias="MAX_PDFS_PER_INSTALLATION",
     )
@@ -126,6 +140,10 @@ class Settings(BaseSettings):
         le=120,
         alias="OCR_PAGE_TIMEOUT_SECONDS",
     )
+    ocr_min_confidence: float = Field(default=55, ge=0, le=100, alias="OCR_MIN_CONFIDENCE")
+    ocr_max_render_pixels: int = Field(default=12_000_000, ge=100_000, le=30_000_000, alias="OCR_MAX_RENDER_PIXELS")
+    ocr_mixed_pages_enabled: bool = Field(default=True, alias="OCR_MIXED_PAGES_ENABLED")
+    ocr_retry_enabled: bool = Field(default=True, alias="OCR_RETRY_ENABLED")
     require_upload_auth: bool = Field(
         default=False,
         alias="REQUIRE_UPLOAD_AUTH",
@@ -179,6 +197,7 @@ class Settings(BaseSettings):
         alias="EMBEDDING_MODEL_NAME",
     )
     embedding_provider: str = Field(default="local", alias="EMBEDDING_PROVIDER")
+    local_model_device: str = Field(default="auto", pattern=r"^(auto|cpu|mps)$", alias="LOCAL_MODEL_DEVICE")
     embedding_dimension: int = Field(
         default=384,
         ge=1,
@@ -190,13 +209,17 @@ class Settings(BaseSettings):
         alias="RERANK_MODEL_NAME",
     )
     cohere_api_key: SecretStr | None = Field(default=None, alias="COHERE_API_KEY")
+    retrieval_candidate_limit: int = Field(default=10, ge=1, le=100, alias="RETRIEVAL_CANDIDATE_LIMIT")
+    retrieval_identifier_lookup: bool = Field(default=True, alias="RETRIEVAL_IDENTIFIER_LOOKUP")
+    retrieval_identifier_limit: int = Field(default=10, ge=1, le=30, alias="RETRIEVAL_IDENTIFIER_LIMIT")
+    retrieval_verify_identifiers: bool = Field(default=True, alias="RETRIEVAL_VERIFY_IDENTIFIERS")
     provider_timeout_seconds: float = Field(
         default=30.0,
         ge=1.0,
         le=120.0,
         alias="PROVIDER_TIMEOUT_SECONDS",
     )
-    graph_json_repair_enabled: bool = Field(default=False, alias="GRAPH_JSON_REPAIR_ENABLED")
+    graph_json_repair_enabled: bool = Field(default=True, alias="GRAPH_JSON_REPAIR_ENABLED")
     graph_batch_size: int = Field(
         default=4,
         ge=2,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -43,6 +43,9 @@ class DocumentUpload(Base):
     lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
     processed_chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    source_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reserved_chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     graph_node_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     graph_edge_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     graph_status: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
@@ -107,3 +110,22 @@ class GraphExtractionCheckpoint(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class WorkerPresence(Base):
+    __tablename__ = "worker_presence"
+
+    instance_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    concurrency: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class ProviderBudget(Base):
+    __tablename__ = "provider_budgets"
+
+    scope: Mapped[str] = mapped_column(String(80), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(16), primary_key=True)
+    minute_window: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    day_window: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    minute_requests: Mapped[int] = mapped_column(Integer, nullable=False)
+    day_requests: Mapped[int] = mapped_column(Integer, nullable=False)

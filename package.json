@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:frontend": "node --test tests/retrieval_status.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

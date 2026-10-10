@@ -109,6 +109,14 @@ services:
         value: "10"
       - key: PROCESSING_CONCURRENCY
         value: "1"
+      - key: PROCESSING_ROLE
+        value: combined
+      - key: SHARED_PROVIDER_LIMITS_ENABLED
+        value: "true"
+      - key: PROVIDER_REQUESTS_PER_MINUTE
+        value: "10"
+      - key: PROVIDER_REQUESTS_PER_DAY
+        value: "300"
       - key: PROCESSING_QUEUE_CAPACITY
         value: "8"
       - key: PROCESSING_LEASE_SECONDS
@@ -118,7 +126,19 @@ services:
       - key: MAX_PDF_SIZE_MB
         value: "10"
       - key: MAX_PDFS_PER_INSTALLATION
-        value: "50"
+        value: "0"
+      - key: MAX_PAGES_PER_DOCUMENT
+        value: "500"
+      - key: MAX_PAGES_PER_INSTALLATION
+        value: "10000"
+      - key: MAX_CHUNKS_PER_DOCUMENT
+        value: "2000"
+      - key: MAX_CHUNKS_PER_INSTALLATION
+        value: "50000"
+      - key: MAX_STORAGE_MB
+        value: "1024"
+      - key: MAX_PENDING_DOCUMENTS
+        value: "32"
       - key: REQUIRE_UPLOAD_AUTH
         value: "true"
       - key: PUBLIC_SAMPLE_COURSE_ID

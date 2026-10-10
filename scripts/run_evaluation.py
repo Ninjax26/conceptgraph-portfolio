@@ -53,6 +53,16 @@ def load_dataset(path: Path) -> dict[str, Any]:
         if not isinstance(case, dict) or not str(case.get("question", "")).strip():
             raise ValueError(f"Evaluation question {index} is missing question text.")
         should_refuse = bool(case.get("should_refuse"))
+        if "should_refuse" in case and not isinstance(case["should_refuse"], bool):
+            raise ValueError(f"Evaluation question {index} needs a boolean should_refuse label.")
+        expected = case.get("expected_sources")
+        if expected:
+            if not isinstance(expected, list) or any(
+                not isinstance(source, dict) or not str(source.get("document_name", "")).strip()
+                or type(source.get("page_number")) is not int or source["page_number"] < 1
+                for source in expected
+            ):
+                raise ValueError(f"Evaluation question {index} has invalid expected_sources labels.")
         if not should_refuse and not case.get("expected_sources") and (
             not case.get("expected_document") or not isinstance(case.get("expected_page"), int)
         ):
@@ -102,7 +112,7 @@ async def run_direct_evaluation(
     from types import SimpleNamespace
     from sqlalchemy import text
     from app.core.database import AsyncSessionLocal, close_database_connections
-    from app.services.citation_service import assess_evidence, build_sources
+    from app.services.citation_service import prepare_evidence
     from app.services.rag_service import RetrievalService
     from app.services.rerank_service import RerankService
     from app.services.synthesis_service import SynthesisService
@@ -154,8 +164,7 @@ async def run_direct_evaluation(
                     case["question"],
                     retrieval["chunks"],
                 )
-                evidence, confidence = assess_evidence(ranked)
-                sources = build_sources(evidence)
+                sources, confidence = prepare_evidence(case["question"], ranked)
                 answer = REFUSAL_TEXT
                 response = {
                     "answer": answer,
@@ -192,7 +201,7 @@ async def run_direct_ablation(
 
     from app.core.database import AsyncSessionLocal, close_database_connections
     from app.services.course_service import CourseService
-    from app.services.citation_service import assess_evidence, build_sources
+    from app.services.citation_service import prepare_evidence
     from app.services.rag_service import RetrievalMode, RetrievalService
     from app.services.rerank_service import RerankService
 
@@ -234,8 +243,7 @@ async def run_direct_ablation(
                         retrieval["chunks"],
                     )
                     candidates = retrieval["chunks"]
-                    evidence, confidence = assess_evidence(ranked)
-                    sources = build_sources(evidence)
+                    sources, confidence = prepare_evidence(case["question"], ranked)
                     graph_metadata = retrieval["graph_metadata"]
                 except Exception as exc:
                     error = f"{type(exc).__name__}: retrieval pipeline request failed"
@@ -326,9 +334,9 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
     latencies = [float(result["latency_seconds"]) for result in results]
     return {
         "correct_document_top_5": sum(result["document_correct"] is True for result in supported),
-        "document_question_count": len(supported),
+        "document_question_count": sum(result["document_correct"] is not None for result in supported),
         "correct_source_page_top_5": sum(result["page_correct"] is True for result in supported),
-        "page_question_count": len(supported),
+        "page_question_count": sum(result["page_correct"] is not None for result in supported),
         "answers_with_citations": sum(result["citation_present"] is True for result in supported),
         "supported_question_count": len(supported),
         "unsupported_questions_refused": sum(result["refused"] is True for result in unsupported),
@@ -348,6 +356,7 @@ def score_retrieval_result(
     error: str | None = None,
     ranked_chunks: list[dict[str, Any]] | None = None,
     candidates: list[dict[str, Any]] | None = None,
+    stage_timings: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """Score retrieval only, keeping generation quality outside the ablation."""
 
@@ -369,19 +378,25 @@ def score_retrieval_result(
     def pairs(items):
         return {(str(item.get("document_name", "")).casefold(), item.get("page_number")) for item in items}
     expected_pairs = pairs(expected)
-    def rank_sources(chunks):
+    def rank_sources(chunks, limit=5):
         return [{"document_name": (chunk.get("metadata") or {}).get("document_name"),
-                 "page_number": (chunk.get("metadata") or {}).get("page_number")} for chunk in chunks[:5]]
+                 "page_number": (chunk.get("metadata") or {}).get("page_number")} for chunk in chunks[:limit]]
     ranked_sources = rank_sources(ranked_chunks or [])
     raw_sources = rank_sources(candidates or [])
+    pool_pairs = pairs(rank_sources(candidates or [], limit=len(candidates or [])))
+    pool_complete = bool(expected_pairs) and expected_pairs <= pool_pairs
     required_docs = {doc for doc, _ in expected_pairs}
     def hits(items):
         found = pairs(items)
+        relevance = [(str(item.get("document_name", "")).casefold(), item.get("page_number")) in expected_pairs for item in items]
+        first = next((rank for rank, relevant in enumerate(relevance, start=1) if relevant), None)
         return {
             "document_hit": bool(required_docs & {doc for doc, _ in found}),
             "page_hit": bool(expected_pairs & found),
             "all_sources_hit": bool(expected_pairs) and expected_pairs <= found,
             "source_recall": len(expected_pairs & found) / len(expected_pairs) if expected_pairs else None,
+            "reciprocal_rank_at_5": 1 / first if first else 0.0,
+            "label_precision_at_5": sum(relevance) / 5,
         }
     return {
         "question": case["question"],
@@ -419,6 +434,18 @@ def score_retrieval_result(
             for source in top_sources
         ],
         "error": error,
+        "stage_timings_ms": stage_timings or graph_metadata.get("timings", {}),
+        "candidate_count": len(candidates or []),
+        "candidate_pool_all_sources_hit": pool_complete,
+        "candidate_pool_source_recall": len(expected_pairs & pool_pairs) / len(expected_pairs) if expected_pairs else None,
+        "failure_stage": (
+            "request_error" if error else
+            "unexpected_evidence" if should_refuse and top_sources else
+            None if should_refuse or hits(top_sources)["all_sources_hit"] else
+            "retrieval" if not pool_complete else
+            "reranking" if not hits(ranked_sources)["all_sources_hit"] else
+            "evidence_gate"
+        ),
     }
 
 
@@ -433,7 +460,9 @@ def summarize_retrieval(results: list[dict[str, Any]]) -> dict[str, Any]:
                 "document_hits": sum(bool(r.get(stage, {}).get("document_hit")) and not r["error"] for r in supported),
                 "page_hits": sum(bool(r.get(stage, {}).get("page_hit")) and not r["error"] for r in supported),
                 "all_required_sources": sum(bool(r.get(stage, {}).get("all_sources_hit")) and not r["error"] for r in supported),
-                "mean_source_recall": round(statistics.fmean(r.get(stage, {}).get("source_recall") or 0 for r in supported), 3) if supported else 0,
+                "mean_source_recall": round(statistics.fmean((r.get(stage, {}).get("source_recall") or 0) if not r["error"] else 0 for r in supported), 3) if supported else 0,
+                "mrr_at_5": round(statistics.fmean((r.get(stage, {}).get("reciprocal_rank_at_5") or 0) if not r["error"] else 0 for r in supported), 4) if supported else 0,
+                "mean_label_precision_at_5": round(statistics.fmean((r.get(stage, {}).get("label_precision_at_5") or 0) if not r["error"] else 0 for r in supported), 4) if supported else 0,
             } for stage in ("raw_retrieval", "reranked_retrieval", "accepted_evidence")
         },
         "graph_fallbacks": sum(bool(r.get("fallback_reason")) for r in results),
@@ -442,11 +471,11 @@ def summarize_retrieval(results: list[dict[str, Any]]) -> dict[str, Any]:
         "correct_document_top_5": sum(
             result["document_correct"] is True for result in supported
         ),
-        "document_question_count": len(supported),
+        "document_question_count": sum(result["document_correct"] is not None for result in supported),
         "correct_source_page_top_5": sum(
             result["page_correct"] is True for result in supported
         ),
-        "page_question_count": len(supported),
+        "page_question_count": sum(result["page_correct"] is not None for result in supported),
         "supported_questions_with_evidence": sum(
             result["evidence_found"] is True for result in supported
         ),
@@ -455,6 +484,10 @@ def summarize_retrieval(results: list[dict[str, Any]]) -> dict[str, Any]:
             result["refused"] is True for result in unsupported
         ),
         "unsupported_question_count": len(unsupported),
+        "supported_questions_incorrectly_refused": sum(result["refused"] is True and not result["error"] for result in supported),
+        "unsupported_questions_with_evidence": sum(result["evidence_found"] is True and not result["error"] for result in unsupported),
+        "failure_stages": {stage: sum(result.get("failure_stage") == stage for result in results)
+                           for stage in ("retrieval", "reranking", "evidence_gate", "unexpected_evidence", "request_error")},
         "graph_anchor_matches": sum(
             result["graph_anchor_match_found"] is True for result in results
         ),
@@ -463,6 +496,16 @@ def summarize_retrieval(results: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "p95_retrieval_seconds": round(latencies[p95_index], 3) if latencies else 0.0,
         "request_errors": sum(bool(result["error"]) for result in results),
+        "stage_latency_ms": {
+            stage: {
+                "mean": round(statistics.fmean(values), 2),
+                "p95": round(sorted(values)[max(0, math.ceil(len(values) * .95) - 1)], 2),
+                "samples": len(values),
+            }
+            for stage in {key for result in results for key in result.get("stage_timings_ms", {})}
+            if (values := [float(result["stage_timings_ms"][stage]) for result in results
+                           if stage in result.get("stage_timings_ms", {}) and not result["error"]])
+        },
     }
 
 

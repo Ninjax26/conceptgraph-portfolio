@@ -1,0 +1,291 @@
+{
+  "name": "equipment-documentation-v1",
+  "title": "Equipment Documentation",
+  "description": "Compare a specification, a maintenance guide, and a scanned inspection record for the fictional pump PMP-104.",
+  "provenance": "Original fictional educational documents. Answers, graph relationships, and evidence references are manually authored, not live model output. All operating values are illustrative and must not be used for real equipment.",
+  "documents": [
+    {
+      "filename": "equipment-specification.pdf",
+      "revision": "SPEC-104 / Rev B",
+      "pages": [
+        {
+          "title": "PMP-104: Specification",
+          "text": "The fictional pump PMP-104 has a rated pressure of 12 bar. Its normal operating pressure range is 6 to 10 bar. Rated pressure is a specification limit, not a recommended operating setpoint.\n\nPMP-104 uses a mechanical seal to limit leakage around its rotating shaft. Seal inspection and replacement intervals are described in the separate maintenance guide.\n\nThis educational specification does not state the motor power, motor speed, or electrical supply. Those properties cannot be inferred from the pressure rating."
+        },
+        {
+          "title": "PMP-104: Pressure Monitoring",
+          "text": "The pressure sensor PRS-204 monitors pump PMP-104. The illustrative high-pressure alarm threshold is 9 bar. An alarm is a reason to review the inspection record, not proof that the pump or sensor has failed.\n\nA measured pressure within the normal operating range does not prove that all components are healthy. Pressure and seal condition are separate observations. Consult the maintenance guide for inspection intervals."
+        }
+      ]
+    },
+    {
+      "filename": "equipment-maintenance.pdf",
+      "revision": "MAINT-104 / Rev C",
+      "pages": [
+        {
+          "title": "PMP-104: Seal Inspection",
+          "text": "For fictional pump PMP-104, inspect the mechanical seal every 30 days. Record visible leakage and seal condition in the inspection record. This interval is not determined by the pump's 12 bar rated pressure.\n\nThe illustrative scheduled seal replacement interval is 1,000 operating hours. Visible damage requires a separate maintenance review; this sample does not authorize continued operation or prescribe a repair procedure."
+        },
+        {
+          "title": "PRS-204: Sensor Review",
+          "text": "For the fictional pressure sensor PRS-204 on pump PMP-104, the calibration review interval is 90 days. Review an alarm alongside the measured pressure and maintenance history before assigning a cause.\n\nThe inspection record contains observations, not a fault diagnosis. Elevated vibration alone does not establish that the mechanical seal or pressure sensor caused it. This guide supplies no vibration limit or diagnostic procedure."
+        }
+      ]
+    },
+    {
+      "filename": "equipment-inspection.pdf",
+      "revision": "INSP-104 / Record 01",
+      "pages": [
+        {
+          "title": "PMP-104: Inspection Record",
+          "extraction_method": "ocr",
+          "text": "Fictional inspection record 01 for pump PMP-104. The recorded pressure was 8.2 bar. The mechanical seal had no visible leakage at the time of inspection.\n\nThe operator recorded elevated vibration. No cause was established. The record contains no motor power measurement and does not certify the equipment as safe.\n\nThis page is an image-only scan created for testing OCR. Its contents were authored for the ConceptGraph demonstration, not collected from real equipment."
+        },
+        {
+          "title": "Interpreting the Record",
+          "text": "To interpret inspection record 01 for PMP-104, compare its measured pressure with the operating range in equipment-specification.pdf. Compare its seal observation with the inspection requirements in equipment-maintenance.pdf.\n\nThe specification, guide, and inspection record describe different facts. An observation does not override a specification, and a maintenance interval is not an inspection result. Use the cited pages rather than treating these documents as interchangeable."
+        }
+      ]
+    }
+  ],
+  "saved_examples": [
+    {
+      "question": "What is PMP-104's pressure rating, and how often should its seal be inspected?",
+      "answer": "The specification gives PMP-104 a rated pressure of 12 bar and a normal operating range of 6 to 10 bar. The separate maintenance guide specifies a seal inspection every 30 days. The pressure rating is not an inspection interval or operating setpoint; both documents are needed to answer this question.",
+      "sources": [
+        [
+          "equipment-specification.pdf",
+          1,
+          1
+        ],
+        [
+          "equipment-maintenance.pdf",
+          1,
+          1
+        ]
+      ],
+      "concepts": [],
+      "nodes": [
+        {
+          "id": "pump",
+          "label": "PMP-104",
+          "description": "Fictional pump with a 12 bar rated pressure and a 6 to 10 bar operating range.",
+          "source": [
+            "equipment-specification.pdf",
+            1,
+            1
+          ]
+        },
+        {
+          "id": "seal",
+          "label": "Mechanical Seal",
+          "description": "Limits shaft leakage; this component has separate maintenance requirements.",
+          "source": [
+            "equipment-specification.pdf",
+            1,
+            2
+          ]
+        },
+        {
+          "id": "inspection",
+          "label": "30-day Seal Inspection",
+          "description": "The maintenance guide requires inspection every 30 days, independent of rated pressure.",
+          "source": [
+            "equipment-maintenance.pdf",
+            1,
+            1
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "source": "seal",
+          "target": "pump",
+          "type": "PART_OF",
+          "source_reference": [
+            "equipment-specification.pdf",
+            1,
+            2
+          ]
+        },
+        {
+          "source": "inspection",
+          "target": "seal",
+          "type": "APPLIES_TO",
+          "source_reference": [
+            "equipment-maintenance.pdf",
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "question": "Was the recorded pressure within PMP-104's operating range, and what did the scanned record say about the seal?",
+      "answer": "The scanned inspection record reports 8.2 bar and no visible seal leakage at the time of inspection. The specification gives a normal operating range of 6 to 10 bar, so that pressure was within the stated range. This does not prove that the equipment was healthy or safe: the same record notes elevated vibration without an established cause.",
+      "sources": [
+        [
+          "equipment-inspection.pdf",
+          1,
+          1
+        ],
+        [
+          "equipment-specification.pdf",
+          1,
+          1
+        ],
+        [
+          "equipment-inspection.pdf",
+          1,
+          2
+        ]
+      ],
+      "concepts": [],
+      "nodes": [
+        {
+          "id": "pump",
+          "label": "PMP-104",
+          "description": "Normal operating pressure range: 6 to 10 bar. This is not a general health guarantee.",
+          "source": [
+            "equipment-specification.pdf",
+            1,
+            1
+          ]
+        },
+        {
+          "id": "record",
+          "label": "Inspection Record 01",
+          "description": "Image-only source reports 8.2 bar, no visible leakage, and elevated vibration with no established cause.",
+          "source": [
+            "equipment-inspection.pdf",
+            1,
+            1
+          ]
+        },
+        {
+          "id": "seal",
+          "label": "Mechanical Seal",
+          "description": "Part of the pump; no visible leakage was recorded at this inspection.",
+          "source": [
+            "equipment-inspection.pdf",
+            1,
+            1
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "source": "record",
+          "target": "pump",
+          "type": "APPLIES_TO",
+          "source_reference": [
+            "equipment-inspection.pdf",
+            1,
+            1
+          ]
+        },
+        {
+          "source": "seal",
+          "target": "pump",
+          "type": "PART_OF",
+          "source_reference": [
+            "equipment-specification.pdf",
+            1,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "question": "What does PRS-204 monitor, and what is its calibration review interval?",
+      "answer": "PRS-204 monitors pressure on pump PMP-104, according to the specification. The maintenance guide gives a calibration review interval of 90 days. The illustrative 9 bar alarm threshold and the 90-day review interval are different quantities; an alarm alone does not establish a fault cause.",
+      "sources": [
+        [
+          "equipment-specification.pdf",
+          2,
+          1
+        ],
+        [
+          "equipment-maintenance.pdf",
+          2,
+          1
+        ]
+      ],
+      "concepts": [],
+      "nodes": [
+        {
+          "id": "pump",
+          "label": "PMP-104",
+          "description": "Pump monitored by pressure sensor PRS-204.",
+          "source": [
+            "equipment-specification.pdf",
+            2,
+            1
+          ]
+        },
+        {
+          "id": "sensor",
+          "label": "PRS-204",
+          "description": "Pressure sensor on the pump with an illustrative 9 bar alarm threshold.",
+          "source": [
+            "equipment-specification.pdf",
+            2,
+            1
+          ]
+        },
+        {
+          "id": "review",
+          "label": "90-day Calibration Review",
+          "description": "Maintenance review interval for PRS-204; not a fault diagnosis.",
+          "source": [
+            "equipment-maintenance.pdf",
+            2,
+            1
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "source": "sensor",
+          "target": "pump",
+          "type": "PART_OF",
+          "source_reference": [
+            "equipment-specification.pdf",
+            2,
+            1
+          ]
+        },
+        {
+          "source": "review",
+          "target": "sensor",
+          "type": "APPLIES_TO",
+          "source_reference": [
+            "equipment-maintenance.pdf",
+            2,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "question": "What is PMP-104's motor power in kW?",
+      "answer": "There is insufficient evidence to answer. The specification explicitly omits motor power, and the inspection record contains no motor power measurement. A pressure rating cannot establish motor power. This saved refusal illustrates the expected boundary; it is not a live test of the evidence gate.",
+      "should_refuse": true,
+      "sources": [
+        [
+          "equipment-specification.pdf",
+          1,
+          3
+        ],
+        [
+          "equipment-inspection.pdf",
+          1,
+          2
+        ]
+      ],
+      "concepts": [],
+      "nodes": [],
+      "relationships": []
+    }
+  ]
+}

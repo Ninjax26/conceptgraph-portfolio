@@ -17,6 +17,8 @@ import {
 import PdfPreviewModal from "../components/PdfPreviewModal";
 import UploadModal from "../components/UploadModal";
 import { buildGraphElements } from "../lib/graphElements";
+import { graphDiagnosticMessages } from "../lib/graphDiagnostics";
+import { graphEmptyState, retrievalSummary } from "../lib/retrievalStatus";
 import {
   API_BASE_URL,
   CourseSummary,
@@ -30,7 +32,7 @@ import {
   getProviderStatus,
   getReadiness,
   listCourses,
-  listUploads,
+  listUploadPage,
   retryUpload,
   removeUpload,
   sendQuery,
@@ -61,6 +63,12 @@ export default function Dashboard(): JSX.Element {
   const [uploadJobs, setUploadJobs] = useState<UploadJob[]>([]);
   const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(true);
+  const uploadCursorRef = useRef<string | null>(null);
+  const uploadRefreshVersion = useRef(0);
+  const [nextUploadCursor, setNextUploadCursor] = useState<string | null>(null);
+  const [uploadCursorTrail, setUploadCursorTrail] = useState<Array<string | null>>([null]);
+  const [uploadPage, setUploadPage] = useState(0);
+  const [ingestionAvailable, setIngestionAvailable] = useState<boolean | null>(null);
   const [pendingCourseSelection, setPendingCourseSelection] = useState<string | null>(null);
   const [showAllUploads, setShowAllUploads] = useState(false);
   const [retryingUploadId, setRetryingUploadId] = useState<string | null>(null);
@@ -101,20 +109,38 @@ export default function Dashboard(): JSX.Element {
     { active: 0, ready: 0, failed: 0 },
   );
 
-  async function refreshUploads(): Promise<void> {
+  async function refreshUploads(cursor: string | null = uploadCursorRef.current): Promise<boolean> {
+    const version = ++uploadRefreshVersion.current;
     setIsRefreshing(true);
     try {
-      const [nextUploads, nextCourses] = await Promise.all([listUploads(), listCourses()]);
-      setUploadJobs(nextUploads);
+      const [page, nextCourses] = await Promise.all([listUploadPage(cursor), listCourses()]);
+      if (version !== uploadRefreshVersion.current) return false;
+      uploadCursorRef.current = cursor;
+      setUploadJobs(page.items);
+      setNextUploadCursor(page.next_cursor);
       setCourses(nextCourses);
+      return true;
     } catch (requestError) {
+      if (version !== uploadRefreshVersion.current) return false;
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Unable to load recent uploads.",
       );
+      return false;
     } finally {
-      setIsRefreshing(false);
+      if (version === uploadRefreshVersion.current) setIsRefreshing(false);
+    }
+  }
+
+  async function changeUploadPage(direction: -1 | 1): Promise<void> {
+    const cursor = direction === 1 ? nextUploadCursor : uploadCursorTrail[uploadPage - 1];
+    if (cursor === undefined || (direction === 1 && cursor === null)) return;
+    if (await refreshUploads(cursor)) {
+      const nextPage = uploadPage + direction;
+      if (direction === 1) setUploadCursorTrail((trail) => [...trail.slice(0, nextPage), cursor]);
+      setUploadPage(nextPage);
+      setShowAllUploads(true);
     }
   }
 
@@ -128,16 +154,27 @@ export default function Dashboard(): JSX.Element {
   }
 
   useEffect(() => {
+    let active = true;
     void refreshUploads();
-    void getProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null));
+    void getProviderStatus().then((status) => { if (active) setProviderStatus(status); }).catch(() => { if (active) setProviderStatus(null); });
     const refreshReadiness = () => {
-      void getReadiness().then((status) => setGraphAvailable(status.graph_available)).catch(() => setGraphAvailable(null));
+      void getReadiness().then((status) => {
+        if (!active) return;
+        setGraphAvailable(status.graph_available);
+        setIngestionAvailable(status.ingestion_available !== false);
+      }).catch(() => {
+        if (!active) return;
+        setGraphAvailable(null);
+        setIngestionAvailable(null);
+      });
     };
     refreshReadiness();
     const readinessInterval = window.setInterval(refreshReadiness, 60_000);
     return () => {
+      active = false;
       window.clearInterval(readinessInterval);
       requestVersion.current += 1;
+      uploadRefreshVersion.current += 1;
     };
   }, []);
 
@@ -262,6 +299,9 @@ export default function Dashboard(): JSX.Element {
   }, [pendingCourseSelection, uploadJobs]);
 
   function handleUploadCreated(upload: IngestResponse): void {
+    uploadCursorRef.current = null;
+    setUploadCursorTrail([null]);
+    setUploadPage(0);
     const now = new Date().toISOString();
     setUploadJobs((current) => [
       {
@@ -461,7 +501,7 @@ export default function Dashboard(): JSX.Element {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500" title="In-memory measurements for the current API process; token values are estimates.">
-              <span className="font-semibold text-slate-600">Measured usage</span>
+              <span className="font-semibold text-slate-600">This API process</span>
               <span>{providerStatus.metrics.totals.provider_attempts} calls</span>
               <span>{providerStatus.metrics.totals.failover_attempts} failovers</span>
               <span>{providerStatus.metrics.totals.rate_limit_errors} quota errors</span>
@@ -474,6 +514,10 @@ export default function Dashboard(): JSX.Element {
                 </span>
               ))}
             </div>
+            {providerStatus.shared_budget?.enabled ? <p className="text-[11px] leading-5 text-slate-600">
+              Shared request budget per provider: {providerStatus.shared_budget.requests_per_minute}/minute · {providerStatus.shared_budget.requests_per_day}/day.
+              {providerStatus.shared_budget.usage.map((usage) => <span className="ml-2" key={usage.provider}>{usage.provider}: {usage.minute_requests} reserved this minute · {usage.day_requests} this UTC day.</span>)}
+            </p> : null}
           </div>
         ) : null}
         <form className="border-b border-slate-200 p-4" onSubmit={handleSubmit}>
@@ -591,9 +635,8 @@ export default function Dashboard(): JSX.Element {
 
           {response ? (
             <div className="mb-3 space-y-1 rounded-md bg-slate-100 p-2 text-xs text-slate-600" role="status">
-              <p>{response.graph_metadata.fallback_reason
-                  ? "Graph unavailable; answering from PDF evidence using vector retrieval."
-                  : `Evidence retrieved with ${(response.graph_metadata.retrieval_mode ?? "two_hop").split("_").join(" ")}.`} {response.sources.length} source passage{response.sources.length === 1 ? "" : "s"} passed the evidence check.</p>
+              <p>{retrievalSummary(response.graph_metadata)} {response.sources.length} source passage{response.sources.length === 1 ? "" : "s"} passed the evidence check.</p>
+              {response.confidence.level === "insufficient" ? <p>{response.confidence.reason}</p> : null}
               <p>
                 <span className="font-semibold text-slate-700">Answer provider:</span>{" "}
                 {response.generation_metadata.provider_used === "not_attempted"
@@ -687,7 +730,7 @@ export default function Dashboard(): JSX.Element {
               <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
             </span>
             <span className="normal-case tracking-normal text-slate-400">
-              {queueMetrics.active} active · {queueMetrics.ready} ready · {queueMetrics.failed} failed
+              {queueMetrics.active} active · {queueMetrics.ready} ready · {queueMetrics.failed} failed on this page
             </span>
           </summary>
           <div className="border-t border-slate-200 p-4">
@@ -696,7 +739,7 @@ export default function Dashboard(): JSX.Element {
               Processing queue
             </h2>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">{uploadJobs.length} documents</span>
+              <span className="text-xs text-slate-500">Page {uploadPage + 1} · {uploadJobs.length} shown</span>
               <button
                 aria-label="Refresh uploads"
                 className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -707,6 +750,7 @@ export default function Dashboard(): JSX.Element {
               </button>
             </div>
           </div>
+          {ingestionAvailable === false ? <p role="status" className="mb-3 text-xs leading-5 text-amber-800">The ingestion worker is offline. Accepted uploads remain saved in the queue until a worker returns.</p> : null}
           <div className="mb-3 flex gap-1 rounded-md bg-slate-100 p-1">
             {(["active", "ready", "failed", "all"] as const).map((filter) => (
               <button className={`flex-1 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${queueFilter === filter ? "bg-white text-ink shadow-sm" : "text-slate-500"}`} key={filter} onClick={() => setQueueFilter(filter)} type="button">
@@ -721,8 +765,8 @@ export default function Dashboard(): JSX.Element {
                   className="rounded-md border border-slate-200 bg-panel px-3 py-2"
                   key={job.task_id}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
+                  <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                    <div className="min-w-0 max-w-full">
                       <p className="truncate text-sm font-medium text-ink">
                         {job.original_filename}
                       </p>
@@ -735,7 +779,7 @@ export default function Dashboard(): JSX.Element {
                         Course {job.course_name}
                       </button>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex max-w-full flex-wrap items-center gap-2">
                       <span className={statusClass(job.status)}>
                         {job.status}
                       </span>
@@ -825,7 +869,27 @@ export default function Dashboard(): JSX.Element {
                           {ocrSummaryLabel(job.result_json)}
                         </span>
                       ) : null}
+                      {extractionWarningLabel(job.result_json) ? (
+                        <span className="text-[10px] font-medium text-amber-700">
+                          {extractionWarningLabel(job.result_json)}
+                        </span>
+                      ) : null}
                     </div>
+                  ) : null}
+                  {graphDiagnosticMessages(job.result_json).length > 0 ? (
+                    <details className="mt-2 text-xs text-slate-600">
+                      <summary className="cursor-pointer font-medium hover:text-teal-700">
+                        Graph extraction details
+                      </summary>
+                      <ul className="mt-2 list-disc space-y-1 break-words pl-4 leading-5">
+                        {graphDiagnosticMessages(job.result_json).slice(0, 8).map((message) => (
+                          <li key={message}>{message}</li>
+                        ))}
+                      </ul>
+                      {graphDiagnosticMessages(job.result_json).length > 8 ? (
+                        <p className="mt-1">{graphDiagnosticMessages(job.result_json).length - 8} additional section outcomes.</p>
+                      ) : null}
+                    </details>
                   ) : null}
                 </div>
               ))}
@@ -845,6 +909,13 @@ export default function Dashboard(): JSX.Element {
               Upload a syllabus to see live processing progress here.
             </p>
           )}
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-200 pt-3">
+            <button type="button" disabled={isRefreshing || uploadPage === 0} onClick={() => void changeUploadPage(-1)}
+              className="min-h-11 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-teal-700 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+            <span role="status" className="text-xs text-slate-500">{isRefreshing ? "Loading…" : `Page ${uploadPage + 1}`}</span>
+            <button type="button" disabled={isRefreshing || !nextUploadCursor} onClick={() => void changeUploadPage(1)}
+              className="min-h-11 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-teal-700 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+          </div>
           </div>
         </details>
 
@@ -876,6 +947,7 @@ export default function Dashboard(): JSX.Element {
                 ? `Showing ${response.graph_metadata.displayed_nodes} of ${response.graph_metadata.total_nodes} concepts and ${response.graph_metadata.displayed_edges} of ${response.graph_metadata.total_edges} relationships.`
                 : "Ask a question to retrieve the most relevant concepts and prerequisite links."}
             </p>
+            {response?.graph_metadata.display_budget_applied ? <p className="mt-1 text-xs text-slate-500">Bounded graph view: up to {response.graph_metadata.display_node_limit} concepts and {response.graph_metadata.display_edge_limit} relationships.</p> : null}
             {response?.graph_metadata.graph_expansion?.anchor_match_found ? (
               <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] font-medium text-slate-500" aria-label="Graph retrieval legend">
                 <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2 border-teal-700 bg-cyan-50" />Query match</span>
@@ -922,24 +994,10 @@ export default function Dashboard(): JSX.Element {
               <div className="max-w-sm">
                 <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-lg font-bold text-teal-700">CG</div>
                 <p className="font-semibold text-ink">
-                  {graphAvailable === false
-                    ? "Graph service offline"
-                    : response?.graph_metadata.retrieval_mode === "vector_only"
-                    ? "Answering from PDF passages"
-                    : selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
-                    ? "No validated graph was produced"
-                    : "Your course graph will appear here"}
+                  {graphEmptyState(response?.graph_metadata, graphAvailable, selectedCourse?.graph_status).title}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  {graphAvailable === false
-                    ? "Neo4j is unavailable right now. Existing relationships cannot load, and new graph builds should wait until the service is restored."
-                    : response?.graph_metadata.retrieval_mode === "vector_only"
-                    ? (response.graph_metadata.fallback_reason
-                      ? "The graph service is unavailable. Your answer and source citations are still available in the answer panel."
-                      : "Vector mode does not retrieve a graph. Choose One hop or Two hops and run your question to explore concept connections.")
-                    : selectedCourse?.graph_status === "READY_WITHOUT_GRAPH"
-                    ? "The PDF is still searchable for grounded answers, but the extracted graph did not meet the minimum quality checks."
-                    : "Select a ready course and ask a question to reveal relevant concepts, relationships, and prerequisites."}
+                  {graphEmptyState(response?.graph_metadata, graphAvailable, selectedCourse?.graph_status).detail}
                 </p>
               </div>
             </div>
@@ -982,6 +1040,7 @@ function graphRecoveryExhausted(job: UploadStatusResponse): boolean {
   const noBatchesRemaining = result.graph_batches_skipped === 0 && result.graph_batches_failed === 0;
   if (!noBatchesRemaining) return false;
   if (result.graph_relationship_pass_version === 3 && result.graph_global_linking_succeeded === true) return true;
+  if (result.graph_relationship_pass_version === 4 && result.graph_global_linking_processed === true) return true;
   return job.graph_node_count < 2
     && typeof result.graph_batches_total === "number"
     && result.graph_batches_total > 0
@@ -1000,6 +1059,11 @@ function graphCoverageLabel(resultJson: Record<string, unknown> | null | undefin
   ) {
     return null;
   }
+  const processed = resultJson.graph_sections_processed;
+  const empty = resultJson.graph_sections_empty;
+  if (typeof processed === "number" && typeof empty === "number") {
+    return `${processed} of ${total} sections processed · ${represented} contributed${empty > 0 ? ` · ${empty} returned no concepts` : ""}`;
+  }
   return `${total} sections scanned locally · ${represented} contributed to graph`;
 }
 
@@ -1016,6 +1080,10 @@ function chunkCoverageLabel(resultJson: Record<string, unknown> | null | undefin
 
 function graphLimitLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
   if (!resultJson) return null;
+  if (Array.isArray(resultJson.graph_batch_diagnostics) && resultJson.graph_batch_diagnostics.some((entry: unknown) =>
+    entry !== null && typeof entry === "object" && (entry as Record<string, unknown>).category === "application_budget")) {
+    return "Shared application provider budget reached; validated progress was checkpointed";
+  }
   if (resultJson.graph_provider_limited === true) {
     const completed = resultJson.graph_checkpointed_batches;
     return typeof completed === "number"
@@ -1040,13 +1108,26 @@ function graphLimitLabel(resultJson: Record<string, unknown> | null | undefined)
 
 function ocrSummaryLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
   if (!resultJson) return null;
-  const pages = resultJson.ocr_pages;
-  if (typeof pages !== "number" || pages <= 0) return null;
+  const scanned = typeof resultJson.ocr_pages === "number" ? resultJson.ocr_pages : 0;
+  const mixed = typeof resultJson.hybrid_text_ocr_pages === "number" ? resultJson.hybrid_text_ocr_pages : 0;
+  const pages = scanned + mixed;
+  if (pages <= 0) return null;
   const confidence = resultJson.ocr_average_confidence;
   const pageLabel = `${pages} ${pages === 1 ? "page" : "pages"}`;
+  const mixedLabel = mixed > 0 ? ` · ${mixed} mixed text/image` : "";
   return typeof confidence === "number"
-    ? `OCR recovered ${pageLabel} · ${Math.round(confidence)}% avg confidence`
-    : `OCR recovered ${pageLabel}`;
+    ? `OCR used on ${pageLabel}${mixedLabel} · engine confidence ${Math.round(confidence)}/100`
+    : `OCR used on ${pageLabel}${mixedLabel}`;
+}
+
+function extractionWarningLabel(resultJson: Record<string, unknown> | null | undefined): string | null {
+  const count = resultJson?.extraction_warning_pages;
+  if (typeof count !== "number" || count <= 0) return null;
+  const numbers = resultJson?.extraction_warning_page_numbers;
+  const pages = Array.isArray(numbers)
+    ? numbers.filter((value): value is number => typeof value === "number" && Number.isInteger(value) && value > 0).slice(0, 8)
+    : [];
+  return `${count} ${count === 1 ? "page needs" : "pages need"} extraction review${pages.length ? ` · pages ${pages.join(", ")}` : ""}`;
 }
 
 function statusClass(status: UploadStatusResponse["status"]): string {

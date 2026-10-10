@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -17,6 +18,7 @@ from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
 from app.services.course_service import ReadyCourseContext
 from app.services.gemini_service import gemini_service
+from app.services.retrieval_candidates import fuse_candidates, identifier_terms
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +115,14 @@ class RetrievalService:
         self,
         question: str,
         context: ReadyCourseContext,
-        top_k: int = 10,
+        top_k: int | None = None,
         retrieval_mode: RetrievalMode | str = RetrievalMode.TWO_HOP,
     ) -> dict[str, Any]:
+        top_k = settings.retrieval_candidate_limit if top_k is None else top_k
+        if not 1 <= top_k <= 100:
+            raise ValueError("The retrieval candidate count must be between 1 and 100.")
         mode = RetrievalMode(retrieval_mode)
+        graph_started = time.perf_counter()
         if mode is RetrievalMode.VECTOR_ONLY:
             graph_result = GraphRetrievalResult(
                 concepts=[],
@@ -147,15 +153,20 @@ class RetrievalService:
                         max_hops=mode.maximum_hops, retrieval_mode=mode,
                     ), timeout=5.0,
                 )
-            except Exception:
+            except Exception as exc:
+                failed_graph_ms = round((time.perf_counter() - graph_started) * 1000, 2)
                 logger.warning("Graph retrieval unavailable; using vector retrieval", exc_info=True)
                 result = await self.retrieve(question, context, top_k, RetrievalMode.VECTOR_ONLY)
                 result["graph_metadata"].update({
                     "requested_mode": mode.value,
-                    "fallback_reason": "graph_unavailable",
+                    "fallback_reason": "graph_timeout" if isinstance(exc, TimeoutError) else "graph_unavailable",
                     "filter_reason": "graph_unavailable",
                 })
+                result["graph_metadata"]["timings"]["graph_ms"] = failed_graph_ms
                 return result
+        graph_ms = round((time.perf_counter() - graph_started) * 1000, 2)
+        retrieval_metadata: dict[str, Any] = {"candidate_limit": top_k}
+        vector_started = time.perf_counter()
         chunks = await asyncio.to_thread(
             self.search_qdrant,
             question,
@@ -163,7 +174,13 @@ class RetrievalService:
             graph_result.two_hop_prerequisite_names,
             context.document_ids,
             top_k,
+            metadata=retrieval_metadata,
         )
+        graph_result.metadata.update({
+            "candidates": retrieval_metadata,
+            "timings": {"graph_ms": graph_ms, "vector_ms": round((time.perf_counter() - vector_started) * 1000, 2),
+                        **retrieval_metadata.get("timings", {})},
+        })
         return {
             "graph_context": graph_result.concepts,
             "graph_cypher": graph_result.cypher,
@@ -209,7 +226,7 @@ class RetrievalService:
                 session, context.graph_course_ids, context.document_ids
             )
 
-        return self._build_graph_result(
+        graph_result = self._build_graph_result(
             records,
             totals,
             cypher=cypher,
@@ -223,6 +240,11 @@ class RetrievalService:
             max_hops=max_hops,
             retrieval_mode=mode.value,
         )
+        # Tracking counts describe the ingestion result, not the selected Neo4j
+        # instance. Do not present a missing projection as a waiting-to-load graph.
+        if totals["total_nodes"] == 0 and any(getattr(document, "graph_node_count", 0) > 0 for document in getattr(context, "documents", ())):
+            graph_result.metadata["projection_missing"] = True
+        return graph_result
 
     async def fetch_course_graph(
         self,
@@ -267,7 +289,6 @@ class RetrievalService:
         concepts: list[dict[str, Any]] = []
         one_hop_names: set[str] = set()
         two_hop_names: set[str] = set()
-        displayed_edge_ids: set[tuple[str, str, str]] = set()
         for record in records:
             concept = self._node_to_dict(record.get("concept"))
             raw_related_concepts = [
@@ -332,16 +353,13 @@ class RetrievalService:
                 for node in two_hop_prerequisites
                 if node.get("name")
             )
-            for relationship in relationships:
-                edge_id = (
-                    str(relationship.get("source", "")),
-                    str(relationship.get("target", "")),
-                    str(relationship.get("type", "")),
-                )
-                displayed_edge_ids.add(edge_id)
 
         # A concept reachable at both distances is kept in the stronger direct set.
         two_hop_names.difference_update(one_hop_names)
+
+        from app.services.graph_display_service import bound_graph_context
+        concepts, display_limited, display_nodes, display_edges = bound_graph_context(
+            concepts, max_nodes=settings.graph_display_max_nodes, max_edges=settings.graph_display_max_edges)
 
         return GraphRetrievalResult(
             concepts=concepts,
@@ -349,14 +367,12 @@ class RetrievalService:
             two_hop_prerequisite_names=sorted(two_hop_names),
             cypher=cypher,
             metadata={
+                "display_budget_applied": display_limited,
+                "display_node_limit": settings.graph_display_max_nodes,
+                "display_edge_limit": settings.graph_display_max_edges,
                 **totals,
-                "displayed_nodes": len({
-                    node.get("id")
-                    for item in concepts
-                    for node in [item["concept"], *item["related_concepts"]]
-                    if node.get("id")
-                }),
-                "displayed_edges": len(displayed_edge_ids),
+                "displayed_nodes": display_nodes,
+                "displayed_edges": display_edges,
                 "filter_reason": filter_reason,
                 "graph_status": graph_status,
                 "retrieval_mode": retrieval_mode,
@@ -389,9 +405,22 @@ class RetrievalService:
         one_hop_prerequisite_names: list[str],
         two_hop_prerequisite_names: list[str],
         document_ids: list[str],
-        top_k: int = 10,
+        top_k: int | None = None,
+        *,
+        metadata: dict[str, Any] | None = None,
     ) -> list[Any]:
-        if not self._collection_exists():
+        top_k = settings.retrieval_candidate_limit if top_k is None else top_k
+        if not 1 <= top_k <= 100:
+            raise ValueError("The retrieval candidate count must be between 1 and 100.")
+        if not document_ids:
+            return []
+        stage_timings: dict[str, float] = {}
+        if metadata is not None:
+            metadata["timings"] = stage_timings
+        stage_started = time.perf_counter()
+        collection_exists = self._collection_exists()
+        stage_timings["collection_check_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
+        if not collection_exists:
             logger.info("Qdrant collection %s does not exist yet.", self.collection_name)
             return []
 
@@ -400,6 +429,7 @@ class RetrievalService:
             one_hop_prerequisite_names,
             two_hop_prerequisite_names,
         )
+        stage_started = time.perf_counter()
         if settings.embedding_provider == "qdrant_cloud":
             query_vector = Document(
                 text=expanded_query,
@@ -412,6 +442,10 @@ class RetrievalService:
                 normalize_embeddings=True,
                 show_progress_bar=False,
             ).tolist()
+        # Hosted inference is executed inside query_points, not Document construction.
+        stage_timings["query_embedding_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
+        if metadata is not None:
+            metadata["embedding_execution"] = "hosted_in_dense_search" if settings.embedding_provider == "qdrant_cloud" else "local"
         query_filter = Filter(
             must=[
                 FieldCondition(
@@ -421,6 +455,7 @@ class RetrievalService:
             ]
         )
 
+        stage_started = time.perf_counter()
         try:
             results = self.vector_client.query_points(
                 collection_name=self.collection_name,
@@ -449,22 +484,45 @@ class RetrievalService:
                     return []
                 raise
 
-        chunks: list[dict[str, Any]] = []
-        for point in results:
-            payload = point.payload or {}
-            chunks.append(
-                {
-                    "id": str(point.id),
-                    "score": float(point.score),
-                    "text": str(payload.get("text", "")),
-                    "metadata": {
-                        key: value
-                        for key, value in payload.items()
-                        if key != "text"
-                    },
-                }
-            )
-        return chunks
+        stage_timings["dense_search_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
+
+        chunks = [self._point_to_chunk(point) for point in results]
+        lexical: list[dict[str, Any]] = []
+        terms = (identifier_terms(question, limit=8, named_only=True) or identifier_terms(question, limit=8)) if settings.retrieval_identifier_lookup else []
+        fallback_reason = None
+        stage_started = time.perf_counter()
+        if terms:
+            identifier_filter = Filter(must=[
+                *query_filter.must,
+                FieldCondition(key="identifier_terms", match=MatchAny(any=terms)),
+            ])
+            try:
+                # Indexed payload lookup needs neither another embedding nor an LLM call.
+                points, _ = self.vector_client.scroll(
+                    collection_name=self.collection_name, scroll_filter=identifier_filter,
+                    limit=min(settings.retrieval_identifier_limit, top_k),
+                    with_payload=True, with_vectors=False,
+                )
+                lexical = [self._point_to_chunk(point) for point in points]
+            except Exception:
+                logger.warning("Optional identifier lookup failed; preserving dense candidates")
+                fallback_reason = "identifier_lookup_unavailable"
+        stage_timings["identifier_lookup_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
+        merged = fuse_candidates(chunks, lexical, top_k) if lexical else chunks
+        if metadata is not None:
+            metadata.update({"dense_count": len(chunks), "identifier_count": len(lexical),
+                             "merged_count": len(merged), "identifier_terms_count": len(terms),
+                             "identifier_lookup_used": bool(lexical), "fallback_reason": fallback_reason})
+        return merged
+
+    @staticmethod
+    def _point_to_chunk(point: Any) -> dict[str, Any]:
+        payload = point.payload or {}
+        score = getattr(point, "score", None)
+        return {"id": str(point.id), "score": float(score) if score is not None else None,
+                "text": str(payload.get("text", "")),
+                "metadata": {key: value for key, value in payload.items()
+                             if key not in {"text", "identifier_terms"}}}
 
     @property
     def embedding_model(self):
@@ -779,8 +837,5 @@ class RetrievalService:
 
     @staticmethod
     def _resolve_embedding_device() -> str:
-        import torch
-
-        if torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
+        from app.core.model_runtime import local_model_device
+        return local_model_device()

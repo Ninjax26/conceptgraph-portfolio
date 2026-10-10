@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -35,16 +36,19 @@ from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
 from app.core.processing import minimum_graph_relationships
 from app.core.exceptions import (
+    GraphFailureReason,
     GraphStructureError,
     LLMConfigurationError,
     LLMProviderRateLimitError,
     LLMProviderRequestError,
     LLMProviderUnavailableError,
+    LLMProviderTruncatedResponseError,
 )
 from app.schemas.extraction import (
     ALLOWED_RELATIONSHIP_TYPES,
     ConceptNode,
     ConceptRelationship,
+    GraphBatchDiagnostic,
     GraphExtractionResponse,
     normalize_concept_name,
 )
@@ -52,7 +56,8 @@ from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.parser_service import DocumentChunk
 from app.services.provider_failover import provider_circuit_breaker
-from app.services.provider_metrics import provider_metrics
+from app.services.shared_provider_service import observe_provider_call
+from app.services.retrieval_candidates import identifier_terms
 
 
 logger = logging.getLogger(__name__)
@@ -70,6 +75,7 @@ class GraphSectionBatch:
 class IngestionService:
     MAX_CONCEPTS_PER_BATCH = 8
     MAX_RELATIONSHIPS_PER_BATCH = 10
+    MAX_GRAPH_OUTPUT_TOKENS = 2_000
 
     def __init__(
         self,
@@ -108,6 +114,7 @@ class IngestionService:
                 payload={
                     **chunk.metadata,
                     "text": chunk.text,
+                    "identifier_terms": identifier_terms(chunk.text),
                 },
             )
             for chunk, vector in zip(chunks, vectors, strict=True)
@@ -154,6 +161,7 @@ class IngestionService:
             key: extraction
             for key, extraction in completed_batches.items()
             if key in candidate_keys
+            and (extraction.nodes or extraction.empty_extraction)
         }
         missing_batches = [
             batch for batch in candidate_batches if batch.batch_key not in cached_by_key
@@ -175,15 +183,32 @@ class IngestionService:
         consecutive_timeouts = 0
         partials: list[GraphExtractionResponse] = []
         completed_section_batches: list[GraphSectionBatch] = []
+        completed_keys = set(cached_by_key)
+        diagnostics: list[GraphBatchDiagnostic] = []
+        empty_batches = sum(not extraction.nodes for extraction in cached_by_key.values())
+
+        def diagnostic(batch: GraphSectionBatch, outcome: str, category: str) -> None:
+            diagnostics.append(GraphBatchDiagnostic(
+                section_label=batch.section_label, kind=batch.kind,
+                outcome=outcome, category=category,
+            ))
+
+        selected_keys = {batch.batch_key for batch in batches}
+        for batch in missing_batches:
+            if batch.batch_key not in selected_keys:
+                diagnostic(batch, "skipped", "budget")
 
         for batch in candidate_batches:
             extraction = cached_by_key.get(batch.batch_key)
             if extraction is None:
                 continue
             partials.append(extraction)
-            completed_section_batches.append(batch)
+            diagnostics.extend(extraction.batch_diagnostics)
             if extraction.nodes:
+                completed_section_batches.append(batch)
                 represented_sections.add(batch.section_key)
+            else:
+                diagnostic(batch, "empty", "no_concepts")
 
         for batch_index, batch in enumerate(batches):
             context = "\n\n".join(
@@ -192,10 +217,17 @@ class IngestionService:
             )
             try:
                 extraction = await self.extract_graph_from_text(context)
-            except (RateLimitError, LLMProviderRateLimitError):
+                enriched = self._attach_provenance(extraction, batch.chunks)
+                if extraction.nodes and not enriched.nodes:
+                    raise GraphStructureError("No extracted concepts cite the supplied source.", reason=GraphFailureReason.UNKNOWN_SOURCE)
+            except (RateLimitError, LLMProviderRateLimitError) as exc:
                 failed_batches += 1
                 provider_limited = True
+                category = self._graph_failure_category(exc)
+                diagnostic(batch, "failed", category)
                 skipped_batches += len(batches) - batch_index - 1
+                for pending in batches[batch_index + 1:]:
+                    diagnostic(pending, "skipped", category)
                 logger.warning(
                     "Graph extraction stopped because the provider quota was reached; "
                     "preserving completed graph batches"
@@ -206,45 +238,73 @@ class IngestionService:
                 APITimeoutError,
                 InternalServerError,
                 LLMProviderUnavailableError,
-            ):
+            ) as exc:
                 failed_batches += 1
                 consecutive_timeouts += 1
+                diagnostic(batch, "failed", self._graph_failure_category(exc))
                 logger.warning(
-                    "Skipped one timed-out graph batch for section %s",
-                    batch.section_label,
+                    "Skipped graph batch: category=provider_unavailable",
                 )
                 if consecutive_timeouts >= 2:
                     skipped_batches += len(batches) - batch_index - 1
+                    for pending in batches[batch_index + 1:]:
+                        diagnostic(pending, "skipped", "provider_unavailable")
                     logger.warning(
                         "Graph extraction stopped after repeated provider timeouts; "
                         "preserving completed graph batches"
                     )
                     break
                 continue
-            except GraphStructureError:
+            except GraphStructureError as exc:
                 failed_batches += 1
+                diagnostic(batch, "failed", exc.reason.value)
                 logger.warning(
-                    "Skipped one malformed graph batch for section %s",
-                    batch.section_label,
+                    "Skipped invalid graph batch: category=%s", exc.reason.value,
                 )
                 continue
+            except (LLMConfigurationError, AuthenticationError, PermissionDeniedError,
+                    BadRequestError, LLMProviderRequestError) as exc:
+                failed_batches += 1
+                category = self._graph_failure_category(exc)
+                diagnostic(batch, "failed", category)
+                skipped_batches += len(batches) - batch_index - 1
+                for pending in batches[batch_index + 1:]:
+                    diagnostic(pending, "skipped", category)
+                logger.warning("Graph extraction stopped: category=%s", category)
+                break
 
             consecutive_timeouts = 0
             successful_batches += 1
-            enriched = self._attach_provenance(extraction, batch.chunks)
+            completed_keys.add(batch.batch_key)
             if enriched.nodes:
+                completed_section_batches.append(batch)
                 represented_sections.add(batch.section_key)
+                if len(enriched.nodes) < len(extraction.nodes):
+                    filtered = GraphBatchDiagnostic(
+                        section_label=batch.section_label, outcome="filtered", category="unknown_source",
+                        discarded_nodes=len(extraction.nodes) - len(enriched.nodes),
+                        discarded_relationships=len(extraction.relationships) - len(enriched.relationships),
+                    )
+                    diagnostics.append(filtered)
+                    enriched = enriched.model_copy(update={"batch_diagnostics": [filtered]})
+            else:
+                empty_batches += 1
+                diagnostic(batch, "empty", "no_concepts")
             partials.append(enriched)
-            completed_section_batches.append(batch)
             if on_batch_completed is not None:
                 await on_batch_completed(batch, enriched)
 
-        failed_sections = set(section_labels) - represented_sections
+        processed_sections = {
+            key for key in section_labels
+            if all(batch.batch_key in completed_keys for batch in candidate_batches if batch.section_key == key)
+        }
+        empty_sections = processed_sections - represented_sections
+        failed_sections = set(section_labels) - processed_sections
         merged = self._merge_graph_extractions(
             partials,
             sections_total=len(section_labels),
             sections_succeeded=len(represented_sections),
-            sections_failed=len(section_labels) - len(represented_sections),
+            sections_failed=len(failed_sections),
             batches_total=len(candidate_batches),
             batches_succeeded=successful_batches,
             batches_failed=failed_batches,
@@ -259,6 +319,7 @@ class IngestionService:
 
         global_attempted = False
         global_succeeded = False
+        global_processed = False
         if (
             settings.graph_global_linking_enabled
             and not provider_limited
@@ -301,7 +362,9 @@ class IngestionService:
                         linked = self._attach_provenance(
                             extraction, global_batch.chunks
                         )
-                        if on_batch_completed is not None and linked.nodes:
+                        if extraction.nodes and not linked.nodes:
+                            raise GraphStructureError("No linked concepts cite the supplied source.", reason=GraphFailureReason.UNKNOWN_SOURCE)
+                        if on_batch_completed is not None:
                             await on_batch_completed(global_batch, linked)
                     except (
                         RateLimitError,
@@ -316,12 +379,14 @@ class IngestionService:
                         PermissionDeniedError,
                         BadRequestError,
                         GraphStructureError,
-                    ):
+                    ) as exc:
+                        diagnostic(global_batch, "failed", self._graph_failure_category(exc))
                         logger.warning(
                             "Optional graph relationship pass was skipped; "
                             "the validated section graph remains usable"
                         )
                         linked = None
+                global_processed = linked is not None
                 if linked is not None and linked.nodes:
                     previous_relationship_count = len(merged.relationships)
                     merged = self._merge_graph_extractions(
@@ -338,128 +403,145 @@ class IngestionService:
                         failed_section_labels=merged.failed_section_labels,
                     )
                     global_succeeded = len(merged.relationships) > previous_relationship_count
+                    if not global_succeeded:
+                        diagnostic(global_batch, "empty", "no_new_relationships")
+                elif linked is not None:
+                    diagnostic(global_batch, "empty", "no_concepts")
 
         return merged.model_copy(
             update={
                 "global_linking_attempted": global_attempted,
                 "global_linking_succeeded": global_succeeded,
+                "global_linking_processed": global_processed,
+                "sections_processed": len(processed_sections),
+                "sections_empty": len(empty_sections),
+                "batches_empty": empty_batches,
+                "batch_diagnostics": diagnostics,
             }
         )
 
+    @staticmethod
+    def _graph_failure_category(exc: Exception) -> str:
+        if getattr(exc, "application_budget", False):
+            return "application_budget"
+        if isinstance(exc, GraphStructureError):
+            return exc.reason.value
+        if isinstance(exc, (RateLimitError, LLMProviderRateLimitError)):
+            return "quota"
+        if isinstance(exc, (LLMConfigurationError, AuthenticationError, PermissionDeniedError)):
+            return "configuration"
+        if isinstance(exc, (BadRequestError, LLMProviderRequestError)):
+            return "provider_request"
+        return "provider_unavailable"
+
     async def extract_graph_from_text(self, text: str) -> GraphExtractionResponse:
         provider = settings.llm_provider.lower()
-        if provider == "gemini":
-            return await asyncio.to_thread(
-                provider_metrics.observe,
-                "gemini",
-                "graph_extraction",
-                lambda: self._validate_provider_graph(self._extract_with_gemini(text), text),
-                input_characters=len(text),
-            )
         if provider == "groq":
             return await self._extract_with_failover(text)
-        if provider == "cerebras":
-            return await asyncio.to_thread(
-                provider_metrics.observe,
-                "cerebras",
-                "graph_extraction",
-                lambda: self._validate_provider_graph(self._extract_with_cerebras(text), text),
-                input_characters=len(text),
-            )
-        raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
+        if provider not in {"gemini", "cerebras"}:
+            raise ValueError(f"Unsupported LLM_PROVIDER: {settings.llm_provider}")
+        try:
+            return await self._graph_provider_attempt(provider, text)
+        except GraphStructureError:
+            if not settings.graph_json_repair_enabled:
+                raise
+            return await self._graph_provider_attempt(provider, text, repair=True)
+
+    async def _graph_provider_attempt(
+        self, provider: str, text: str, *, failover: bool = False, repair: bool = False,
+    ) -> GraphExtractionResponse:
+        request_text = self._graph_extraction_contexts(text)[-1 if repair else 0]
+        extractors = {
+            "groq": self._extract_with_groq,
+            "gemini": self._extract_with_gemini,
+            "cerebras": self._extract_with_cerebras,
+        }
+        extractor = extractors[provider]
+
+        def generate() -> GraphExtractionResponse:
+            # Orchestration owns the single repair allowance across all providers.
+            kwargs = {"repair": repair}
+            if provider != "gemini":
+                kwargs["allow_repair"] = False
+            return self._validate_provider_graph(extractor(request_text, **kwargs), text)
+
+        result = await observe_provider_call(
+            provider, "graph_extraction", generate,
+            input_characters=len(request_text), failover=failover, repair=repair,
+        )
+        provider_circuit_breaker.record_success(provider)
+        return result
 
     async def _extract_with_failover(self, text: str) -> GraphExtractionResponse:
-        primary_error: Exception | None = None
-        if provider_circuit_breaker.is_available("groq") and settings.groq_api_key:
-            try:
-                result = await asyncio.to_thread(
-                    provider_metrics.observe,
-                    "groq",
-                    "graph_extraction",
-                    lambda: self._validate_provider_graph(self._extract_with_groq(text), text),
-                    input_characters=len(text),
-                )
-                provider_circuit_breaker.record_success("groq")
-                return result
-            except (
-                RateLimitError,
-                AuthenticationError,
-                PermissionDeniedError,
-                APIConnectionError,
-                APITimeoutError,
-                InternalServerError,
-            ) as exc:
-                primary_error = exc
-                provider_circuit_breaker.block(
-                    "groq", settings.llm_failover_cooldown_seconds, exc
-                )
-                logger.warning("Groq graph extraction is temporarily unavailable; trying backup providers")
-            except (BadRequestError, GraphStructureError) as exc:
-                primary_error = exc
-                logger.warning(
-                    "Groq could not produce a valid graph; trying backup providers for this batch"
-                )
-        elif not settings.groq_api_key and not cerebras_service.configured and not settings.gemini_api_key:
+        providers = []
+        if settings.groq_api_key:
+            providers.append("groq")
+        if settings.gemini_api_key:
+            providers.append("gemini")
+        elif cerebras_service.configured:
+            providers.append("cerebras")
+        if not providers:
             raise LLMConfigurationError(
                 "GROQ_API_KEY, CEREBRAS_API_KEY, or GEMINI_API_KEY is required when LLM_PROVIDER=groq"
             )
 
-        if cerebras_service.configured and not settings.gemini_api_key and provider_circuit_breaker.is_available("cerebras"):
+        last_error: Exception | None = None
+        repair_provider: str | None = None
+        for provider in providers:
+            if not provider_circuit_breaker.is_available(provider):
+                continue
             try:
-                result = await asyncio.to_thread(
-                    provider_metrics.observe,
-                    "cerebras",
-                    "graph_extraction",
-                    lambda: self._validate_provider_graph(self._extract_with_cerebras(text), text),
-                    input_characters=len(text),
-                    failover=True,
+                return await self._graph_provider_attempt(
+                    provider, text, failover=provider != "groq",
                 )
-                provider_circuit_breaker.record_success("cerebras")
-                return result
-            except (LLMProviderRateLimitError, LLMProviderUnavailableError) as exc:
-                provider_circuit_breaker.block(
-                    "cerebras", settings.llm_failover_cooldown_seconds, exc
-                )
-                logger.warning("Cerebras graph extraction is temporarily unavailable")
-                primary_error = exc
-            except (LLMConfigurationError, LLMProviderRequestError, GraphStructureError) as exc:
-                logger.warning("Cerebras graph failover could not complete the batch: %s", exc)
-                if primary_error is None:
-                    raise
-
-        if settings.gemini_api_key and provider_circuit_breaker.is_available("gemini"):
-            try:
-                result = await asyncio.to_thread(
-                    provider_metrics.observe,
-                    "gemini",
-                    "graph_extraction",
-                    lambda: self._validate_provider_graph(self._extract_with_gemini(text), text),
-                    input_characters=len(text),
-                    failover=True,
-                )
-                provider_circuit_breaker.record_success("gemini")
-                return result
             except GraphStructureError as exc:
-                logger.warning("Gemini returned an unusable graph for this batch")
-                primary_error = primary_error or exc
-            except Exception as exc:
-                provider_circuit_breaker.block("gemini", settings.llm_failover_cooldown_seconds, exc)
-                logger.warning("Gemini graph extraction is unavailable")
-                primary_error = primary_error or exc
+                last_error = exc
+                repair_provider = provider
+                logger.warning("Graph provider returned invalid output: provider=%s category=%s", provider, exc.reason.value)
+            except (
+                RateLimitError, LLMProviderRateLimitError, AuthenticationError,
+                PermissionDeniedError, APIConnectionError, APITimeoutError,
+                InternalServerError, LLMProviderUnavailableError, LLMConfigurationError,
+            ) as exc:
+                last_error = exc
+                repair_provider = None
+                provider_circuit_breaker.block(
+                    provider, settings.llm_failover_cooldown_seconds, exc,
+                )
+                logger.warning("Graph provider unavailable: provider=%s category=%s", provider, self._graph_failure_category(exc))
+            except (BadRequestError, LLMProviderRequestError) as exc:
+                last_error = exc
+                repair_provider = None
+                logger.warning("Graph provider rejected request: provider=%s", provider)
 
-        if isinstance(primary_error, (RateLimitError, LLMProviderRateLimitError)):
+        # At most one extra request per batch, after normal provider failover.
+        # Quota, timeout, authentication, and request errors never trigger repair.
+        if repair_provider is not None and settings.graph_json_repair_enabled:
+            try:
+                return await self._graph_provider_attempt(
+                    repair_provider, text, failover=repair_provider != "groq", repair=True,
+                )
+            except (GraphStructureError, BadRequestError, LLMProviderRequestError) as exc:
+                last_error = exc
+            except (RateLimitError, LLMProviderRateLimitError, AuthenticationError,
+                    PermissionDeniedError, APIConnectionError, APITimeoutError,
+                    InternalServerError, LLMProviderUnavailableError, LLMConfigurationError) as exc:
+                last_error = exc
+                provider_circuit_breaker.block(repair_provider, settings.llm_failover_cooldown_seconds, exc)
+
+        if isinstance(last_error, (RateLimitError, LLMProviderRateLimitError)):
+            if getattr(last_error, "application_budget", False):
+                raise last_error
             raise LLMProviderRateLimitError(
-                "Groq quota is exhausted and configured failover providers were unavailable"
-            ) from primary_error
-        if isinstance(
-            primary_error,
-            (APIConnectionError, APITimeoutError, InternalServerError),
-        ):
+                "Configured graph providers have exhausted their available quota",
+                retry_after_seconds=getattr(last_error, "retry_after_seconds", None),
+            ) from last_error
+        if isinstance(last_error, (APIConnectionError, APITimeoutError, InternalServerError)):
             raise LLMProviderUnavailableError(
-                "Groq and configured failover providers are temporarily unavailable"
-            ) from primary_error
-        if primary_error is not None:
-            raise primary_error
+                "Configured graph providers are temporarily unavailable"
+            ) from last_error
+        if last_error is not None:
+            raise last_error
         raise LLMProviderUnavailableError("No graph-generation provider is available")
 
     async def store_graph_extraction(
@@ -576,7 +658,8 @@ class IngestionService:
         }
 
     async def cleanup_upload(self, upload_id: str, course_id: str) -> None:
-        self.cleanup_vectors(upload_id)
+        from app.core.blocking import run_blocking_safely
+        await run_blocking_safely(self.cleanup_vectors, upload_id)
         await self.cleanup_graph(upload_id, course_id)
 
     def cleanup_vectors(self, upload_id: str) -> None:
@@ -678,45 +761,49 @@ class IngestionService:
     def _ensure_qdrant_payload_indexes(self) -> None:
         collection = self.vector_client.get_collection(self.collection_name)
         payload_schema = collection.payload_schema or {}
-        if "upload_id" in payload_schema:
-            return
-        try:
-            self.vector_client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="upload_id",
-                field_schema=PayloadSchemaType.KEYWORD,
-                wait=True,
-            )
-        except UnexpectedResponse as exc:
-            if exc.status_code != 409 and b"already exists" not in exc.content.lower():
-                raise
+        for field in ("upload_id", "identifier_terms"):
+            if field in payload_schema:
+                continue
+            try:
+                self.vector_client.create_payload_index(
+                    collection_name=self.collection_name, field_name=field,
+                    field_schema=PayloadSchemaType.KEYWORD, wait=True,
+                )
+            except UnexpectedResponse as exc:
+                if exc.status_code != 409 and b"already exists" not in exc.content.lower():
+                    raise
 
-    def _extract_with_groq(self, text: str) -> GraphExtractionResponse:
+    def _extract_with_groq(
+        self, text: str, *, repair: bool = False, allow_repair: bool | None = None,
+    ) -> GraphExtractionResponse:
         if not settings.groq_api_key:
             raise LLMConfigurationError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
 
+        contexts = self._graph_extraction_contexts(text)
         client = Groq(
             api_key=settings.groq_api_key,
             timeout=settings.provider_timeout_seconds,
             max_retries=0,
         )
-        contexts = self._graph_extraction_contexts(text)
         try:
             completion = client.chat.completions.create(
                 model=settings.groq_model,
                 messages=[
                     {
                         "role": "system",
-                        "content": self._extraction_system_prompt(),
+                        "content": self._extraction_system_prompt() + (
+                            " Return one JSON object with exactly two arrays named nodes and relationships."
+                            if repair else ""
+                        ),
                     },
                     {
                         "role": "user",
-                        "content": contexts[0],
+                        "content": contexts[-1] if repair else contexts[0],
                     },
                 ],
                 temperature=0,
-                max_completion_tokens=1000,
-                response_format={
+                max_completion_tokens=self.MAX_GRAPH_OUTPUT_TOKENS,
+                response_format={"type": "json_object"} if repair else {
                     "type": "json_schema",
                     "json_schema": {
                         "name": "concept_graph_extraction",
@@ -725,61 +812,38 @@ class IngestionService:
                     },
                 },
             )
-            content = completion.choices[0].message.content or "{}"
-            return self._validate_graph_batch_size(
-                GraphExtractionResponse.model_validate_json(content)
-            )
+            choice = completion.choices[0]
+            if getattr(choice, "finish_reason", None) == "length":
+                raise GraphStructureError("The graph response was truncated.", reason=GraphFailureReason.TRUNCATED_RESPONSE)
+            return self._validate_provider_graph(self._parse_provider_graph(choice.message.content or "{}"), text)
         except BadRequestError as exc:
             if not self._is_json_validation_failure(exc):
                 raise
-        except ValidationError:
-            pass
+            error = GraphStructureError("The provider rejected the graph schema.")
+        except GraphStructureError as exc:
+            error = exc
+        finally:
+            client.close()
+        repair_allowed = settings.graph_json_repair_enabled if allow_repair is None else allow_repair
+        if repair or not repair_allowed:
+            raise error
+        return self._extract_with_groq(text, repair=True, allow_repair=False)
 
-        if not settings.graph_json_repair_enabled:
-            raise GraphStructureError("Groq returned an invalid graph; JSON repair is disabled")
-
-        # Some compatible models reject strict JSON Schema even when they can
-        # return valid JSON. Use the smallest context for one simpler fallback,
-        # then still validate the graph locally before accepting it.
-        try:
-            completion = client.chat.completions.create(
-                model=settings.groq_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            f"{self._extraction_system_prompt()} Return one JSON object "
-                            "with exactly two arrays named nodes and relationships."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": contexts[-1],
-                    },
-                ],
-                temperature=0,
-                max_completion_tokens=1000,
-                response_format={"type": "json_object"},
-            )
-            content = completion.choices[0].message.content or "{}"
-            return self._validate_graph_batch_size(
-                GraphExtractionResponse.model_validate_json(content)
-            )
-        except (BadRequestError, ValidationError, ValueError) as exc:
-            raise GraphStructureError(
-                "json_validate_failed: Groq could not produce a valid graph for this section."
-            ) from exc
-
-    def _extract_with_cerebras(self, text: str) -> GraphExtractionResponse:
+    def _extract_with_cerebras(
+        self, text: str, *, repair: bool = False, allow_repair: bool | None = None,
+    ) -> GraphExtractionResponse:
         contexts = self._graph_extraction_contexts(text)
         try:
             content = cerebras_service.complete(
                 [
-                    {"role": "system", "content": self._extraction_system_prompt()},
-                    {"role": "user", "content": contexts[0]},
+                    {"role": "system", "content": self._extraction_system_prompt() + (
+                        " Return one JSON object with exactly two arrays named nodes and relationships."
+                        if repair else ""
+                    )},
+                    {"role": "user", "content": contexts[-1] if repair else contexts[0]},
                 ],
-                max_tokens=1_000,
-                response_format={
+                max_tokens=self.MAX_GRAPH_OUTPUT_TOKENS,
+                response_format={"type": "json_object"} if repair else {
                     "type": "json_schema",
                     "json_schema": {
                         "name": "concept_graph_extraction",
@@ -788,51 +852,44 @@ class IngestionService:
                     },
                 },
             )
-            return self._validate_graph_batch_size(
-                GraphExtractionResponse.model_validate_json(content)
-            )
-        except (LLMProviderRequestError, ValidationError, ValueError):
-            pass
-
-        if not settings.graph_json_repair_enabled:
-            raise GraphStructureError("Cerebras returned an invalid graph; JSON repair is disabled")
-
-        try:
-            content = cerebras_service.complete(
-                [
-                    {
-                        "role": "system",
-                        "content": (
-                            f"{self._extraction_system_prompt()} Return one JSON object "
-                            "with exactly two arrays named nodes and relationships."
-                        ),
-                    },
-                    {"role": "user", "content": contexts[-1]},
-                ],
-                max_tokens=1_000,
-                response_format={"type": "json_object"},
-            )
-            return self._validate_graph_batch_size(
-                GraphExtractionResponse.model_validate_json(content)
-            )
-        except (LLMProviderRequestError, ValidationError, ValueError) as exc:
-            raise GraphStructureError(
-                "json_validate_failed: Cerebras could not produce a valid graph for this section."
-            ) from exc
+            return self._validate_provider_graph(self._parse_provider_graph(content), text)
+        except LLMProviderRequestError:
+            # A rejected request is not evidence that retrying JSON will help.
+            raise
+        except GraphStructureError as exc:
+            error = exc
+        repair_allowed = settings.graph_json_repair_enabled if allow_repair is None else allow_repair
+        if repair or not repair_allowed:
+            raise error
+        return self._extract_with_cerebras(text, repair=True, allow_repair=False)
 
     @staticmethod
     def _graph_extraction_contexts(text: str) -> tuple[str, ...]:
+        """Bound whole source excerpts, preserving IDs and evidence across paragraphs."""
         contexts: list[str] = []
-        excerpts = [excerpt.strip() for excerpt in text.split("\n\n") if excerpt.strip()]
+        parts = [part.strip() for part in re.split(r"(?m)(?=^\[Source chunk ID:)", text) if part.strip()]
+        excerpts = [part for part in parts if part.startswith("[Source chunk ID:")]
+        prologue = "\n\n".join(part for part in parts if not part.startswith("[Source chunk ID:"))
         for limit in (5000, 3000):
-            per_excerpt = max(160, limit // max(1, len(excerpts)))
-            shortened = "\n\n".join(
-                IngestionService._truncate_excerpt(excerpt, per_excerpt)
-                for excerpt in excerpts
-            ).strip()
+            if not excerpts:
+                shortened = text.strip()[:limit].strip()
+            else:
+                prefix = prologue[:1000].strip()
+                separators = 2 * (len(excerpts) - 1 + bool(prefix))
+                per_excerpt = (limit - len(prefix) - separators) // len(excerpts)
+                bounded = []
+                for excerpt in excerpts:
+                    header, _, body = excerpt.partition("\n")
+                    if len(header) + 80 > per_excerpt:
+                        source_id = header.partition(":")[2].split("|", 1)[0].rstrip("]").strip()
+                        header = f"[Source chunk ID: {source_id}]"
+                    if len(header) > per_excerpt:
+                        raise GraphStructureError("Source identifiers exceed the graph context budget.", reason=GraphFailureReason.BATCH_LIMIT)
+                    bounded.append(IngestionService._truncate_excerpt(f"{header}\n{body}", per_excerpt))
+                shortened = "\n\n".join(([prefix] if prefix else []) + bounded).strip()
             if shortened and (not contexts or shortened != contexts[-1]):
                 contexts.append(shortened)
-        return tuple(contexts or [text])
+        return tuple(contexts or [""])
 
     @staticmethod
     def _cerebras_graph_extraction_schema() -> dict:
@@ -848,12 +905,12 @@ class IngestionService:
         extraction: GraphExtractionResponse,
     ) -> GraphExtractionResponse:
         if len(extraction.nodes) > IngestionService.MAX_CONCEPTS_PER_BATCH:
-            raise ValueError("Graph extraction exceeded the concept limit.")
+            raise GraphStructureError("Graph extraction exceeded the concept limit.", reason=GraphFailureReason.BATCH_LIMIT)
         if (
             len(extraction.relationships)
             > IngestionService.MAX_RELATIONSHIPS_PER_BATCH
         ):
-            raise ValueError("Graph extraction exceeded the relationship limit.")
+            raise GraphStructureError("Graph extraction exceeded the relationship limit.", reason=GraphFailureReason.BATCH_LIMIT)
         return extraction
 
     @staticmethod
@@ -863,7 +920,7 @@ class IngestionService:
     ) -> GraphExtractionResponse:
         """Reject structurally valid output that cannot produce a sourced graph."""
         if not extraction.nodes:
-            raise GraphStructureError("The provider returned an empty graph.")
+            return extraction.model_copy(update={"empty_extraction": True})
 
         source_ids = {
             match.strip()
@@ -877,9 +934,39 @@ class IngestionService:
             node.source_chunk_id in source_ids for node in extraction.nodes
         ):
             raise GraphStructureError(
-                "The provider graph did not reference any supplied source chunk."
+                "The provider graph did not reference any supplied source chunk.",
+                reason=GraphFailureReason.UNKNOWN_SOURCE,
             )
         return extraction
+
+    @classmethod
+    def _parse_provider_graph(cls, content: str) -> GraphExtractionResponse:
+        try:
+            payload = json.loads(content)
+        except (ValueError, TypeError) as exc:
+            raise GraphStructureError("The graph response is not valid JSON.", reason=GraphFailureReason.MALFORMED_JSON) from exc
+        if not isinstance(payload, dict) or set(payload) != {"nodes", "relationships"}:
+            raise GraphStructureError("The graph response must contain nodes and relationships arrays.")
+        if not isinstance(payload["nodes"], list) or not isinstance(payload["relationships"], list):
+            raise GraphStructureError("The graph response must contain nodes and relationships arrays.")
+        # Enforce limits before normalization can hide an oversized response.
+        if len(payload["nodes"]) > cls.MAX_CONCEPTS_PER_BATCH or len(payload["relationships"]) > cls.MAX_RELATIONSHIPS_PER_BATCH:
+            raise GraphStructureError("Graph extraction exceeded the batch limit.", reason=GraphFailureReason.BATCH_LIMIT)
+        for relationship in payload["relationships"]:
+            if isinstance(relationship, dict) and isinstance(relationship.get("relation_type"), str):
+                relation_type = re.sub(r"[^A-Z0-9]+", "_", relationship["relation_type"].strip().upper()).strip("_")
+                if relation_type not in ALLOWED_RELATIONSHIP_TYPES:
+                    raise GraphStructureError("The graph used an unsupported relationship type.", reason=GraphFailureReason.UNSUPPORTED_RELATIONSHIP)
+        try:
+            return GraphExtractionResponse.model_validate(payload)
+        except ValidationError as exc:
+            messages = [error["msg"] for error in exc.errors(include_input=False, include_url=False)]
+            reason = GraphFailureReason.INVALID_SCHEMA
+            if any("not extracted" in message for message in messages):
+                reason = GraphFailureReason.INVALID_ENDPOINTS
+            elif any("duplicate concept IDs" in message for message in messages):
+                reason = GraphFailureReason.DUPLICATE_IDS
+            raise GraphStructureError("The graph response failed structural validation.", reason=reason) from exc
 
     @staticmethod
     def _is_json_validation_failure(exc: BadRequestError) -> bool:
@@ -890,32 +977,35 @@ class IngestionService:
                 return True
         return "json_validate_failed" in str(exc).lower()
 
-    def _extract_with_gemini(self, text: str) -> GraphExtractionResponse:
+    def _extract_with_gemini(self, text: str, *, repair: bool = False) -> GraphExtractionResponse:
         if not settings.gemini_api_key:
             raise LLMConfigurationError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini")
 
-        content = gemini_service.generate(
-            [self._extraction_system_prompt(), text],
-            json_mode=True,
-            response_schema=self._graph_extraction_schema(),
-            max_output_tokens=1_000,
-        )
+        context = self._graph_extraction_contexts(text)[-1 if repair else 0]
         try:
-            return self._validate_graph_batch_size(
-                GraphExtractionResponse.model_validate_json(content)
+            content = gemini_service.generate(
+                [self._extraction_system_prompt() + (
+                    " Regenerate a minimal graph with exact source IDs and every endpoint in nodes."
+                    if repair else ""
+                ), context],
+                json_mode=True,
+                response_schema=None if repair else self._graph_extraction_schema(),
+                max_output_tokens=self.MAX_GRAPH_OUTPUT_TOKENS,
+                require_complete=True,
             )
-        except ValidationError as exc:
-            raise GraphStructureError(
-                "json_validate_failed: Gemini could not produce a valid graph for this section."
-            ) from exc
+        except LLMProviderTruncatedResponseError as exc:
+            raise GraphStructureError("The graph response was truncated.", reason=GraphFailureReason.TRUNCATED_RESPONSE) from exc
+        return self._validate_provider_graph(self._parse_provider_graph(content), text)
 
     @staticmethod
     def _extraction_system_prompt() -> str:
         relationship_types = ", ".join(sorted(ALLOWED_RELATIONSHIP_TYPES))
         return (
             "Extract academic concepts and relationships from the supplied source excerpts. "
-            "Return only the requested structured response. Use stable lowercase snake_case "
-            "ids for nodes. Every concept must cite exactly one supplied Source chunk ID in "
+            "Return only the requested structured response. Use stable lowercase snake_case ids for nodes. "
+            "Keep concept descriptions to one short sentence. If the excerpts support no "
+            "academic concepts, return explicit empty nodes and relationships arrays. "
+            "Every concept must cite exactly one supplied Source chunk ID in "
             "source_chunk_id; never invent a source ID. Every relationship endpoint must "
             "reference an extracted node. The only permitted relationship types are: "
             f"{relationship_types}. Use these directions exactly: A PREREQUISITE_OF B means A "
@@ -980,11 +1070,8 @@ class IngestionService:
 
     @staticmethod
     def _resolve_embedding_device() -> str:
-        import torch
-
-        if torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
+        from app.core.model_runtime import local_model_device
+        return local_model_device()
 
     @staticmethod
     def _validate_llm_configured() -> None:
@@ -1119,7 +1206,7 @@ class IngestionService:
             digest.update(b"\0")
             digest.update(chunk.text.encode("utf-8"))
         return GraphSectionBatch(
-            batch_key=f"global:v3:{digest.hexdigest()}",
+            batch_key=f"global:v4:{digest.hexdigest()}",
             section_key="__global__",
             section_label="Relationship recovery",
             chunks=tuple(selected),
@@ -1237,7 +1324,10 @@ class IngestionService:
             if relationship.source_node_id in retained_ids
             and relationship.target_node_id in retained_ids
         ]
-        return GraphExtractionResponse(nodes=nodes, relationships=relationships)
+        return GraphExtractionResponse(
+            nodes=nodes, relationships=relationships,
+            empty_extraction=not extraction.nodes,
+        )
 
     @staticmethod
     def _merge_graph_extractions(

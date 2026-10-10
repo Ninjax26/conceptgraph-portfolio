@@ -1,29 +1,31 @@
 """API endpoints for document ingestion and upload tracking."""
 
-import asyncio
 import hashlib
 from urllib.parse import quote
 from uuid import uuid4
 
 import pymupdf as fitz
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from app.core.database import get_postgres_session
+from app.core.blocking import run_blocking_safely
 from app.core.config import settings
-from app.schemas.ingest import CourseSummaryResponse, IngestResponse, UploadStatusResponse
+from app.schemas.ingest import CourseSummaryResponse, IngestResponse, UploadStatusResponse, UploadPageResponse
 from app.services.upload_service import UploadService
 from app.services.course_service import CourseService
+from app.services.resource_budget_service import ResourceBudgetExceeded, resource_budget_service
 from app.services.storage_service import (
     ObjectNotFoundError,
     ObjectStorageError,
     StorageService,
     storage_service,
 )
-from app.core.processing import FailureCategory
+from app.core.processing import FailureCategory, normalize_course_name
 from app.core.processing_coordinator import EnqueueDisposition, processing_coordinator
+from app.models.document_upload import DocumentUpload
 from app.services.document_processing_service import document_processing_service
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
@@ -46,6 +48,8 @@ async def upload_document(
 ) -> IngestResponse:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    if len(file.filename) > 255:
+        raise HTTPException(status_code=400, detail="The PDF filename must be 255 characters or fewer.")
     if file.content_type not in {"application/pdf", "application/x-pdf"}:
         raise HTTPException(status_code=400, detail="The selected file is not a valid PDF.")
     if file.size is not None and file.size > MAX_UPLOAD_BYTES:
@@ -53,6 +57,8 @@ async def upload_document(
     course_id = course_id.strip()
     if not course_id:
         raise HTTPException(status_code=400, detail="course_id cannot be empty.")
+    if max(len(course_id), len(course_id.upper()), len(normalize_course_name(course_id))) > 255:
+        raise HTTPException(status_code=400, detail="The course name is too long for document tracking. Use a shorter name.")
 
     content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
@@ -70,6 +76,9 @@ async def upload_document(
                 )
             if document.page_count == 0:
                 raise HTTPException(status_code=400, detail="The PDF contains no pages.")
+            page_count = document.page_count
+            if page_count > settings.max_pages_per_document:
+                raise HTTPException(status_code=413, detail="This PDF exceeds the configured page budget.")
     except HTTPException:
         raise
     except Exception as exc:
@@ -88,20 +97,19 @@ async def upload_document(
             message="This PDF already exists in the course. The existing document was returned.",
             duplicate=True,
         )
-    if await upload_service.count_uploads(db) >= settings.max_pdfs_per_installation:
-        raise HTTPException(
-            status_code=429,
-            detail=(
-                "This installation has reached its configured PDF limit. "
-                "Remove an eligible document before uploading another."
-            ),
-        )
+    reserved_chunks = resource_budget_service.chunk_reservation(page_count)
+    try:
+        usage = await resource_budget_service.usage(db)
+        resource_budget_service.check(usage, pages=page_count, chunks=reserved_chunks, source_bytes=len(content))
+    except ResourceBudgetExceeded as exc:
+        await db.rollback()
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     upload_id = str(uuid4())
     task_id = str(uuid4())
     storage_key = StorageService.object_key(course.id, content_hash)
     try:
-        await asyncio.to_thread(storage_service.put_pdf, storage_key, content)
+        await run_blocking_safely(storage_service.put_pdf, storage_key, content)
     except ObjectStorageError as exc:
         await db.rollback()
         raise HTTPException(
@@ -118,6 +126,9 @@ async def upload_document(
             content_hash=content_hash,
             original_filename=file.filename,
             storage_key=storage_key,
+            source_bytes=len(content),
+            page_count=page_count,
+            reserved_chunk_count=reserved_chunks,
         )
     except Exception as exc:
         await db.rollback()
@@ -153,31 +164,7 @@ async def get_upload_status(
     if record is None:
         raise HTTPException(status_code=404, detail="Upload not found.")
 
-    return UploadStatusResponse(
-        upload_id=record.upload_id,
-        task_id=record.task_id,
-        course_id=record.course_uuid or record.course_id,
-        original_filename=record.original_filename,
-        course_name=record.course_id,
-        status=record.status,
-        stage=record.stage,
-        failure_category=record.failure_category,
-        retryable=record.retryable,
-        attempt_count=record.attempt_count,
-        last_attempted_at=record.last_attempted_at,
-        last_heartbeat_at=record.last_heartbeat_at,
-        processed_chunk_count=record.processed_chunk_count,
-        graph_node_count=record.graph_node_count,
-        graph_edge_count=record.graph_edge_count,
-        graph_status=record.graph_status,
-        error_message=record.error_message,
-        result_json=record.result_json,
-        created_at=record.created_at,
-        updated_at=record.updated_at,
-        started_at=record.started_at,
-        completed_at=record.completed_at,
-        preview_url=f"/api/v1/ingest/uploads/{record.upload_id}/preview",
-    )
+    return _upload_status_response(record)
 
 
 @router.get("/uploads", response_model=list[UploadStatusResponse])
@@ -194,34 +181,7 @@ async def list_uploads(
         if current is None or rank.get(record.status, 9) < rank.get(current.status, 9):
             grouped[key] = record
     records = list(grouped.values())[: max(1, min(limit, 100))]
-    return [
-        UploadStatusResponse(
-            upload_id=record.upload_id,
-            task_id=record.task_id,
-            course_id=record.course_uuid or record.course_id,
-            course_name=record.course_id,
-            original_filename=record.original_filename,
-            status=record.status,
-            stage=record.stage,
-            failure_category=record.failure_category,
-            retryable=record.retryable,
-            attempt_count=record.attempt_count,
-            last_attempted_at=record.last_attempted_at,
-            last_heartbeat_at=record.last_heartbeat_at,
-            processed_chunk_count=record.processed_chunk_count,
-            graph_node_count=record.graph_node_count,
-            graph_edge_count=record.graph_edge_count,
-            graph_status=record.graph_status,
-            error_message=record.error_message,
-            result_json=record.result_json,
-            created_at=record.created_at,
-            updated_at=record.updated_at,
-            started_at=record.started_at,
-            completed_at=record.completed_at,
-            preview_url=f"/api/v1/ingest/uploads/{record.upload_id}/preview",
-        )
-        for record in records
-    ]
+    return [_upload_status_response(record) for record in records]
 
 
 @router.get("/courses", response_model=list[CourseSummaryResponse])
@@ -252,6 +212,31 @@ async def list_courses(
     ]
 
 
+@router.get("/uploads/page", response_model=UploadPageResponse)
+async def list_upload_page(
+    limit: int = Query(default=25, ge=1, le=100),
+    cursor: str | None = Query(default=None, max_length=512),
+    db: AsyncSession = Depends(get_postgres_session),
+) -> UploadPageResponse:
+    from app.services.upload_pagination import paginated_uploads
+    try:
+        records, next_cursor = await paginated_uploads(db, limit=limit, cursor=cursor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid document cursor.") from exc
+    return UploadPageResponse(items=[_upload_status_response(record) for record in records], next_cursor=next_cursor)
+
+
+@router.get("/resources")
+async def installation_resources(db: AsyncSession = Depends(get_postgres_session)) -> dict:
+    from dataclasses import asdict
+    usage = await resource_budget_service.usage(db)
+    return {"usage": asdict(usage), "limits": {
+        "pages": settings.max_pages_per_installation, "chunks": settings.max_chunks_per_installation,
+        "source_bytes": settings.max_storage_mb * 1024 * 1024, "pending": settings.max_pending_documents,
+        "legacy_document_limit": settings.max_pdfs_per_installation or None,
+    }, "note": "Chunk reservations are reconciled before indexing. Unknown legacy documents count conservatively; storage is source PDF bytes, not vector/graph/database overhead."}
+
+
 @router.post("/uploads/{upload_id}/retry", response_model=IngestResponse)
 async def retry_upload(
     upload_id: str,
@@ -270,7 +255,10 @@ async def retry_upload(
         )
 
     task_id = str(uuid4())
-    record = await upload_service.retry_upload(db, upload_id, task_id)
+    try:
+        record = await upload_service.retry_upload(db, upload_id, task_id)
+    except ResourceBudgetExceeded as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     if record is None:
         raise HTTPException(
             status_code=409,
@@ -278,7 +266,7 @@ async def retry_upload(
         )
 
     try:
-        source_exists = await asyncio.to_thread(storage_service.exists, record.storage_key)
+        source_exists = await run_blocking_safely(storage_service.exists, record.storage_key)
     except ObjectStorageError as exc:
         await upload_service.mark_failed(
             db,
@@ -328,7 +316,7 @@ async def preview_upload(
         raise HTTPException(status_code=404, detail="Upload not found.")
 
     try:
-        content = await asyncio.to_thread(storage_service.get_bytes, record.storage_key)
+        content = await run_blocking_safely(storage_service.get_bytes, record.storage_key)
     except ObjectNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Stored PDF is no longer available.")
     except ObjectStorageError as exc:
@@ -378,7 +366,7 @@ async def remove_upload(
     )
     if not shared_object:
         try:
-            await asyncio.to_thread(storage_service.delete, record.storage_key)
+            await run_blocking_safely(storage_service.delete, record.storage_key)
         except ObjectStorageError as exc:
             await db.rollback()
             raise HTTPException(status_code=503, detail="Document storage is temporarily unavailable.") from exc
@@ -436,6 +424,34 @@ def build_pdf_response(content: bytes, filename: str, range_header: str | None) 
 
 
 _pdf_response = build_pdf_response
+
+
+def _upload_status_response(record: DocumentUpload) -> UploadStatusResponse:
+    return UploadStatusResponse(
+        upload_id=record.upload_id,
+        task_id=record.task_id,
+        course_id=record.course_uuid or record.course_id,
+        course_name=record.course_id,
+        original_filename=record.original_filename,
+        status=record.status,
+        stage=record.stage,
+        failure_category=record.failure_category,
+        retryable=record.retryable,
+        attempt_count=record.attempt_count,
+        last_attempted_at=record.last_attempted_at,
+        last_heartbeat_at=record.last_heartbeat_at,
+        processed_chunk_count=record.processed_chunk_count,
+        graph_node_count=record.graph_node_count,
+        graph_edge_count=record.graph_edge_count,
+        graph_status=record.graph_status,
+        error_message=record.error_message,
+        result_json=record.result_json,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        started_at=record.started_at,
+        completed_at=record.completed_at,
+        preview_url=f"/api/v1/ingest/uploads/{record.upload_id}/preview",
+    )
 
 
 def _ingest_response(record, *, message: str, duplicate: bool) -> IngestResponse:

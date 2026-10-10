@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, settings
+from app.core.blocking import run_blocking_safely
 from app.core.database import AsyncSessionLocal
 from app.services.course_service import CourseService
 from app.services.document_processing_service import document_processing_service
@@ -100,7 +101,7 @@ class DemoRetentionService:
                 record.upload_id,
             )
             if not shared_object:
-                await asyncio.to_thread(self.storage.delete, record.storage_key)
+                await run_blocking_safely(self.storage.delete, record.storage_key)
             deleted = await self.upload_service.delete_document(session, upload_id)
             return deleted is not None
         except ObjectStorageError:

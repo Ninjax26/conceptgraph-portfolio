@@ -65,3 +65,8 @@ class CourseSummaryResponse(BaseModel):
     last_updated_at: datetime | None = None
     historical_records: int = 0
     duplicate_records: int = 0
+
+
+class UploadPageResponse(BaseModel):
+    items: list[UploadStatusResponse]
+    next_cursor: str | None = None

@@ -61,12 +61,28 @@ export interface QueryResponse {
     total_nodes: number;
     total_edges: number;
     displayed_nodes: number;
+    display_budget_applied?: boolean;
+    display_node_limit?: number;
+    display_edge_limit?: number;
     displayed_edges: number;
     filter_reason: string;
     graph_status: GraphStatus;
     retrieval_mode?: "vector_only" | "one_hop" | "two_hop" | "visualization_only";
     requested_mode?: RetrievalMode;
     fallback_reason?: string;
+    projection_missing?: boolean;
+    candidates?: {
+      candidate_limit: number;
+      embedding_execution?: "local" | "hosted_in_dense_search";
+      timings?: Record<string, number>;
+      dense_count?: number;
+      identifier_count?: number;
+      merged_count?: number;
+      identifier_terms_count?: number;
+      identifier_lookup_used?: boolean;
+      fallback_reason?: string | null;
+    };
+    timings?: Record<string, number>;
     graph_expansion?: {
       anchor_match_found: boolean;
       maximum_hops: number;
@@ -88,6 +104,13 @@ export interface QueryResponse {
 }
 
 export interface ProviderStatusResponse {
+  shared_budget?: {
+    enabled: boolean;
+    requests_per_minute: number;
+    requests_per_day: number;
+    usage: Array<{ provider: string; minute_requests: number; day_requests: number }>;
+    note: string;
+  };
   primary: string;
   fallback_order: string[];
   providers: Array<{
@@ -109,6 +132,7 @@ export interface ProviderStatusResponse {
       successful_attempts: number;
       failed_attempts: number;
       failover_attempts: number;
+      repair_attempts?: number;
       rate_limit_errors: number;
       evidence_fallbacks: number;
       estimated_input_tokens: number;
@@ -147,6 +171,8 @@ export interface ProviderStatusResponse {
       estimated_input_tokens: number;
       estimated_output_tokens: number;
       recorded_at: string;
+      failure_reason?: string | null;
+      repair?: boolean;
     }>;
     privacy_note: string;
     accuracy_note: string;
@@ -177,6 +203,9 @@ export interface ReadinessStatus {
   processing_queue_depth: number;
   degraded_services: string[];
   graph_available: boolean;
+  ingestion_available?: boolean;
+  active_workers?: number | null;
+  processing_role?: "combined" | "api";
 }
 
 async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}) {
@@ -228,6 +257,11 @@ async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: 
   }
 }
 
+async function fetchJson<T>(url: string, options: RequestInit & { timeout?: number }): Promise<T> {
+  const response = await fetchWithTimeout(url, options);
+  return response.json() as Promise<T>;
+}
+
 export interface AuthSessionStatus {
   enabled: boolean;
   authenticated: boolean;
@@ -250,13 +284,12 @@ export async function getAuthSession(): Promise<AuthSessionStatus> {
 }
 
 export async function createAuthSession(accessCode: string): Promise<AuthSessionStatus> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/auth/session`, {
+  return fetchJson<AuthSessionStatus>(`${API_BASE_URL}/auth/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ access_code: accessCode }),
     timeout: 15000,
   });
-  return response.json() as Promise<AuthSessionStatus>;
 }
 
 export async function deleteAuthSession(): Promise<void> {
@@ -267,11 +300,10 @@ export async function deleteAuthSession(): Promise<void> {
 }
 
 export async function getPublicSample(): Promise<PublicSampleResponse> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/public/sample`, {
+  return fetchJson<PublicSampleResponse>(`${API_BASE_URL}/public/sample`, {
     method: "GET",
     timeout: 15000,
   });
-  return response.json() as Promise<PublicSampleResponse>;
 }
 
 export type RetrievalMode = "vector_only" | "one_hop" | "two_hop";
@@ -281,7 +313,7 @@ export async function sendQuery(
   courseId: string,
   retrievalMode: RetrievalMode = "two_hop",
 ): Promise<QueryResponse> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/query`, {
+  return fetchJson<QueryResponse>(`${API_BASE_URL}/query`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -293,25 +325,21 @@ export async function sendQuery(
     }),
     timeout: 60000, // 60s timeout for LLM synthesis
   });
-
-  return response.json() as Promise<QueryResponse>;
 }
 
 export async function getProviderStatus(): Promise<ProviderStatusResponse> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/providers/status`, {
+  return fetchJson<ProviderStatusResponse>(`${API_BASE_URL}/providers/status`, {
     method: "GET",
     timeout: 15000,
   });
-  return response.json() as Promise<ProviderStatusResponse>;
 }
 
 export async function getReadiness(): Promise<ReadinessStatus> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/ready`, {
+  return fetchJson<ReadinessStatus>(`${API_BASE_URL}/ready`, {
     method: "GET",
     cache: "no-store",
     timeout: 12000,
   });
-  return response.json() as Promise<ReadinessStatus>;
 }
 
 export interface MockQuestion {
@@ -346,7 +374,7 @@ export async function generateExam(
   courseId: string,
   numQuestions: number = 5
 ): Promise<ExamResponse> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/exam/generate`, {
+  return fetchJson<ExamResponse>(`${API_BASE_URL}/exam/generate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -357,8 +385,6 @@ export async function generateExam(
     }),
     timeout: 60000, // 60s timeout for LLM exam generation
   });
-
-  return response.json() as Promise<ExamResponse>;
 }
 
 export interface IngestResponse {
@@ -381,13 +407,11 @@ export async function uploadDocument(
   formData.append("file", file);
   formData.append("course_id", courseId);
 
-  const response = await fetchWithTimeout(`${API_BASE_URL}/ingest/upload`, {
+  return fetchJson<IngestResponse>(`${API_BASE_URL}/ingest/upload`, {
     method: "POST",
     body: formData,
     timeout: 30000,
   });
-
-  return response.json() as Promise<IngestResponse>;
 }
 
 export interface UploadStatusResponse {
@@ -436,37 +460,44 @@ export interface CourseSummary {
 }
 
 export async function getUploadStatus(taskId: string): Promise<UploadStatusResponse> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/ingest/status/${taskId}`, {
+  return fetchJson<UploadStatusResponse>(`${API_BASE_URL}/ingest/status/${taskId}`, {
     method: "GET",
     timeout: 15000,
   });
-
-  return response.json() as Promise<UploadStatusResponse>;
 }
 
 export async function listUploads(): Promise<UploadStatusResponse[]> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/ingest/uploads`, {
+  return fetchJson<UploadStatusResponse[]>(`${API_BASE_URL}/ingest/uploads`, {
     method: "GET",
     timeout: 15000,
   });
+}
 
-  return response.json() as Promise<UploadStatusResponse[]>;
+export interface UploadPageResponse {
+  items: UploadStatusResponse[];
+  next_cursor: string | null;
+}
+
+export async function listUploadPage(cursor: string | null = null): Promise<UploadPageResponse> {
+  const params = new URLSearchParams({ limit: "25" });
+  if (cursor) params.set("cursor", cursor);
+  return fetchJson<UploadPageResponse>(`${API_BASE_URL}/ingest/uploads/page?${params}`, {
+    method: "GET", timeout: 15000,
+  });
 }
 
 export async function listCourses(): Promise<CourseSummary[]> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/ingest/courses`, {
+  return fetchJson<CourseSummary[]>(`${API_BASE_URL}/ingest/courses`, {
     method: "GET",
     timeout: 15000,
   });
-  return response.json() as Promise<CourseSummary[]>;
 }
 
 export async function retryUpload(uploadId: string): Promise<IngestResponse> {
-  const response = await fetchWithTimeout(
+  return fetchJson<IngestResponse>(
     `${API_BASE_URL}/ingest/uploads/${uploadId}/retry`,
     { method: "POST", timeout: 15000 },
   );
-  return response.json() as Promise<IngestResponse>;
 }
 
 export async function removeUpload(uploadId: string): Promise<void> {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from collections.abc import Sequence
 from typing import Any, TypeVar
@@ -10,14 +11,15 @@ from typing import Any, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, settings
+from app.core.blocking import run_blocking_safely
 from app.core.database import AsyncSessionLocal
 from app.core.processing import ProcessingStage, assess_graph_status, classify_failure
-from app.models.document_upload import DocumentUpload
 from app.schemas.extraction import GraphExtractionResponse
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.parser_service import ExtractedPage, ParserService
 from app.services.storage_service import storage_service
 from app.services.upload_service import UploadService
+from app.services.shared_provider_service import provider_call_counts
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -70,6 +72,9 @@ class DocumentProcessingService:
                 f"Processing attempt {task_id} is not claimed for {upload_id}."
             )
         heartbeat_stop = asyncio.Event()
+        processing_started = time.perf_counter()
+        call_token = provider_call_counts.set({})
+        stage_seconds: dict[str, float] = {}
         superseded = asyncio.Event()
         heartbeat_task = asyncio.create_task(
             self._heartbeat_loop(
@@ -88,19 +93,21 @@ class DocumentProcessingService:
 
             cleanup_vectors = getattr(self.ingestion_service, "cleanup_vectors", None)
             if cleanup_vectors is not None:
-                await asyncio.to_thread(cleanup_vectors, upload_id)
+                await run_blocking_safely(cleanup_vectors, upload_id)
 
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.EXTRACTING
             )
-            pdf_content = await asyncio.to_thread(
+            stage_started = time.perf_counter()
+            pdf_content = await run_blocking_safely(
                 storage_service.get_bytes, record.storage_key
             )
-            pages = await asyncio.to_thread(
+            pages = await run_blocking_safely(
                 self.parser_service.extract_pages_from_bytes,
                 pdf_content,
             )
             extraction_summary = self._page_extraction_summary(pages)
+            stage_seconds["text_extraction"] = round(time.perf_counter() - stage_started, 4)
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.EXTRACTED
             )
@@ -108,12 +115,13 @@ class DocumentProcessingService:
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.CHUNKING
             )
-            chunks = await asyncio.to_thread(
+            chunks = await run_blocking_safely(
                 self.parser_service.chunk_pages,
                 pages,
                 record.course_uuid,
                 upload_id,
                 record.original_filename,
+                max_chunks=self.config.max_chunks_per_document,
             )
             for chunk in chunks:
                 chunk.metadata["execution_token"] = task_id
@@ -121,6 +129,13 @@ class DocumentProcessingService:
                 raise ValueError(
                     "No readable text was found after native extraction and OCR."
                 )
+            reserve = getattr(self.upload_service, "reserve_chunks", None)
+            if reserve is not None:
+                reserved = await self._run_with_session(lambda session: reserve(
+                    session, upload_id, task_id, lease_owner=lease_owner,
+                    pages=len(pages), chunks=len(chunks), source_bytes=len(pdf_content)))
+                if not reserved:
+                    raise ProcessingAttemptSuperseded("Resource reservation belongs to a superseded attempt.")
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.CHUNKED
             )
@@ -128,11 +143,13 @@ class DocumentProcessingService:
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.EMBEDDING
             )
-            vector_count = await asyncio.to_thread(
+            stage_started = time.perf_counter()
+            vector_count = await run_blocking_safely(
                 self.ingestion_service.upsert_chunks_to_qdrant, chunks
             )
             if vector_count != len(chunks) or vector_count <= 0:
                 raise RuntimeError("Qdrant did not commit every document chunk.")
+            stage_seconds["vector_indexing"] = round(time.perf_counter() - stage_started, 4)
             await self._ensure_current(superseded, upload_id, task_id)
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.EMBEDDED
@@ -141,6 +158,7 @@ class DocumentProcessingService:
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.BUILDING_GRAPH
             )
+            stage_started = time.perf_counter()
             completed_batches: dict[str, GraphExtractionResponse] = {}
             load_checkpoints = getattr(
                 self.upload_service, "load_graph_checkpoints", None
@@ -209,8 +227,9 @@ class DocumentProcessingService:
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.GRAPH_BUILT
             )
+            stage_seconds["graph_building"] = round(time.perf_counter() - stage_started, 4)
 
-            source_exists = await asyncio.to_thread(
+            source_exists = await run_blocking_safely(
                 storage_service.exists, record.storage_key
             )
             if not source_exists:
@@ -221,6 +240,7 @@ class DocumentProcessingService:
                 len(graph.relationships),
                 sections_total=graph.sections_total,
                 sections_succeeded=graph.sections_succeeded,
+                sections_empty=graph.sections_empty,
                 batches_failed=graph.batches_failed,
                 batches_skipped=graph.batches_skipped,
             ).value
@@ -234,6 +254,9 @@ class DocumentProcessingService:
                 "graph_sections_total": graph.sections_total,
                 "graph_sections_succeeded": graph.sections_succeeded,
                 "graph_sections_failed": graph.sections_failed,
+                "graph_sections_processed": graph.sections_processed,
+                "graph_sections_empty": graph.sections_empty,
+                "graph_batches_empty": graph.batches_empty,
                 "graph_batches_total": graph.batches_total,
                 "graph_batches_succeeded": graph.batches_succeeded,
                 "graph_batches_failed": graph.batches_failed,
@@ -242,10 +265,19 @@ class DocumentProcessingService:
                 "graph_extraction_budget_applied": graph.extraction_budget_applied,
                 "graph_global_linking_attempted": graph.global_linking_attempted,
                 "graph_global_linking_succeeded": graph.global_linking_succeeded,
-                "graph_relationship_pass_version": 3 if graph.global_linking_attempted else 0,
+                "graph_global_linking_processed": graph.global_linking_processed,
+                "graph_relationship_pass_version": 4 if graph.global_linking_attempted else 0,
                 "graph_checkpointed_batches": graph.batches_succeeded,
                 "graph_failed_sections": graph.failed_section_labels,
+                "graph_batch_diagnostics": [entry.model_dump(mode="json") for entry in graph.batch_diagnostics],
                 **extraction_summary,
+                "processing_seconds": round(time.perf_counter() - processing_started, 4),
+                "stage_seconds": stage_seconds,
+                "source_bytes": len(pdf_content),
+                "page_count": len(pages),
+                "graph_provider_calls": (provider_call_counts.get() or {}).get("graph_extraction", 0),
+                "queue_wait_seconds": max(0, (record.started_at - record.last_attempted_at).total_seconds())
+                if getattr(record, "started_at", None) is not None and getattr(record, "last_attempted_at", None) is not None else None,
             }
             completed = await self._run_with_session(
                 lambda session: self.upload_service.mark_completed(
@@ -335,6 +367,7 @@ class DocumentProcessingService:
                 "error": message,
             }
         finally:
+            provider_call_counts.reset(call_token)
             heartbeat_stop.set()
             heartbeat_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -396,21 +429,41 @@ class DocumentProcessingService:
     @staticmethod
     def _page_extraction_summary(
         pages: Sequence[ExtractedPage | tuple[int, str]],
-    ) -> dict[str, int | float | None]:
+    ) -> dict[str, Any]:
         native_pages = 0
         ocr_pages = 0
+        hybrid_pages = 0
+        warning_pages = 0
+        ocr_attempts = 0
+        unreadable_pages = 0
+        warning_page_numbers: list[int] = []
         confidences: list[float] = []
         for page in pages:
-            if isinstance(page, ExtractedPage) and page.extraction_method == "ocr":
-                ocr_pages += 1
+            if isinstance(page, ExtractedPage):
+                ocr_attempts += page.ocr_attempts
+                warning_pages += bool(page.extraction_warnings)
+                if page.extraction_warnings:
+                    warning_page_numbers.append(page.page_number)
+            if isinstance(page, ExtractedPage) and page.extraction_method in {"ocr", "native_text+ocr"}:
+                if page.extraction_method == "native_text+ocr":
+                    hybrid_pages += 1
+                else:
+                    ocr_pages += 1
                 if page.ocr_confidence is not None:
                     confidences.append(page.ocr_confidence)
+            elif isinstance(page, ExtractedPage) and page.extraction_method == "unreadable":
+                unreadable_pages += 1
             else:
                 native_pages += 1
         return {
             "pages_extracted": len(pages),
             "native_text_pages": native_pages,
             "ocr_pages": ocr_pages,
+            "hybrid_text_ocr_pages": hybrid_pages,
+            "extraction_warning_pages": warning_pages,
+            "ocr_attempts": ocr_attempts,
+            "unreadable_pages": unreadable_pages,
+            "extraction_warning_page_numbers": warning_page_numbers,
             "ocr_average_confidence": (
                 round(sum(confidences) / len(confidences), 1)
                 if confidences

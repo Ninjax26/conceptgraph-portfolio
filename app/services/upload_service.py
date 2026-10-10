@@ -54,6 +54,10 @@ class UploadService:
                     and result.get("graph_global_linking_succeeded") is True
                 )
                 or (
+                    result.get("graph_relationship_pass_version") == 4
+                    and result.get("graph_global_linking_processed") is True
+                )
+                or (
                     (
                         int(getattr(record, "graph_node_count", 0)) < 2
                     )
@@ -141,6 +145,9 @@ class UploadService:
         content_hash: str,
         original_filename: str,
         storage_key: str,
+        source_bytes: int | None = None,
+        page_count: int | None = None,
+        reserved_chunk_count: int | None = None,
     ) -> DocumentUpload:
         now = datetime.now(timezone.utc)
         record = DocumentUpload(
@@ -154,6 +161,9 @@ class UploadService:
             week_number=1,
             original_filename=original_filename,
             storage_key=storage_key,
+            source_bytes=source_bytes,
+            page_count=page_count,
+            reserved_chunk_count=reserved_chunk_count,
             status="active",
             stage=ProcessingStage.UPLOADED.value,
             retryable=False,
@@ -189,6 +199,21 @@ class UploadService:
     async def count_uploads(self, session: AsyncSession) -> int:
         result = await session.execute(select(func.count(DocumentUpload.upload_id)))
         return int(result.scalar_one())
+
+    async def reserve_chunks(self, session, upload_id, task_id, *, lease_owner, pages, chunks, source_bytes):
+        from app.services.resource_budget_service import resource_budget_service
+        await resource_budget_service.lock(session)
+        record = await self._get_current_upload(session, upload_id, task_id, lease_owner=lease_owner)
+        if record is None or record.status != "active":
+            await session.rollback()
+            return False
+        usage = await resource_budget_service.usage(session, exclude_upload_id=upload_id)
+        resource_budget_service.check(usage, pages=pages, chunks=chunks, source_bytes=source_bytes, new_document=False)
+        record.source_bytes = source_bytes
+        record.page_count = pages
+        record.reserved_chunk_count = chunks
+        await session.commit()
+        return True
 
     async def get_upload(self, session: AsyncSession, upload_id: str) -> DocumentUpload | None:
         result = await session.execute(
@@ -391,9 +416,11 @@ class UploadService:
         record.lease_owner = lease_owner
         record.lease_expires_at = now + timedelta(seconds=lease_seconds)
         record.last_heartbeat_at = now
+        record.started_at = getattr(record, "started_at", None) or now
         attempt = await self._current_attempt(session, record)
         if attempt is not None:
             attempt.last_heartbeat_at = now
+            attempt.started_at = getattr(attempt, "started_at", None) or now
         await session.commit()
         await session.refresh(record)
         return record
@@ -404,6 +431,12 @@ class UploadService:
         upload_id: str,
         task_id: str,
     ) -> DocumentUpload | None:
+        from app.services.resource_budget_service import ResourceBudgetExceeded, resource_budget_service
+        await resource_budget_service.lock(session)
+        usage = await resource_budget_service.usage(session)
+        if usage.pending >= resource_budget_service.config.max_pending_documents:
+            await session.rollback()
+            raise ResourceBudgetExceeded("The pending processing budget is full. Wait for existing jobs to finish.")
         result = await session.execute(
             select(DocumentUpload)
             .where(DocumentUpload.upload_id == upload_id)
@@ -676,7 +709,7 @@ class UploadService:
         ]
         if lease_owner is not None:
             conditions.append(DocumentUpload.lease_owner == lease_owner)
-        result = await session.execute(select(DocumentUpload).where(*conditions))
+        result = await session.execute(select(DocumentUpload).where(*conditions).with_for_update())
         return result.scalar_one_or_none()
 
     async def _current_attempt(

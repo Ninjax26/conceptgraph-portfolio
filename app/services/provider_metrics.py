@@ -33,6 +33,8 @@ class ProviderCallMetric:
     estimated_input_tokens: int
     estimated_output_tokens: int
     recorded_at: str
+    failure_reason: str | None = None
+    repair: bool = False
 
 
 class ProviderMetrics:
@@ -53,6 +55,7 @@ class ProviderMetrics:
         *,
         input_characters: int,
         failover: bool = False,
+        repair: bool = False,
     ) -> T:
         started = time.perf_counter()
         try:
@@ -66,6 +69,8 @@ class ProviderMetrics:
                 failover=failover,
                 input_characters=input_characters,
                 output_characters=0,
+                failure_reason=exc.reason.value if isinstance(exc, GraphStructureError) else None,
+                repair=repair,
             )
             raise
 
@@ -77,6 +82,7 @@ class ProviderMetrics:
             failover=failover,
             input_characters=input_characters,
             output_characters=self._output_size(result),
+            repair=repair,
         )
         return result
 
@@ -102,6 +108,7 @@ class ProviderMetrics:
                 "successful_attempts": len(successful),
                 "failed_attempts": len(events) - len(successful),
                 "failover_attempts": sum(event.failover for event in events),
+                "repair_attempts": sum(event.repair for event in events),
                 "rate_limit_errors": sum(event.outcome == "rate_limited" for event in events),
                 "evidence_fallbacks": evidence_fallbacks,
                 "estimated_input_tokens": sum(event.estimated_input_tokens for event in events),
@@ -138,6 +145,8 @@ class ProviderMetrics:
         failover: bool,
         input_characters: int,
         output_characters: int,
+        failure_reason: str | None = None,
+        repair: bool = False,
     ) -> None:
         event = ProviderCallMetric(
             provider=provider,
@@ -148,6 +157,8 @@ class ProviderMetrics:
             estimated_input_tokens=self._estimate_tokens(input_characters),
             estimated_output_tokens=self._estimate_tokens(output_characters),
             recorded_at=self._now(),
+            failure_reason=failure_reason,
+            repair=repair,
         )
         with self._lock:
             self._events.append(event)

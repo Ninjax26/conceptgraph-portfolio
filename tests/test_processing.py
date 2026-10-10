@@ -17,7 +17,7 @@ from starlette.datastructures import Headers
 
 from app.api.endpoints import auth, ingest, public_demo, query
 from app.api.endpoints.query import QueryRequest
-from app.core.config import Settings
+from app.core.config import Settings, settings
 from app.core.exceptions import GraphStructureError, LLMProviderRateLimitError
 from app.core.processing import (
     FailureCategory,
@@ -602,11 +602,15 @@ class ProcessingRulesTests(unittest.TestCase):
 
         service._ensure_qdrant_collection(vector_size=384)
 
-        vector_client.create_payload_index.assert_called_once_with(
+        vector_client.create_payload_index.assert_any_call(
             collection_name="conceptgraph_chunks",
             field_name="upload_id",
             field_schema=ANY,
             wait=True,
+        )
+        vector_client.create_payload_index.assert_any_call(
+            collection_name="conceptgraph_chunks", field_name="identifier_terms",
+            field_schema=ANY, wait=True,
         )
 
     def test_incompatible_qdrant_dimension_is_rejected(self):
@@ -731,7 +735,7 @@ class ProcessingRulesTests(unittest.TestCase):
             response_format["json_schema"]["schema"]["properties"]["nodes"]["maxItems"],
             IngestionService.MAX_CONCEPTS_PER_BATCH,
         )
-        self.assertEqual(result, GraphExtractionResponse())
+        self.assertEqual(result, GraphExtractionResponse(empty_extraction=True))
 
     def test_graph_extraction_fails_over_and_keeps_groq_on_cooldown(self):
         rate_limit = RateLimitError(
@@ -822,7 +826,7 @@ class ProcessingRulesTests(unittest.TestCase):
         first_context = client.chat.completions.create.call_args_list[0].kwargs["messages"][1]["content"]
         second_context = client.chat.completions.create.call_args_list[1].kwargs["messages"][1]["content"]
         self.assertLess(len(second_context), len(first_context))
-        self.assertEqual(result, GraphExtractionResponse())
+        self.assertEqual(result, GraphExtractionResponse(empty_extraction=True))
 
     def test_groq_exhausted_schema_failures_use_json_object_fallback(self):
         self.enterContext(patch("app.services.ingestion_service.settings.graph_json_repair_enabled", True))
@@ -859,7 +863,7 @@ class ProcessingRulesTests(unittest.TestCase):
             client.chat.completions.create.call_args.kwargs["response_format"],
             {"type": "json_object"},
         )
-        self.assertEqual(result, GraphExtractionResponse())
+        self.assertEqual(result, GraphExtractionResponse(empty_extraction=True))
 
     def test_groq_invalid_json_object_fallback_raises_structure_error(self):
         self.enterContext(patch("app.services.ingestion_service.settings.graph_json_repair_enabled", True))
@@ -1698,6 +1702,8 @@ class ProcessingRulesTests(unittest.TestCase):
                     text="NETWORK SECURITY\nA firewall filters network traffic.",
                     extraction_method="ocr",
                     ocr_confidence=91.4,
+                    text_quality_score=1.0,
+                    ocr_attempts=1,
                 )
             ],
         )
@@ -2003,7 +2009,7 @@ class ProcessingRulesTests(unittest.TestCase):
 
         service.execute_graph_retrieval.assert_not_awaited()
         service.search_qdrant.assert_called_once_with(
-            "What is zero trust?", [], [], ["upload-1"], 10
+            "What is zero trust?", [], [], ["upload-1"], settings.retrieval_candidate_limit, metadata=ANY
         )
         self.assertEqual(result["graph_context"], [])
         self.assertEqual(result["graph_metadata"]["retrieval_mode"], "vector_only")
@@ -2047,7 +2053,7 @@ class ProcessingRulesTests(unittest.TestCase):
             retrieval_mode=RetrievalMode.ONE_HOP,
         )
         service.search_qdrant.assert_called_once_with(
-            "Explain deployment", ["Direct"], [], ["upload-1"], 10
+            "Explain deployment", ["Direct"], [], ["upload-1"], settings.retrieval_candidate_limit, metadata=ANY
         )
 
     def test_prerequisite_hops_keep_one_and_two_hop_results_separate(self):
@@ -2270,6 +2276,31 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual(response.body, b"2345")
         self.assertEqual(response.headers["content-range"], "bytes 2-5/10")
 
+    def test_upload_status_and_list_use_the_same_response_shape(self):
+        now = datetime.now(timezone.utc)
+        record = SimpleNamespace(
+            upload_id="upload-1", task_id="task-1", course_uuid="course-uuid",
+            course_id="COURSE", content_hash="hash", original_filename="notes.pdf",
+            status="ready", stage=ProcessingStage.READY.value,
+            failure_category=None, retryable=False, attempt_count=2,
+            last_attempted_at=now, last_heartbeat_at=now,
+            processed_chunk_count=4, graph_node_count=2, graph_edge_count=1,
+            graph_status=GraphStatus.GRAPH_READY.value, error_message=None,
+            result_json={"chunks_indexed": 4}, created_at=now, updated_at=now,
+            started_at=now, completed_at=now,
+        )
+        with (
+            patch.object(ingest.upload_service, "get_upload_by_task_id", AsyncMock(return_value=record)),
+            patch.object(ingest.upload_service, "list_uploads", AsyncMock(return_value=[record])),
+        ):
+            single = asyncio.run(ingest.get_upload_status("task-1", db=SimpleNamespace()))
+            listed = asyncio.run(ingest.list_uploads(db=SimpleNamespace()))
+
+        self.assertEqual(single.model_dump(), listed[0].model_dump())
+        self.assertEqual(single.course_id, "course-uuid")
+        self.assertEqual(single.course_name, "COURSE")
+        self.assertEqual(single.preview_url, "/api/v1/ingest/uploads/upload-1/preview")
+
 
 class StorageServiceTests(unittest.TestCase):
     class FakeBody:
@@ -2388,6 +2419,7 @@ class StorageServiceTests(unittest.TestCase):
 
 class UploadEndpointTests(unittest.TestCase):
     def test_upload_writes_content_addressed_object_before_enqueuing(self):
+        from app.services.resource_budget_service import ResourceUsage
         document = fitz.open()
         page = document.new_page()
         page.insert_text((72, 72), "Object storage test")
@@ -2414,9 +2446,9 @@ class UploadEndpointTests(unittest.TestCase):
                 AsyncMock(return_value=None),
             ),
             patch.object(
-                ingest.upload_service,
-                "count_uploads",
-                AsyncMock(return_value=0),
+                ingest.resource_budget_service,
+                "usage",
+                AsyncMock(return_value=ResourceUsage()),
             ),
             patch.object(ingest.upload_service, "create_upload", AsyncMock()),
             patch.object(ingest.storage_service, "put_pdf") as put_pdf,
@@ -2962,6 +2994,44 @@ class ReadyContextTests(unittest.TestCase):
         self.assertEqual(summary.processed_chunk_count, 0)
         self.assertEqual(summary.graph_node_count, 0)
         self.assertEqual(summary.graph_edge_count, 0)
+
+    def test_course_summaries_keep_courses_and_records_separate(self):
+        service = CourseService()
+        now = datetime.now(timezone.utc)
+        courses = [
+            SimpleNamespace(id="course-a", display_name="A"),
+            SimpleNamespace(id="course-b", display_name="B"),
+        ]
+        documents = [
+            SimpleNamespace(
+                upload_id=upload_id,
+                course_uuid=course_uuid,
+                content_hash="shared-hash",
+                status=status,
+                stage=stage,
+                updated_at=now,
+                processed_chunk_count=chunks,
+                graph_node_count=0,
+                graph_edge_count=0,
+            )
+            for upload_id, course_uuid, status, stage, chunks in (
+                ("new-a", "course-a", "ready", ProcessingStage.READY.value, 4),
+                ("old-a", "course-a", "failed", ProcessingStage.FAILED.value, 0),
+                ("only-b", "course-b", "ready", ProcessingStage.READY.value, 7),
+            )
+        ]
+        session = SimpleNamespace(
+            execute=AsyncMock(side_effect=[
+                SimpleNamespace(scalars=lambda: courses),
+                SimpleNamespace(scalars=lambda: documents),
+            ])
+        )
+
+        summaries = asyncio.run(service.list_summaries(session))
+
+        self.assertEqual([item.course.id for item in summaries], ["course-a", "course-b"])
+        self.assertEqual([item.processed_chunk_count for item in summaries], [4, 7])
+        self.assertEqual([item.duplicate_records for item in summaries], [1, 0])
 
 
 class RetryEndpointTests(unittest.TestCase):
