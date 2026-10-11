@@ -127,6 +127,8 @@ Increasing the dense shortlist from 10 to 20 did not improve evidence completene
 
 ## Reliability and security boundaries
 
+OCR uses a bounded child-process thread count (`OCR_THREADS=1` by default). The free Render profile gives the existing per-page OCR/retry deadline 60 seconds without lowering confidence/text-quality thresholds. A live smoke test exposed an OCR timeout despite healthy readiness; the [constrained profile check](evaluation/ocr-free-profile.md) records the failure and measurement limits explicitly.
+
 - **Durable processing:** a bounded one-worker default, PostgreSQL leases/heartbeats, task-token fencing, restart recovery, retries, and idempotent cleanup protect against lost or stale work.
 - **Data lifecycle:** deletion removes upload-scoped data from PostgreSQL, Qdrant, Neo4j, and object storage. Reviewer uploads expire after the configured retention period; the public sample is excluded.
 - **Protected operations:** a reviewer code is exchanged for an expiring, signed HttpOnly cookie and verified before the dashboard unlocks. Upload, query, exam, retry, deletion, and provider metrics require authorization. The static sample needs none.
@@ -224,7 +226,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python scripts/evaluate_ingestion_scalin
 
 The benchmark uses isolated local PostgreSQL, the real ASGI upload/delete handlers, cached CPU embeddings, and in-memory Qdrant. Worker coordinators share a Python process; storage and graph generation/projection are test doubles. Graph-provider calls are **zero because generation is disabled**, not because graphs are free. It does not establish real Neo4j/R2 consistency under hard kills, hosted ANN performance, actual OS-process memory use, live AI throughput, or production capacity. Private workspace ownership is a separate next phase; reviewer data remains shared.
 
-The [local verification record](evaluation/scaling-validation.md) lists the 297 passing backend tests, eight frontend status tests, build checks, browser checks, and unverified production boundaries. Private workspaces are deliberately deferred; the reviewer demo remains shared.
+The [local verification record](evaluation/scaling-validation.md) lists the 299 passing backend tests, eight frontend status tests, build checks, browser checks, and unverified production boundaries. Private workspaces are deliberately deferred; the reviewer demo remains shared.
 
 ## Verify
 

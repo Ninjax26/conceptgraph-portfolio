@@ -1,5 +1,6 @@
 """Extraction quality and resource limits, using synthetic PDFs and mocked OCR."""
 
+import os
 import subprocess
 import unittest
 from types import SimpleNamespace
@@ -13,6 +14,23 @@ from app.services.parser_service import ExtractedPage, LayoutLine, OCRResult, Pa
 
 
 class OCRQualityTests(unittest.TestCase):
+    def test_tesseract_thread_limit_is_scoped_to_its_child_process(self):
+        pixmap = SimpleNamespace(tobytes=Mock(return_value=b"png"))
+        completed = SimpleNamespace(returncode=0, stdout=b"block_num\tpar_num\tline_num\tconf\ttext\n1\t1\t1\t90\tEvidence\n")
+        with patch.dict(os.environ, {"OMP_THREAD_LIMIT": "4", "OCR_TEST_MARKER": "keep"}), \
+             patch("app.services.parser_service.subprocess.run", return_value=completed) as run:
+            result = ParserService(ocr_threads=1)._run_tesseract(pixmap, dpi=200, psm=1, timeout=9)
+            self.assertEqual(run.call_args.kwargs["env"]["OMP_THREAD_LIMIT"], "1")
+            self.assertEqual(run.call_args.kwargs["env"]["OCR_TEST_MARKER"], "keep")
+            self.assertEqual(os.environ["OMP_THREAD_LIMIT"], "4")
+        self.assertEqual(result.text, "Evidence")
+        self.assertEqual(run.call_args.kwargs["timeout"], 9)
+
+    def test_ocr_thread_configuration_is_bounded(self):
+        for threads in (0, 5):
+            with self.assertRaises(ValueError):
+                ParserService(ocr_threads=threads)
+
     @staticmethod
     def pdf(text="", image=False):
         document = fitz.open()

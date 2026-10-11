@@ -140,6 +140,7 @@ class Settings(BaseSettings):
         le=120,
         alias="OCR_PAGE_TIMEOUT_SECONDS",
     )
+    ocr_threads: int = Field(default=1, ge=1, le=4, alias="OCR_THREADS")
     ocr_min_confidence: float = Field(default=55, ge=0, le=100, alias="OCR_MIN_CONFIDENCE")
     ocr_max_render_pixels: int = Field(default=12_000_000, ge=100_000, le=30_000_000, alias="OCR_MAX_RENDER_PIXELS")
     ocr_mixed_pages_enabled: bool = Field(default=True, alias="OCR_MIXED_PAGES_ENABLED")

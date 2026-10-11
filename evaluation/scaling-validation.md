@@ -6,7 +6,7 @@ Verified on 10 October 2026. Changes are local; this is not a production deploym
 
 | Command | Result |
 | --- | --- |
-| `.venv/bin/python -m unittest discover -s tests -q` | 297 tests passed |
+| `.venv/bin/python -m unittest discover -s tests -q` | 299 tests passed after the OCR threading regression checks |
 | `npm run test:frontend` | 8 tests passed |
 | `.venv/bin/python -m compileall -q app scripts tests` | Passed |
 | `npm run build` | TypeScript check and Vite build passed |

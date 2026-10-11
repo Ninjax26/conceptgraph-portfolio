@@ -231,6 +231,8 @@ When demo protection is enabled, a background retention sweep removes READY and 
 
 ## Operational endpoints
 
+Tesseract receives `OMP_THREAD_LIMIT` in its child environment from `OCR_THREADS` (1–4, default 1), without mutating application-wide environment variables. Render's free profile has a 60-second shared page deadline rather than the 20-second local default; first/alternate recognition attempts still share one deadline. More time does not relax text quality, confidence, rendering size or page-count limits. The production OCR timeout and local constrained check are recorded in `evaluation/ocr-free-profile.md`; successful readiness is not an OCR capacity test.
+
 Graph retrieval returns `fallback_reason=graph_timeout` when its time budget expires, separately from a connection/other graph failure. If tracking counts record concepts but the selected Neo4j scope contains none, `projection_missing` is reported and the dashboard explains the stored-data mismatch. It does not automatically rebuild a document or consume more LLM quota. This detects complete absence, not every partially missing node.
 
 Vector timing metadata separates `collection_check_ms`, `query_embedding_ms`, `dense_search_ms` and `identifier_lookup_ms`. Local embedding time includes first model load. Hosted query embedding runs inside `query_points`, so its cost is included in `dense_search_ms`, with `embedding_execution=hosted_in_dense_search`; constructing the client `Document` is not a hosted-inference measurement. Reranking/generation remain separately timed. No prompt, key or passage is added to these numeric diagnostics.

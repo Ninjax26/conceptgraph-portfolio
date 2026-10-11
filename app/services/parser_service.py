@@ -4,6 +4,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 from io import StringIO
 import math
+import os
 import re
 import subprocess
 import time
@@ -82,6 +83,7 @@ class ParserService:
         ocr_min_native_characters: int = settings.ocr_min_native_characters,
         ocr_max_pages_per_document: int = settings.ocr_max_pages_per_document,
         ocr_page_timeout_seconds: int = settings.ocr_page_timeout_seconds,
+        ocr_threads: int = settings.ocr_threads,
         ocr_min_confidence: float = settings.ocr_min_confidence,
         ocr_max_render_pixels: int = settings.ocr_max_render_pixels,
         ocr_mixed_pages_enabled: bool = settings.ocr_mixed_pages_enabled,
@@ -99,6 +101,9 @@ class ParserService:
         self.ocr_min_native_characters = ocr_min_native_characters
         self.ocr_max_pages_per_document = ocr_max_pages_per_document
         self.ocr_page_timeout_seconds = ocr_page_timeout_seconds
+        if not 1 <= ocr_threads <= 4:
+            raise ValueError("OCR threads must be between 1 and 4.")
+        self.ocr_threads = ocr_threads
         self.ocr_min_confidence = ocr_min_confidence
         self.ocr_max_render_pixels = ocr_max_render_pixels
         self.ocr_mixed_pages_enabled = ocr_mixed_pages_enabled
@@ -626,6 +631,7 @@ class ParserService:
                 stderr=subprocess.PIPE,
                 check=False,
                 timeout=timeout,
+                env={**os.environ, "OMP_THREAD_LIMIT": str(self.ocr_threads)},
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
