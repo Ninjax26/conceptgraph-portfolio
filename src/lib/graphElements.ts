@@ -93,7 +93,10 @@ export function buildGraphElements(graphContext: GraphContextItem[]): GraphEleme
         omittedRelationships += 1;
         return;
       }
-      const edgeId = `${source}->${target}:${relationType}`;
+      // Two opposite RELATED_TO records describe one undirected relationship.
+      // Keep directional relations (especially prerequisites) distinct.
+      const endpoints = relationType === "RELATED_TO" ? [source, target].sort() : [source, target];
+      const edgeId = `${endpoints[0]}->${endpoints[1]}:${relationType}`;
       const sourceHop = nodes.get(source)?.retrievalHop;
       const targetHop = nodes.get(target)?.retrievalHop;
       const strongestHop = Math.max(sourceHop ?? 0, targetHop ?? 0);

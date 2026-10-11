@@ -22,6 +22,13 @@ def normalize_concept_name(value: str) -> str:
     return re.sub(r"\s+", "", value.casefold())
 
 
+def relationship_key(source: str, target: str, relation_type: str) -> tuple[str, str, str]:
+    """RELATED_TO is symmetric; all other relation directions carry meaning."""
+    if relation_type == "RELATED_TO":
+        source, target = sorted((source, target))
+    return source, target, relation_type
+
+
 class ConceptNode(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -129,11 +136,7 @@ class GraphExtractionResponse(BaseModel):
             target_id = canonical_id_by_original_id[relationship.target_node_id]
             if source_id == target_id:
                 continue
-            key = (
-                source_id,
-                target_id,
-                relation_type,
-            )
+            key = relationship_key(source_id, target_id, relation_type)
             if key in seen:
                 continue
             seen.add(key)

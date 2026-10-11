@@ -19,6 +19,7 @@ from app.core.database import neo4j_driver, qdrant_client
 from app.services.course_service import ReadyCourseContext
 from app.services.gemini_service import gemini_service
 from app.services.retrieval_candidates import fuse_candidates, identifier_terms
+from app.schemas.extraction import relationship_key
 
 logger = logging.getLogger(__name__)
 
@@ -745,7 +746,7 @@ class RetrievalService:
     ) -> list[dict[str, Any]]:
         unique: dict[tuple[str, str, str], dict[str, Any]] = {}
         for relationship in relationships:
-            key = (
+            key = relationship_key(
                 str(relationship.get("source", "")),
                 str(relationship.get("target", "")),
                 str(relationship.get("type", "")),

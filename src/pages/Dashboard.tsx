@@ -617,8 +617,12 @@ export default function Dashboard(): JSX.Element {
 
           <div className="mb-3 flex min-h-7 items-center justify-between gap-3">
             <div>
+              {response && answeredQuestion ? (
+                <p className="mb-3 break-words text-sm text-slate-600">
+                  <span className="font-semibold text-slate-700">Your question:</span>{" "}{answeredQuestion}
+                </p>
+              ) : null}
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grounded answer</p>
-              {response && answeredQuestion ? <p className="mt-2 break-words text-sm font-medium text-slate-800">{answeredQuestion}</p> : null}
               {response?.answer ? (
                 <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${confidenceClass(response.confidence.level)}`}>
                   {response.confidence.level} confidence · {Math.round(response.confidence.score * 100)}%
@@ -676,7 +680,9 @@ export default function Dashboard(): JSX.Element {
               </ReactMarkdown>
             ) : (
               <p className="my-0 text-slate-500">
-                Ask a course question to see a formatted answer, confidence score, and page-level evidence here.
+                {response
+                  ? "The AI provider returned no answer text. You can inspect the retrieved evidence below and try the question again."
+                  : "Ask a course question to see a formatted answer, confidence score, and page-level evidence here."}
               </p>
             )}
           </article>

@@ -15,7 +15,7 @@ from app.services.ingestion_service import IngestionService
 from app.services.gemini_service import GeminiService
 from app.services.exam_service import ExamService
 from app.services.provider_failover import ProviderCircuitBreaker, provider_circuit_breaker, retry_after_seconds
-from app.services.synthesis_service import SynthesisService
+from app.services.synthesis_service import InvalidAnswerError, SynthesisService
 
 
 class ProviderQuotaTests(unittest.TestCase):
@@ -24,6 +24,51 @@ class ProviderQuotaTests(unittest.TestCase):
         self.addCleanup(provider_circuit_breaker.clear)
         # Individual tests opt in with fake keys; never call a real provider.
         self.enterContext(patch("app.core.config.settings.gemini_api_key", None))
+
+    def test_blank_or_question_only_answer_is_rejected(self):
+        for answer in ("", "  \n", None, "WHAT are the points involved in SQAP?"):
+            with self.subTest(answer=answer), self.assertRaises(InvalidAnswerError):
+                SynthesisService._validate_answer(answer, "what are the points involved in sqap")
+
+    def test_answer_can_quote_question_when_it_also_answers(self):
+        answer = "What is SQAP? It is a software quality assurance plan. [Source 1]"
+        self.assertEqual(SynthesisService._validate_answer(answer, "What is SQAP?"), answer)
+
+    def test_empty_groq_answer_tries_gemini_instead_of_reporting_success(self):
+        service = SynthesisService()
+        with patch("app.services.synthesis_service.settings.groq_api_key", "test"), \
+             patch("app.services.synthesis_service.settings.gemini_api_key", "test"), \
+             patch.object(service, "_synthesize_with_groq", return_value="  "), \
+             patch.object(service, "_synthesize_with_gemini", return_value="The plan covers quality standards. [Source 1]") as backup:
+            result = asyncio.run(service._synthesize_with_failover_metadata("What does the plan cover?", [], []))
+        self.assertEqual(result.provider_used, "gemini")
+        self.assertEqual(result.failover_reason, "InvalidAnswerError")
+        self.assertTrue(result.failover_used)
+        backup.assert_called_once()
+
+    def test_empty_primary_and_backup_return_retrieved_evidence(self):
+        service = SynthesisService()
+        with patch("app.services.synthesis_service.settings.groq_api_key", "test"), \
+             patch("app.services.synthesis_service.settings.gemini_api_key", "test"), \
+             patch.object(service, "_synthesize_with_groq", return_value=""), \
+             patch.object(service, "_synthesize_with_gemini", return_value=""):
+            result = asyncio.run(service._synthesize_with_failover_metadata("What does the plan cover?", [], [
+                {"supporting_passage": "The plan covers quality standards.", "page_number": 1}
+            ]))
+        self.assertEqual(result.provider_used, "evidence_fallback")
+        self.assertIn("quality standards", result.answer)
+        self.assertIn("[Source 1", result.answer)
+
+    def test_direct_gemini_empty_answer_returns_evidence(self):
+        service = SynthesisService()
+        with patch("app.services.synthesis_service.settings.llm_provider", "gemini"), \
+             patch("app.services.synthesis_service.settings.gemini_api_key", "test"), \
+             patch.object(service, "_synthesize_with_gemini", return_value=""):
+            result = asyncio.run(service.synthesize_with_metadata("Question", [], [
+                {"supporting_passage": "Verified passage", "page_number": 1}
+            ]))
+        self.assertEqual(result.provider_used, "evidence_fallback")
+        self.assertIn("Verified passage", result.answer)
 
     def test_retry_after_numeric_date_and_invalid(self):
         self.assertEqual(retry_after_seconds({"retry-after": "3600"}), 3600)

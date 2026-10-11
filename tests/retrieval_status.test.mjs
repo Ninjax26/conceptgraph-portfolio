@@ -7,6 +7,23 @@ import ts from "typescript";
 const source = await readFile(new URL("../src/lib/retrievalStatus.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } });
 const { graphEmptyState, retrievalSummary } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+const elementsSource = await readFile(new URL("../src/lib/graphElements.ts", import.meta.url), "utf8");
+const elementsOutput = ts.transpileModule(elementsSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
+const { buildGraphElements } = await import(`data:text/javascript;base64,${Buffer.from(elementsOutput).toString("base64")}`);
+
+test("graph display collapses reversed related-to edges, not prerequisites", () => {
+  const item = { concept: { id: "a", name: "A" }, related_concepts: [{ id: "b", name: "B" }], prerequisites: [],
+    relationships: [
+      { source: "a", target: "b", type: "RELATED_TO" },
+      { source: "b", target: "a", type: "RELATED_TO" },
+      { source: "a", target: "b", type: "PREREQUISITE_OF" },
+      { source: "b", target: "a", type: "PREREQUISITE_OF" },
+    ] };
+  const result = buildGraphElements([item]);
+  assert.equal(result.nodes.length, 2);
+  assert.equal(result.edges.length, 3);
+  assert.equal(result.omittedRelationships, 0);
+});
 const base = { total_nodes: 0, total_edges: 0, displayed_nodes: 0, displayed_edges: 0,
   graph_status: "GRAPH_PARTIAL", filter_reason: "query_subgraph", retrieval_mode: "two_hop" };
 

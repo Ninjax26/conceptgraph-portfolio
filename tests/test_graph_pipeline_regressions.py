@@ -8,6 +8,7 @@ from app.schemas.extraction import ConceptNode, ConceptRelationship, GraphExtrac
 from app.services.ingestion_service import IngestionService
 from app.services.parser_service import DocumentChunk
 from app.services.upload_service import UploadService
+from app.services.rag_service import RetrievalService
 
 
 def graph(names, *, connected=True, chunk="chunk"):
@@ -21,6 +22,28 @@ def graph(names, *, connected=True, chunk="chunk"):
 
 
 class GraphPipelineRegressions(unittest.TestCase):
+    def test_symmetric_relationships_merge_but_directional_edges_remain(self):
+        nodes = graph(["QA Lead", "Project Manager"], connected=False).nodes
+        for relation_type, expected_count in (("RELATED_TO", 1), ("PART_OF", 2), ("PREREQUISITE_OF", 2)):
+            with self.subTest(relation_type=relation_type):
+                forward = GraphExtractionResponse(nodes=nodes, relationships=[
+                    ConceptRelationship(source_node_id="0", target_node_id="1", relation_type=relation_type)])
+                reverse = GraphExtractionResponse(nodes=nodes, relationships=[
+                    ConceptRelationship(source_node_id="1", target_node_id="0", relation_type=relation_type)])
+                self.assertEqual(len(self.merge([forward, reverse]).relationships), expected_count)
+
+    def test_stored_symmetric_relationships_are_deduplicated_on_read(self):
+        related = [{"source": "a", "target": "b", "type": "RELATED_TO"},
+                   {"source": "b", "target": "a", "type": "RELATED_TO"}]
+        directional = [{"source": "a", "target": "b", "type": "PREREQUISITE_OF"},
+                       {"source": "b", "target": "a", "type": "PREREQUISITE_OF"}]
+        self.assertEqual(len(RetrievalService._dedupe_relationships(related + directional)), 3)
+
+    def test_graph_prompt_does_not_equate_responsibility_with_part_of(self):
+        prompt = IngestionService._extraction_system_prompt()
+        self.assertIn("Do not use PART_OF merely because", prompt)
+        self.assertIn("explicitly define its abbreviation", prompt)
+
     def test_old_recovery_and_single_chunk_do_not_block_corrected_retry(self):
         record = SimpleNamespace(
             stage="READY", graph_status="GRAPH_PARTIAL", retryable=False,
