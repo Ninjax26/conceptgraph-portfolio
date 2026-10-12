@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-10-12T19:57:25.037578+00:00",
+  "postgres_version": "18.4 (Homebrew)",
+  "checks": {
+    "concurrent_additive_migration_preserves_legacy_counts": true,
+    "old_release_sql_compatible_without_dropping_usage": true,
+    "separate_process_request_holdback_and_total_cap": true,
+    "separate_process_token_cap_no_overspend": true,
+    "denial_rolls_back_insert_and_releases_lock": true,
+    "failed_attempt_retains_committed_reservation": true,
+    "cancelled_lock_wait_no_reservation_or_leaked_lock": true,
+    "expired_windows_reset_counts_and_estimates_together": true,
+    "minute_reset_preserves_current_daily_usage": true,
+    "status_scoped_and_matches_committed_usage": true
+  },
+  "measurements": {
+    "request_priority": {
+      "processes": 3,
+      "background_accepted": 6,
+      "background_denied": 6,
+      "interactive_accepted": 2,
+      "total_requests": 8,
+      "reserved_estimated_tokens": 3200
+    },
+    "token_admission": {
+      "processes": 3,
+      "accepted": 4,
+      "denied": 5,
+      "total_requests": 4,
+      "reserved_estimated_tokens": 2800
+    }
+  },
+  "code_sha256": {
+    "app/core/config.py": "faf664dc0301594be79b766203d4883fb63dde40a4f76d361145bf0dc952212c",
+    "app/core/database.py": "f76027bd82151b06b3a92897f4aac71f436b2fc314982a3cac92a175f18eda94",
+    "app/models/document_upload.py": "9ac6e28ecf23da13124adcb3e9b5f356efbaa96a9319552b36753abed7d33d71",
+    "app/services/provider_budget_policy.py": "c273663ed674a2d35102a3da9e3de64fe508e2c081fc7ed5243aef854357e531",
+    "app/services/shared_provider_service.py": "f8668c9532dc2666a7086773cbf00f7b8ef2ff8d4d19108dcda78e081ad6d361",
+    "app/services/provider_failover.py": "80580a8d636ae7b0d73617ec9bc42eb9b34bfa8a43f38f91d05de678c8e36e94",
+    "scripts/evaluate_provider_admission.py": "34eeaaf1617e033ca438e0d83039d798e2cd6da7f9c867cb4da9cd4a02a9607b"
+  },
+  "provider_calls": 0,
+  "test_schema_removed": true,
+  "limitations": [
+    "Real PostgreSQL and separate admission processes, not separate API/ingestion workers.",
+    "No hosted LLM/embedding/reranking/R2/Neo4j calls; no production load or answer-quality claim.",
+    "Token reservations are explicit fixture estimates, not vendor-reported usage.",
+    "Existing application budgets/data were not accessed; the isolated random schema was removed.",
+    "Estimated-token limits and interactive reserves default to zero (opt-in)."
+  ]
+}

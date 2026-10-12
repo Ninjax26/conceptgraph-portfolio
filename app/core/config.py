@@ -82,6 +82,12 @@ class Settings(BaseSettings):
     shared_provider_scope: str = Field(default="conceptgraph", min_length=1, max_length=80, alias="SHARED_PROVIDER_SCOPE")
     provider_requests_per_minute: int = Field(default=10, ge=1, alias="PROVIDER_REQUESTS_PER_MINUTE")
     provider_requests_per_day: int = Field(default=300, ge=1, alias="PROVIDER_REQUESTS_PER_DAY")
+    provider_estimated_tokens_per_minute: int = Field(default=0, ge=0, alias="PROVIDER_ESTIMATED_TOKENS_PER_MINUTE")
+    provider_estimated_tokens_per_day: int = Field(default=0, ge=0, alias="PROVIDER_ESTIMATED_TOKENS_PER_DAY")
+    provider_interactive_request_reserve_per_minute: int = Field(default=0, ge=0, alias="PROVIDER_INTERACTIVE_REQUEST_RESERVE_PER_MINUTE")
+    provider_interactive_request_reserve_per_day: int = Field(default=0, ge=0, alias="PROVIDER_INTERACTIVE_REQUEST_RESERVE_PER_DAY")
+    provider_interactive_token_reserve_per_minute: int = Field(default=0, ge=0, alias="PROVIDER_INTERACTIVE_TOKEN_RESERVE_PER_MINUTE")
+    provider_interactive_token_reserve_per_day: int = Field(default=0, ge=0, alias="PROVIDER_INTERACTIVE_TOKEN_RESERVE_PER_DAY")
     processing_queue_capacity: int = Field(
         default=8,
         ge=1,
@@ -258,6 +264,16 @@ class Settings(BaseSettings):
     evidence_min_score: float = Field(default=0.35, ge=0, le=1, alias="EVIDENCE_MIN_SCORE")
     evidence_medium_score: float = Field(default=0.5, ge=0, le=1, alias="EVIDENCE_MEDIUM_SCORE")
     evidence_high_score: float = Field(default=0.7, ge=0, le=1, alias="EVIDENCE_HIGH_SCORE")
+
+    @model_validator(mode="after")
+    def validate_provider_reserves(self) -> "Settings":
+        for period in ("minute", "day"):
+            for unit, limit_prefix in (("request", "requests"), ("token", "estimated_tokens")):
+                reserve = getattr(self, f"provider_interactive_{unit}_reserve_per_{period}")
+                limit = getattr(self, f"provider_{limit_prefix}_per_{period}")
+                if reserve and (not limit or reserve >= limit):
+                    raise ValueError(f"Interactive {unit} reserve per {period} must be less than its enabled provider limit.")
+        return self
 
     @model_validator(mode="after")
     def validate_evidence_thresholds(self) -> "Settings":

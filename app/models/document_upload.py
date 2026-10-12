@@ -129,3 +129,5 @@ class ProviderBudget(Base):
     day_window: Mapped[int] = mapped_column(BigInteger, nullable=False)
     minute_requests: Mapped[int] = mapped_column(Integer, nullable=False)
     day_requests: Mapped[int] = mapped_column(Integer, nullable=False)
+    minute_estimated_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    day_estimated_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")

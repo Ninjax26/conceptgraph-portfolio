@@ -71,6 +71,7 @@ async def initialize_database_schema() -> None:
     async with postgres_engine.begin() as conn:
         await conn.execute(text("SELECT pg_advisory_xact_lock(hashtext('conceptgraph:schema'))"))
         await conn.run_sync(Base.metadata.create_all)
+        await migrate_provider_budget_schema(conn)
         migrations = [
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS course_uuid VARCHAR(64)",
             "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64)",
@@ -116,6 +117,16 @@ async def initialize_database_schema() -> None:
                 "AND graph_edge_count < GREATEST(1, (graph_node_count + 2) / 3)"
             )
         )
+
+
+async def migrate_provider_budget_schema(conn) -> None:
+    """Additive, idempotent columns; caller holds the schema transaction lock.
+
+    Older releases ignore these columns and retain their request-count contract.
+    Rollback means running the older release, not dropping recorded usage.
+    """
+    for column in ("minute_estimated_tokens", "day_estimated_tokens"):
+        await conn.execute(text(f"ALTER TABLE provider_budgets ADD COLUMN IF NOT EXISTS {column} BIGINT NOT NULL DEFAULT 0"))
 
 
 async def _migrate_legacy_uploads(conn) -> None:

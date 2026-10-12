@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 import math
 
+from app.core.exceptions import SharedProviderBudgetExceeded
+
 
 def retry_after_seconds(headers) -> float | None:
     """Read standard Retry-After without retaining provider bodies or credentials."""
@@ -38,6 +40,10 @@ class ProviderCircuitBreaker:
             return False
 
     def block(self, provider: str, cooldown_seconds: int, error: Exception | None = None) -> None:
+        # A local per-operation admission denial says nothing about vendor
+        # health. Blocking the whole provider would defeat interactive holdback.
+        if isinstance(error, SharedProviderBudgetExceeded):
+            return
         retry_after = getattr(error, "retry_after_seconds", None)
         if retry_after is None:
             retry_after = retry_after_seconds(getattr(getattr(error, "response", None), "headers", None))

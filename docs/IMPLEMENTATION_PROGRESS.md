@@ -1,6 +1,6 @@
 # ConceptGraph implementation and verification ledger
 
-Updated: 2026-10-12. This is the current roadmap; older numbered scaling phases in the handbook describe earlier work.
+Updated: 2026-10-13. This is the current roadmap; older numbered scaling phases in the handbook describe earlier work.
 
 ## Operating boundaries
 
@@ -19,7 +19,7 @@ Updated: 2026-10-12. This is the current roadmap; older numbered scaling phases 
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Started: audit and admission characterization | Shared PostgreSQL budgets currently count LLM attempts only. No token reservations, hosted embedding/rerank reservations or interactive capacity reserve. Existing checkpoint reload is per-upload; cross-upload versioned cache is not implemented. Three new offline tests preserve admission-before-execution, failover/repair metadata, cancellation and fail-closed budget storage. Next: implement interactive capacity reservation and token admission with isolated persistence/concurrency tests. |
+| 3 — Provider-safe ingestion | Partial: admission increment verified | [Provider admission](PROVIDER_ADMISSION.md) adds optional estimated-token caps/interactive holdbacks and fixes local budget denials incorrectly opening vendor circuits. Ten isolated PostgreSQL checks, three actual admission subprocesses per contention case, and 378 backend tests pass. Defaults preserve current request-only enforcement. Hosted embedding/reranking admission, actual token usage, delayed graph work, full split-worker tests and versioned cache remain unfinished. Next: durable graph retry eligibility and checkpoint-only resumption, then hosted-provider admission. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -29,17 +29,17 @@ Updated: 2026-10-12. This is the current roadmap; older numbered scaling phases 
 ## Phase 3 — Scale ingestion without overwhelming providers
 
 - [ ] Run the API and workers as genuinely separate local processes; verify shared claiming and worker presence.
-- [ ] Reserve provider capacity for interactive answers over background graph extraction, including failover and repair attempts.
+- [x] Implement and test optional interactive request/token holdbacks across graph failover/repair; production activation is deferred until delayed scheduling is implemented.
 - [ ] Durably defer quota-limited graph work until eligible; avoid hot retry loops and unlimited attempts.
 - [ ] Preserve validated checkpoints and resume only unfinished batches; retain lease fencing and deletion semantics.
-- [ ] Add conservative token-aware reservations alongside request limits; distinguish estimates from vendor-reported tokens.
+- [x] Add estimated token reservations and optional caps alongside request limits; labelled as estimates, not actual provider usage or a hard quota guarantee.
 - [ ] Account explicitly for hosted embedding and reranking work and its independent limits.
 - [ ] Cache only validated extraction results with content, provider/model, prompt and schema versions; rebind provenance safely and invalidate stale entries.
 - [ ] Test concurrent reservations, quota reset, failure/cancellation, restart/resume, priority and cache invalidation before deployment.
 
 The initial characterization suite is `tests/test_provider_admission_contract.py`. It makes no database or provider requests. These tests protect existing boundaries; they do not demonstrate separate-process operation or the new priority/token/cache features.
 
-Implementation order for the next run: (1) characterize PostgreSQL reservation windows and concurrent locking using an isolated local database; (2) add per-operation capacity reservation for interactive requests with conservative token limits; (3) persist retry eligibility without replacing lease expiry as the fencing mechanism; (4) cache versioned validated graph batches while safely rebinding upload provenance. Hosted Qdrant inference is executed inside vector operations and needs its own admission boundary; Cohere's comparison path makes two distinct requests. Do not count one user question as one universal provider request.
+Implementation order for the next run: (1) persist graph retry eligibility without replacing lease expiry as the fencing mechanism; (2) verify checkpoint-only resume using real separate API/ingestion workers and hard-kill recovery; (3) integrate hosted embedding/reranking admission and provider-reported token usage where available; (4) cache versioned validated graph batches while safely rebinding upload provenance. Hosted Qdrant inference is executed inside vector operations and needs its own admission boundary; Cohere's comparison path makes two distinct requests. Do not count one user question as one universal provider request. Admission/holdback primitives are tested; do not mark Phase 3 complete or claim their zero-default enforcement is active in production.
 
 More workers cannot create additional free provider capacity. Current entry points: `app/services/shared_provider_service.py`, `provider_metrics.py`, `document_processing_service.py`, `ingestion_service.py`, `app/core/processing_coordinator.py`, `app/services/upload_service.py`, `app/worker.py`, `scripts/start_local.py`.
 
@@ -95,3 +95,4 @@ App heartbeat `conceptgraph-phases-3-8`: every four hours, returning to this cha
 - Phase 1–2 release `9c8568cc66a076baf7d6cab05859115d3a3e2f7e` was pushed only to the portfolio repository. Both existing free Render services report Live. API readiness independently returns this exact revision with no degraded services, health returns 200, and unauthenticated protected course discovery returns 401. The public equipment preview renders its saved answer, citations and three-node/two-edge graph without AI calls. Render startup logs show successful startup and port binding; root 404 is expected because the API has no root route.
 - After the three Phase 3 characterization tests: all 365 backend tests, compile checks and diff checks pass; frontend remains unchanged with nine tests and TypeScript/Vite build passing. GitHub Actions run `38272293936` passed for release `9c8568c` (backend and frontend jobs).
 - Production semantic checks remain unmeasured; no provider quota was consumed by these release tests.
+- Scheduled Phase 3 admission increment: ten real isolated PostgreSQL checks and all 378 backend tests pass; nine frontend tests and TypeScript/Vite build pass. Additive migration preserves old counts/SQL. No provider quota, production test data, environment changes or paid resources. Record the actual release/deployment result separately after verification.
