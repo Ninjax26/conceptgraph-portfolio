@@ -125,6 +125,22 @@ The [retrieval scaling check](evaluation/retrieval-scaling-current.md) runs 45 a
 
 Increasing the dense shortlist from 10 to 20 did not improve evidence completeness in that fixture and increased local reranking time, so the default remains 10. Identifier enrichment recovered one multi-source miss in the larger corpora; identifier verification refused unsupported equipment queries that otherwise passed the evidence gate. Six supported questions still lacked all labelled sources after filtering. The evidence threshold remains unchanged; these small synthetic results do not calibrate hosted Cohere or prove answer correctness.
 
+The subsequent [Phase 1 evidence-selection check](evaluation/evidence-selection-phase1.md) recovers two of those six misses using bounded literal sentence windows and complementary evidence that need not repeat an identifier. At each tested corpus size, required-source completeness increases from **29/35 to 31/35**, while unsupported refusals remain **10/10**. Development improves from 12/17 to 14/17; diagnostic validation remains 9/10 and the separate authored held-out set remains 8/8. The threshold stays at 0.35. Extra windows add reranker work (up to three inputs per candidate, batched in one hosted request); these local results do not establish hosted quality, cost, or answer accuracy. Four misses remain. This follow-up is a local working-tree change until explicitly deployed.
+
+The [Phase 1 continuation](evaluation/evidence-selection-followup-notes.md) audits those four misses and fixes two citation-boundary cases: accepted evidence for a second requested identifier being crowded out of five citation slots, and a conflicting identifier inside the selected excerpt. Final local counts remain **31/35** and **10/10**; nine additional focused regressions pass. Original labels and earlier reports are preserved, and no additional aggregate accuracy gain or production deployment is claimed.
+
+A further [context and challenge check](evaluation/evidence-selection-context-notes.md) aligns scored and cited text at 900 characters and keeps preceding context in final-sentence windows. The original benchmark still reports 31/35 source completeness and 10/10 evidence-gate refusals, but a separate harder set reports **4/6 source completeness and 2/4 gate refusals**. Missing comparison evidence and absent equipment attributes remain limitations. These are retrieval-only checks, not generated-answer accuracy; Phase 1 is not fully closed on broader evidence quality.
+
+The [Phase 1 integration](evaluation/phase1-integration.md) now checks both sides of simple `Compare/Contrast A with B` questions before synthesis. Development source completeness improves from **2/3 to 3/3**; a fresh authored holdout retains **4/4** required source sets and rejects **2/2** unsupported comparisons across 10/50/100 PDFs. Ordinary questions remain single-query; matched hosted comparisons require two Cohere rerank requests. The original 31/35 and 10/10 results are unchanged, and missing-attribute checks remain a limitation. This integration has not been deployed.
+
+### Answer and graph quality (offline)
+
+[Phase 2 quality checks](evaluation/quality-evaluation.md) add twelve claim-review cases, citation index/page/excerpt validation and graph type/direction/provenance audits. The deterministic fallback baseline has **20/20 valid citation indices** and **21/21 literal excerpts**; an older saved graph contains **6/6 known prerequisite links**. These are not LLM accuracy metrics. Groundedness, semantic citation correctness, completeness and refusal accuracy remain **unmeasured pending captured answers and explicit reviews**. The checks make no provider calls or production-data changes.
+
+```bash
+.venv/bin/python scripts/evaluate_quality.py --fallback
+```
+
 ## Reliability and security boundaries
 
 OCR uses a bounded child-process thread count (`OCR_THREADS=1` by default). The free Render profile gives the existing per-page OCR/retry deadline 60 seconds without lowering confidence/text-quality thresholds. A live smoke test exposed an OCR timeout despite healthy readiness; the [constrained profile check](evaluation/ocr-free-profile.md) records the failure and measurement limits explicitly.

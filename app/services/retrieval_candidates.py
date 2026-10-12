@@ -11,6 +11,7 @@ IDENTIFIER = re.compile(
     r"|\b\d+\.\d+(?:\.\d+)*\b|\b\d{3,}\b"
 )
 DASHES = str.maketrans({character: "-" for character in "\u2010\u2011\u2012\u2013\u2014\u2212"})
+EVIDENCE_PASSAGE_LIMIT = 900
 
 
 def identifier_terms(text: str, limit: int = 64, *, named_only: bool = False) -> list[str]:
@@ -43,7 +44,7 @@ def identifier_supported(identifier: str, text: str) -> bool:
     return bool(re.search(_identifier_pattern(identifier), text.translate(DASHES), flags=re.IGNORECASE))
 
 
-def passage_excerpt(passage: str, question: str | None, limit: int = 900) -> str:
+def passage_excerpt(passage: str, question: str | None, limit: int = EVIDENCE_PASSAGE_LIMIT) -> str:
     """A literal, bounded window for reranking and citation; never rewrites evidence."""
     if len(passage) <= limit or not question:
         return passage[:limit]
@@ -69,6 +70,51 @@ def passage_excerpt(passage: str, question: str | None, limit: int = 900) -> str
         boundary = passage.rfind(" ", start, end)
         end = boundary if boundary > start else end
     return passage[start:end]
+
+
+def rerank_passages(passage: str, question: str) -> list[str]:
+    """Keep whole-passage context plus at most two literal sentence windows.
+
+    A relevant sentence near the end of a mixed-topic chunk must not be hidden
+    by its unrelated introduction. Windows overlap to retain local context;
+    they are never summaries or new evidence.
+    """
+    text = " ".join(passage.split())
+    # Score the same bounded text that citations and generation will receive;
+    # otherwise a later trim can remove the reason for a high relevance score.
+    whole = passage_excerpt(text, question, EVIDENCE_PASSAGE_LIMIT)
+    identifiers = identifier_terms(question, limit=8, named_only=True)
+    if identifiers and identifier_terms(text, named_only=True) and not any(
+        identifier_supported(term, text) for term in identifiers
+    ):
+        # Still rank the original candidate, but do not spend extra work on
+        # another equipment identifier that the evidence guard will exclude.
+        return [whole]
+    sentences = list(re.finditer(r"\S.*?(?:[.!?](?=\s|$)|$)", text))
+    if len(sentences) < 3:
+        return [whole]
+    windows = []
+    for index in range(len(sentences) - 1):
+        window = text[sentences[index].start():sentences[min(index + 1, len(sentences) - 1)].end()].strip()
+        if window and len(window) <= EVIDENCE_PASSAGE_LIMIT and window != whole:
+            windows.append(window)
+    stopwords = {
+        "what", "which", "when", "where", "does", "with", "from", "that", "this",
+        "should", "could", "would", "the", "and", "for", "how", "why", "explain",
+        "describe", "please", "must", "its", "can", "are", "not",
+    }
+    terms = {word.casefold() for word in re.findall(r"\w+", question)
+             if len(word) >= 3 and word.casefold() not in stopwords}
+    def focus_score(window: str) -> int:
+        return (
+            2 * sum(identifier_supported(term, window) for term in identifiers)
+            + len(terms & set(re.findall(r"\w+", window.casefold())))
+        )
+
+    # Do not spend extra reranker work on windows matching only generic text.
+    windows = [window for window in windows if focus_score(window) >= 2]
+    windows.sort(key=focus_score, reverse=True)
+    return list(dict.fromkeys([whole, *windows[:2]]))
 
 
 def fuse_candidates(

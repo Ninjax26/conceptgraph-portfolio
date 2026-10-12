@@ -1,0 +1,247 @@
+{
+  "output_kind": "deterministic_evidence_fallback_not_llm",
+  "captures": [
+    {
+      "id": "qa01",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "web-foundations.pdf",
+            "page_number": 1,
+            "document_id": "quality-web-foundations.pdf",
+            "supporting_passage": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS. [Source 1, p. 1]"
+      }
+    },
+    {
+      "id": "qa02",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "web-foundations.pdf",
+            "page_number": 2,
+            "document_id": "quality-web-foundations.pdf",
+            "supporting_passage": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS. [Source 1, p. 2]"
+      }
+    },
+    {
+      "id": "qa03",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "web-foundations.pdf",
+            "page_number": 1,
+            "document_id": "quality-web-foundations.pdf",
+            "supporting_passage": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "web-foundations.pdf",
+            "page_number": 2,
+            "document_id": "quality-web-foundations.pdf",
+            "supporting_passage": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+          },
+          {
+            "source_id": "source-3",
+            "document_name": "web-foundations.pdf",
+            "page_number": 3,
+            "document_id": "quality-web-foundations.pdf",
+            "supporting_passage": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS. [Source 1, p. 1]\n\n- TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS. [Source 2, p. 2]"
+      }
+    },
+    {
+      "id": "qa04",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "identity-security.pdf",
+            "page_number": 1,
+            "document_id": "quality-identity-security.pdf",
+            "supporting_passage": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "identity-security.pdf",
+            "page_number": 2,
+            "document_id": "quality-identity-security.pdf",
+            "supporting_passage": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application. [Source 1, p. 1]\n\n- Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons. [Source 2, p. 2]"
+      }
+    },
+    {
+      "id": "qa05",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "web-foundations.pdf",
+            "page_number": 3,
+            "document_id": "quality-web-foundations.pdf",
+            "supporting_passage": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "identity-security.pdf",
+            "page_number": 5,
+            "document_id": "quality-identity-security.pdf",
+            "supporting_passage": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest. [Source 1, p. 3]\n\n- Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception. [Source 2, p. 5]"
+      }
+    },
+    {
+      "id": "qa06",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "data-reliability.pdf",
+            "page_number": 2,
+            "document_id": "quality-data-reliability.pdf",
+            "supporting_passage": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "data-reliability.pdf",
+            "page_number": 3,
+            "document_id": "quality-data-reliability.pdf",
+            "supporting_passage": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures. [Source 1, p. 2]\n\n- Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects. [Source 2, p. 3]"
+      }
+    },
+    {
+      "id": "qa07",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "data-reliability.pdf",
+            "page_number": 1,
+            "document_id": "quality-data-reliability.pdf",
+            "supporting_passage": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "data-reliability.pdf",
+            "page_number": 4,
+            "document_id": "quality-data-reliability.pdf",
+            "supporting_passage": "Compensating cleanup removes partial derived artifacts after a workflow fails across services. A PostgreSQL rollback cannot erase points already written to Qdrant. Delete by the exact upload identifier and preserve authoritative metadata until cleanup can be retried. Cleanup is not a distributed atomic transaction: it can also fail, so record the failure and keep operations idempotent."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries. [Source 1, p. 1]\n\n- Compensating cleanup removes partial derived artifacts after a workflow fails across services. A PostgreSQL rollback cannot erase points already written to Qdrant. Delete by the exact upload identifier and preserve authoritative metadata until cleanup can be retried. Cleanup is not a distributed atomic transaction: it can also fail, so record the failure and keep operations idempotent. [Source 2, p. 4]"
+      }
+    },
+    {
+      "id": "qa08",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "data-reliability.pdf",
+            "page_number": 6,
+            "document_id": "quality-data-reliability.pdf",
+            "supporting_passage": "Readiness decides whether a service can accept useful traffic. Required dependencies such as the authoritative database must work. An optional concept graph may be reported as degraded while vector-based answers continue. A healthy process does not prove that an external AI provider has quota. Readiness and rate-limit failures require different operator responses."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "web-foundations.pdf",
+            "page_number": 6,
+            "document_id": "quality-web-foundations.pdf",
+            "supporting_passage": "An HTTP 401 response means authentication is required or the supplied credentials are not accepted. An HTTP 403 response means the request is forbidden; it can occur even when identity is known. HTTP 429 indicates too many requests and can include a Retry-After header. HTTP 503 indicates that a service is temporarily unavailable. Clients should distinguish these cases rather than report every failure as an invalid password."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- Readiness decides whether a service can accept useful traffic. Required dependencies such as the authoritative database must work. An optional concept graph may be reported as degraded while vector-based answers continue. A healthy process does not prove that an external AI provider has quota. Readiness and rate-limit failures require different operator responses. [Source 1, p. 6]\n\n- An HTTP 401 response means authentication is required or the supplied credentials are not accepted. An HTTP 403 response means the request is forbidden; it can occur even when identity is known. HTTP 429 indicates too many requests and can include a Retry-After header. HTTP 503 indicates that a service is temporarily unavailable. Clients should distinguish these cases rather than report every failure as an invalid password. [Source 2, p. 6]"
+      }
+    },
+    {
+      "id": "qa09",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 1,
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 2,
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply. [Source 1, p. 1]\n\n- INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval. [Source 2, p. 2]"
+      }
+    },
+    {
+      "id": "qa10",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 1,
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 2,
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply. [Source 1, p. 1]\n\n- INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval. [Source 2, p. 2]"
+      }
+    },
+    {
+      "id": "qa11",
+      "response": {
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_name": "equipment-PMP-105.pdf",
+            "page_number": 1,
+            "document_id": "quality-equipment-PMP-105.pdf",
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-105. The approved maximum operating pressure is 16.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_name": "equipment-PMP-105.pdf",
+            "page_number": 2,
+            "document_id": "quality-equipment-PMP-105.pdf",
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-105. The required inspection interval is 90 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "answer": "AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:\n\n- OPERATING SPECIFICATION Equipment identifier PMP-105. The approved maximum operating pressure is 16.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply. [Source 1, p. 1]\n\n- INSPECTION PROCEDURE Equipment identifier PMP-105. The required inspection interval is 90 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval. [Source 2, p. 2]"
+      }
+    },
+    {
+      "id": "qa12",
+      "response": {
+        "sources": [],
+        "answer": "I could not find enough reliable course content to answer this confidently."
+      }
+    }
+  ]
+}

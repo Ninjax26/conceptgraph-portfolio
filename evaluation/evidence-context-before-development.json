@@ -1,0 +1,1371 @@
+{
+  "generated_at": "2026-10-11T20:24:05.276830+00:00",
+  "dataset": "Authored evidence-context challenge v1",
+  "repeats": 1,
+  "questions": 5,
+  "corpora": [
+    {
+      "documents": 10,
+      "chunks": 32,
+      "index_seconds": 0.303,
+      "vector_bytes_estimate": 49152,
+      "corpus_sha256": {
+        "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+        "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+        "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+        "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+        "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+        "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+        "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+        "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+        "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+        "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54"
+      },
+      "profiles": {
+        "identifier_10_verified": {
+          "summary": {
+            "stage_metrics": {
+              "raw_retrieval": {
+                "document_hits": 3,
+                "page_hits": 3,
+                "all_required_sources": 3,
+                "mean_source_recall": 1.0,
+                "mrr_at_5": 1.0,
+                "mean_label_precision_at_5": 0.4
+              },
+              "reranked_retrieval": {
+                "document_hits": 3,
+                "page_hits": 3,
+                "all_required_sources": 3,
+                "mean_source_recall": 1.0,
+                "mrr_at_5": 1.0,
+                "mean_label_precision_at_5": 0.4
+              },
+              "accepted_evidence": {
+                "document_hits": 3,
+                "page_hits": 3,
+                "all_required_sources": 2,
+                "mean_source_recall": 0.833,
+                "mrr_at_5": 1.0,
+                "mean_label_precision_at_5": 0.3333
+              }
+            },
+            "graph_fallbacks": 0,
+            "queries_with_one_hop_terms": 0,
+            "queries_with_two_hop_terms": 0,
+            "correct_document_top_5": 0,
+            "document_question_count": 0,
+            "correct_source_page_top_5": 0,
+            "page_question_count": 0,
+            "supported_questions_with_evidence": 3,
+            "supported_question_count": 3,
+            "unsupported_questions_refused": 1,
+            "unsupported_question_count": 2,
+            "supported_questions_incorrectly_refused": 0,
+            "unsupported_questions_with_evidence": 1,
+            "failure_stages": {
+              "retrieval": 0,
+              "reranking": 0,
+              "evidence_gate": 1,
+              "unexpected_evidence": 1,
+              "request_error": 0
+            },
+            "graph_anchor_matches": 0,
+            "average_retrieval_seconds": 0.123,
+            "p95_retrieval_seconds": 0.24,
+            "request_errors": 0,
+            "stage_latency_ms": {
+              "collection_check_ms": {
+                "mean": 0.0,
+                "p95": 0.0,
+                "samples": 5
+              },
+              "graph_ms": {
+                "mean": 0.01,
+                "p95": 0.01,
+                "samples": 5
+              },
+              "evidence_ms": {
+                "mean": 0.18,
+                "p95": 0.35,
+                "samples": 5
+              },
+              "vector_ms": {
+                "mean": 6.05,
+                "p95": 7.17,
+                "samples": 5
+              },
+              "identifier_lookup_ms": {
+                "mean": 0.12,
+                "p95": 0.59,
+                "samples": 5
+              },
+              "rerank_ms": {
+                "mean": 117.37,
+                "p95": 235.01,
+                "samples": 5
+              },
+              "dense_search_ms": {
+                "mean": 1.04,
+                "p95": 1.76,
+                "samples": 5
+              },
+              "query_embedding_ms": {
+                "mean": 4.6,
+                "p95": 5.21,
+                "samples": 5
+              }
+            },
+            "p50_retrieval_seconds": 0.117
+          },
+          "by_split": {
+            "development": {
+              "stage_metrics": {
+                "raw_retrieval": {
+                  "document_hits": 3,
+                  "page_hits": 3,
+                  "all_required_sources": 3,
+                  "mean_source_recall": 1.0,
+                  "mrr_at_5": 1.0,
+                  "mean_label_precision_at_5": 0.4
+                },
+                "reranked_retrieval": {
+                  "document_hits": 3,
+                  "page_hits": 3,
+                  "all_required_sources": 3,
+                  "mean_source_recall": 1.0,
+                  "mrr_at_5": 1.0,
+                  "mean_label_precision_at_5": 0.4
+                },
+                "accepted_evidence": {
+                  "document_hits": 3,
+                  "page_hits": 3,
+                  "all_required_sources": 2,
+                  "mean_source_recall": 0.833,
+                  "mrr_at_5": 1.0,
+                  "mean_label_precision_at_5": 0.3333
+                }
+              },
+              "graph_fallbacks": 0,
+              "queries_with_one_hop_terms": 0,
+              "queries_with_two_hop_terms": 0,
+              "correct_document_top_5": 0,
+              "document_question_count": 0,
+              "correct_source_page_top_5": 0,
+              "page_question_count": 0,
+              "supported_questions_with_evidence": 3,
+              "supported_question_count": 3,
+              "unsupported_questions_refused": 1,
+              "unsupported_question_count": 2,
+              "supported_questions_incorrectly_refused": 0,
+              "unsupported_questions_with_evidence": 1,
+              "failure_stages": {
+                "retrieval": 0,
+                "reranking": 0,
+                "evidence_gate": 1,
+                "unexpected_evidence": 1,
+                "request_error": 0
+              },
+              "graph_anchor_matches": 0,
+              "average_retrieval_seconds": 0.123,
+              "p95_retrieval_seconds": 0.24,
+              "request_errors": 0,
+              "stage_latency_ms": {
+                "collection_check_ms": {
+                  "mean": 0.0,
+                  "p95": 0.0,
+                  "samples": 5
+                },
+                "graph_ms": {
+                  "mean": 0.01,
+                  "p95": 0.01,
+                  "samples": 5
+                },
+                "evidence_ms": {
+                  "mean": 0.18,
+                  "p95": 0.35,
+                  "samples": 5
+                },
+                "vector_ms": {
+                  "mean": 6.05,
+                  "p95": 7.17,
+                  "samples": 5
+                },
+                "identifier_lookup_ms": {
+                  "mean": 0.12,
+                  "p95": 0.59,
+                  "samples": 5
+                },
+                "rerank_ms": {
+                  "mean": 117.37,
+                  "p95": 235.01,
+                  "samples": 5
+                },
+                "dense_search_ms": {
+                  "mean": 1.04,
+                  "p95": 1.76,
+                  "samples": 5
+                },
+                "query_embedding_ms": {
+                  "mean": 4.6,
+                  "p95": 5.21,
+                  "samples": 5
+                }
+              }
+            },
+            "validation": {
+              "stage_metrics": {
+                "raw_retrieval": {
+                  "document_hits": 0,
+                  "page_hits": 0,
+                  "all_required_sources": 0,
+                  "mean_source_recall": 0,
+                  "mrr_at_5": 0,
+                  "mean_label_precision_at_5": 0
+                },
+                "reranked_retrieval": {
+                  "document_hits": 0,
+                  "page_hits": 0,
+                  "all_required_sources": 0,
+                  "mean_source_recall": 0,
+                  "mrr_at_5": 0,
+                  "mean_label_precision_at_5": 0
+                },
+                "accepted_evidence": {
+                  "document_hits": 0,
+                  "page_hits": 0,
+                  "all_required_sources": 0,
+                  "mean_source_recall": 0,
+                  "mrr_at_5": 0,
+                  "mean_label_precision_at_5": 0
+                }
+              },
+              "graph_fallbacks": 0,
+              "queries_with_one_hop_terms": 0,
+              "queries_with_two_hop_terms": 0,
+              "correct_document_top_5": 0,
+              "document_question_count": 0,
+              "correct_source_page_top_5": 0,
+              "page_question_count": 0,
+              "supported_questions_with_evidence": 0,
+              "supported_question_count": 0,
+              "unsupported_questions_refused": 0,
+              "unsupported_question_count": 0,
+              "supported_questions_incorrectly_refused": 0,
+              "unsupported_questions_with_evidence": 0,
+              "failure_stages": {
+                "retrieval": 0,
+                "reranking": 0,
+                "evidence_gate": 0,
+                "unexpected_evidence": 0,
+                "request_error": 0
+              },
+              "graph_anchor_matches": 0,
+              "average_retrieval_seconds": 0.0,
+              "p95_retrieval_seconds": 0.0,
+              "request_errors": 0,
+              "stage_latency_ms": {}
+            },
+            "held_out": {
+              "stage_metrics": {
+                "raw_retrieval": {
+                  "document_hits": 0,
+                  "page_hits": 0,
+                  "all_required_sources": 0,
+                  "mean_source_recall": 0,
+                  "mrr_at_5": 0,
+                  "mean_label_precision_at_5": 0
+                },
+                "reranked_retrieval": {
+                  "document_hits": 0,
+                  "page_hits": 0,
+                  "all_required_sources": 0,
+                  "mean_source_recall": 0,
+                  "mrr_at_5": 0,
+                  "mean_label_precision_at_5": 0
+                },
+                "accepted_evidence": {
+                  "document_hits": 0,
+                  "page_hits": 0,
+                  "all_required_sources": 0,
+                  "mean_source_recall": 0,
+                  "mrr_at_5": 0,
+                  "mean_label_precision_at_5": 0
+                }
+              },
+              "graph_fallbacks": 0,
+              "queries_with_one_hop_terms": 0,
+              "queries_with_two_hop_terms": 0,
+              "correct_document_top_5": 0,
+              "document_question_count": 0,
+              "correct_source_page_top_5": 0,
+              "page_question_count": 0,
+              "supported_questions_with_evidence": 0,
+              "supported_question_count": 0,
+              "unsupported_questions_refused": 0,
+              "unsupported_question_count": 0,
+              "supported_questions_incorrectly_refused": 0,
+              "unsupported_questions_with_evidence": 0,
+              "failure_stages": {
+                "retrieval": 0,
+                "reranking": 0,
+                "evidence_gate": 0,
+                "unexpected_evidence": 0,
+                "request_error": 0
+              },
+              "graph_anchor_matches": 0,
+              "average_retrieval_seconds": 0.0,
+              "p95_retrieval_seconds": 0.0,
+              "request_errors": 0,
+              "stage_latency_ms": {}
+            }
+          },
+          "results": [
+            {
+              "question": "Contrast the identity checks in a TLS certificate with authorization checks on a private PDF.",
+              "category": "multi_document",
+              "expected_sources": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 2
+                }
+              ],
+              "raw_retrieval": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "reranked_retrieval": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "accepted_evidence": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": false,
+                "source_recall": 0.5,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.2
+              },
+              "raw_top_5": [
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 3
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 3
+                }
+              ],
+              "reranked_top_5": [
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 3
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 3
+                }
+              ],
+              "fallback_reason": null,
+              "retrieval_mode": "vector_only",
+              "should_refuse": false,
+              "document_correct": null,
+              "page_correct": null,
+              "evidence_found": true,
+              "refused": false,
+              "latency_seconds": 0.126,
+              "graph_anchor_match_found": false,
+              "one_hop_terms": 0,
+              "two_hop_terms": 0,
+              "top_sources": [
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 1
+                }
+              ],
+              "error": null,
+              "stage_timings_ms": {
+                "graph_ms": 0.01,
+                "vector_ms": 7.17,
+                "collection_check_ms": 0.0,
+                "query_embedding_ms": 4.83,
+                "dense_search_ms": 1.76,
+                "identifier_lookup_ms": 0.0,
+                "rerank_ms": 118.6095830053091,
+                "evidence_ms": 0.15166611410677433
+              },
+              "candidate_count": 10,
+              "candidate_pool_all_sources_hit": true,
+              "candidate_pool_source_recall": 1.0,
+              "failure_stage": "evidence_gate",
+              "id": "ec01",
+              "split": "development",
+              "repeat": 1,
+              "rerank_window_count": 17,
+              "source_loss_diagnostics": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2,
+                  "stage": "evidence_gate"
+                }
+              ],
+              "evidence_diagnostics": [
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.6003668607312133,
+                  "rerank_score": 4.3018975257873535,
+                  "passed_gate": true,
+                  "excerpt": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.5442765402714964,
+                  "rerank_score": 0.1998574137687683,
+                  "passed_gate": true,
+                  "excerpt": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.4956139842415028,
+                  "rerank_score": -1.035585641860962,
+                  "passed_gate": false,
+                  "excerpt": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 3,
+                  "vector_score": 0.45780920555908994,
+                  "rerank_score": -3.2508649826049805,
+                  "passed_gate": false,
+                  "excerpt": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks."
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 3,
+                  "vector_score": 0.399698604225323,
+                  "rerank_score": -7.763049125671387,
+                  "passed_gate": false,
+                  "excerpt": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 6,
+                  "vector_score": 0.22428713247107587,
+                  "rerank_score": -9.813990592956543,
+                  "passed_gate": false,
+                  "excerpt": "An HTTP 401 response means authentication is required or the supplied credentials are not accepted. An HTTP 403 response means the request is forbidden; it can occur even when identity is known. HTTP 429 indicates too many requests and can include a Retry-After header. HTTP 503 indicates that a service is temporarily unavailable. Clients should distinguish these cases rather than report every failure as an invalid password."
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.26413867682710607,
+                  "rerank_score": -10.080946922302246,
+                  "passed_gate": false,
+                  "excerpt": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 4,
+                  "vector_score": 0.38396074146329195,
+                  "rerank_score": -11.040597915649414,
+                  "passed_gate": false,
+                  "excerpt": "A signed session cookie lets a server detect tampering and verify an expiry time. HttpOnly prevents page JavaScript from reading the cookie; Secure restricts transmission to HTTPS. A signature provides integrity, not secrecy, so session contents must not include secrets that require encryption. A stateless signed cookie does not by itself create per-user document ownership or provide instant revocation without additional state."
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 5,
+                  "vector_score": 0.3556228915196944,
+                  "rerank_score": -11.173664093017578,
+                  "passed_gate": false,
+                  "excerpt": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.2390391864320562,
+                  "rerank_score": -11.225322723388672,
+                  "passed_gate": false,
+                  "excerpt": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+                }
+              ],
+              "expected_fragments_present": false
+            },
+            {
+              "question": "Compare what SQL transactions roll back with how compensating cleanup removes partial Qdrant writes.",
+              "category": "multi_page",
+              "expected_sources": [
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 4
+                }
+              ],
+              "raw_retrieval": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "reranked_retrieval": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "accepted_evidence": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "raw_top_5": [
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 3
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 5
+                }
+              ],
+              "reranked_top_5": [
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 3
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 5
+                }
+              ],
+              "fallback_reason": null,
+              "retrieval_mode": "vector_only",
+              "should_refuse": false,
+              "document_correct": null,
+              "page_correct": null,
+              "evidence_found": true,
+              "refused": false,
+              "latency_seconds": 0.117,
+              "graph_anchor_match_found": false,
+              "one_hop_terms": 0,
+              "two_hop_terms": 0,
+              "top_sources": [
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 1
+                }
+              ],
+              "error": null,
+              "stage_timings_ms": {
+                "graph_ms": 0.01,
+                "vector_ms": 5.4,
+                "collection_check_ms": 0.0,
+                "query_embedding_ms": 4.37,
+                "dense_search_ms": 0.84,
+                "identifier_lookup_ms": 0.0,
+                "rerank_ms": 111.51558300480247,
+                "evidence_ms": 0.138541916385293
+              },
+              "candidate_count": 10,
+              "candidate_pool_all_sources_hit": true,
+              "candidate_pool_source_recall": 1.0,
+              "failure_stage": null,
+              "id": "ec02",
+              "split": "development",
+              "repeat": 1,
+              "rerank_window_count": 14,
+              "source_loss_diagnostics": [],
+              "evidence_diagnostics": [
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 4,
+                  "vector_score": 0.6739544238210392,
+                  "rerank_score": 5.566219806671143,
+                  "passed_gate": true,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.5042901390968213,
+                  "rerank_score": -0.6865589022636414,
+                  "passed_gate": true,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 3,
+                  "vector_score": 0.30449708925168534,
+                  "rerank_score": -9.763313293457031,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.2682310057136035,
+                  "rerank_score": -10.978997230529785,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 5,
+                  "vector_score": 0.12794273102530815,
+                  "rerank_score": -10.986974716186523,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 6,
+                  "vector_score": 0.19170097710651493,
+                  "rerank_score": -11.244316101074219,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 4,
+                  "vector_score": 0.12685568332771413,
+                  "rerank_score": -11.25444507598877,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 5,
+                  "vector_score": 0.2678510332803896,
+                  "rerank_score": -11.264558792114258,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 6,
+                  "vector_score": 0.14945797997187454,
+                  "rerank_score": -11.309226989746094,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 4,
+                  "vector_score": 0.12418046121067716,
+                  "rerank_score": -11.444068908691406,
+                  "passed_gate": false,
+                  "excerpt": null
+                }
+              ],
+              "expected_fragments_present": true
+            },
+            {
+              "question": "Compare DNS cache expiry with the no-store directive for HTTP responses.",
+              "category": "multi_page",
+              "expected_sources": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 5
+                }
+              ],
+              "raw_retrieval": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "reranked_retrieval": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "accepted_evidence": {
+                "document_hit": true,
+                "page_hit": true,
+                "all_sources_hit": true,
+                "source_recall": 1.0,
+                "reciprocal_rank_at_5": 1.0,
+                "label_precision_at_5": 0.4
+              },
+              "raw_top_5": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 5
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 6
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 1
+                }
+              ],
+              "reranked_top_5": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 5
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 6
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 4
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 1
+                }
+              ],
+              "fallback_reason": null,
+              "retrieval_mode": "vector_only",
+              "should_refuse": false,
+              "document_correct": null,
+              "page_correct": null,
+              "evidence_found": true,
+              "refused": false,
+              "latency_seconds": 0.089,
+              "graph_anchor_match_found": false,
+              "one_hop_terms": 0,
+              "two_hop_terms": 0,
+              "top_sources": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 5
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 4
+                }
+              ],
+              "error": null,
+              "stage_timings_ms": {
+                "graph_ms": 0.01,
+                "vector_ms": 6.29,
+                "collection_check_ms": 0.0,
+                "query_embedding_ms": 5.21,
+                "dense_search_ms": 0.86,
+                "identifier_lookup_ms": 0.0,
+                "rerank_ms": 83.03429186344147,
+                "evidence_ms": 0.14916714280843735
+              },
+              "candidate_count": 10,
+              "candidate_pool_all_sources_hit": true,
+              "candidate_pool_source_recall": 1.0,
+              "failure_stage": null,
+              "id": "ec03",
+              "split": "development",
+              "repeat": 1,
+              "rerank_window_count": 15,
+              "source_loss_diagnostics": [],
+              "evidence_diagnostics": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 5,
+                  "vector_score": 0.5347158641883023,
+                  "rerank_score": 2.778195858001709,
+                  "passed_gate": true,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 4,
+                  "vector_score": 0.6458423063911276,
+                  "rerank_score": 1.3400158882141113,
+                  "passed_gate": true,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 6,
+                  "vector_score": 0.28506100126217837,
+                  "rerank_score": -4.821099281311035,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 4,
+                  "vector_score": 0.28334374779926685,
+                  "rerank_score": -7.651287078857422,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.23082177059948453,
+                  "rerank_score": -7.721299171447754,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 6,
+                  "vector_score": 0.21987352527268983,
+                  "rerank_score": -10.014511108398438,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 3,
+                  "vector_score": 0.18777459752493475,
+                  "rerank_score": -10.063667297363281,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.16928887459637418,
+                  "rerank_score": -10.859994888305664,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 6,
+                  "vector_score": 0.1653052625563623,
+                  "rerank_score": -11.132972717285156,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "data-reliability.pdf",
+                  "page_number": 4,
+                  "vector_score": 0.1516292892406546,
+                  "rerank_score": -11.30327033996582,
+                  "passed_gate": false,
+                  "excerpt": null
+                }
+              ],
+              "expected_fragments_present": true
+            },
+            {
+              "question": "Who manufactured PMP-104?",
+              "category": "unsupported_attribute",
+              "expected_sources": [],
+              "raw_retrieval": {
+                "document_hit": false,
+                "page_hit": false,
+                "all_sources_hit": false,
+                "source_recall": null,
+                "reciprocal_rank_at_5": 0.0,
+                "label_precision_at_5": 0.0
+              },
+              "reranked_retrieval": {
+                "document_hit": false,
+                "page_hit": false,
+                "all_sources_hit": false,
+                "source_recall": null,
+                "reciprocal_rank_at_5": 0.0,
+                "label_precision_at_5": 0.0
+              },
+              "accepted_evidence": {
+                "document_hit": false,
+                "page_hit": false,
+                "all_sources_hit": false,
+                "source_recall": null,
+                "reciprocal_rank_at_5": 0.0,
+                "label_precision_at_5": 0.0
+              },
+              "raw_top_5": [
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "equipment-PMP-200.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "equipment-PMP-105.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "equipment-PMP-102.pdf",
+                  "page_number": 2
+                }
+              ],
+              "reranked_top_5": [
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "equipment-PMP-106.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "equipment-PMP-103.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "equipment-PMP-106.pdf",
+                  "page_number": 2
+                }
+              ],
+              "fallback_reason": null,
+              "retrieval_mode": "vector_only",
+              "should_refuse": true,
+              "document_correct": null,
+              "page_correct": null,
+              "evidence_found": true,
+              "refused": false,
+              "latency_seconds": 0.045,
+              "graph_anchor_match_found": false,
+              "one_hop_terms": 0,
+              "two_hop_terms": 0,
+              "top_sources": [
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 2
+                }
+              ],
+              "error": null,
+              "stage_timings_ms": {
+                "graph_ms": 0.01,
+                "vector_ms": 6.3,
+                "collection_check_ms": 0.0,
+                "query_embedding_ms": 4.52,
+                "dense_search_ms": 0.9,
+                "identifier_lookup_ms": 0.59,
+                "rerank_ms": 38.68520795367658,
+                "evidence_ms": 0.35125017166137695
+              },
+              "candidate_count": 10,
+              "candidate_pool_all_sources_hit": false,
+              "candidate_pool_source_recall": null,
+              "failure_stage": "unexpected_evidence",
+              "id": "ec04",
+              "split": "development",
+              "repeat": 1,
+              "rerank_window_count": 12,
+              "source_loss_diagnostics": [],
+              "evidence_diagnostics": [
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.45775582911328916,
+                  "rerank_score": 2.012631893157959,
+                  "passed_gate": true,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.4722835969639324,
+                  "rerank_score": 1.2164943218231201,
+                  "passed_gate": true,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-106.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.4285743184047576,
+                  "rerank_score": 0.9109438061714172,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-103.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.43689371371458424,
+                  "rerank_score": 0.004718314856290817,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-106.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.4313844278999378,
+                  "rerank_score": -0.02202819287776947,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-102.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.4385704441393101,
+                  "rerank_score": -1.258622169494629,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-105.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.4416909083718937,
+                  "rerank_score": -1.3827979564666748,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-102.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.42516802023987016,
+                  "rerank_score": -1.5031622648239136,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-200.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.43286013314227373,
+                  "rerank_score": -4.178004264831543,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-200.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.4448041103472158,
+                  "rerank_score": -4.9751458168029785,
+                  "passed_gate": false,
+                  "excerpt": null
+                }
+              ],
+              "expected_fragments_present": null
+            },
+            {
+              "question": "What year was TLS invented?",
+              "category": "unsupported_attribute",
+              "expected_sources": [],
+              "raw_retrieval": {
+                "document_hit": false,
+                "page_hit": false,
+                "all_sources_hit": false,
+                "source_recall": null,
+                "reciprocal_rank_at_5": 0.0,
+                "label_precision_at_5": 0.0
+              },
+              "reranked_retrieval": {
+                "document_hit": false,
+                "page_hit": false,
+                "all_sources_hit": false,
+                "source_recall": null,
+                "reciprocal_rank_at_5": 0.0,
+                "label_precision_at_5": 0.0
+              },
+              "accepted_evidence": {
+                "document_hit": false,
+                "page_hit": false,
+                "all_sources_hit": false,
+                "source_recall": null,
+                "reciprocal_rank_at_5": 0.0,
+                "label_precision_at_5": 0.0
+              },
+              "raw_top_5": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 3
+                },
+                {
+                  "document_name": "equipment-PMP-101.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "equipment-PMP-102.pdf",
+                  "page_number": 2
+                }
+              ],
+              "reranked_top_5": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 1
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 3
+                },
+                {
+                  "document_name": "equipment-PMP-106.pdf",
+                  "page_number": 2
+                },
+                {
+                  "document_name": "equipment-PMP-200.pdf",
+                  "page_number": 2
+                }
+              ],
+              "fallback_reason": null,
+              "retrieval_mode": "vector_only",
+              "should_refuse": true,
+              "document_correct": null,
+              "page_correct": null,
+              "evidence_found": false,
+              "refused": true,
+              "latency_seconds": 0.24,
+              "graph_anchor_match_found": false,
+              "one_hop_terms": 0,
+              "two_hop_terms": 0,
+              "top_sources": [],
+              "error": null,
+              "stage_timings_ms": {
+                "graph_ms": 0.01,
+                "vector_ms": 5.08,
+                "collection_check_ms": 0.0,
+                "query_embedding_ms": 4.07,
+                "dense_search_ms": 0.82,
+                "identifier_lookup_ms": 0.0,
+                "rerank_ms": 235.01216596923769,
+                "evidence_ms": 0.1152919139713049
+              },
+              "candidate_count": 10,
+              "candidate_pool_all_sources_hit": false,
+              "candidate_pool_source_recall": null,
+              "failure_stage": null,
+              "id": "ec05",
+              "split": "development",
+              "repeat": 1,
+              "rerank_window_count": 10,
+              "source_loss_diagnostics": [],
+              "evidence_diagnostics": [
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.3838299616281139,
+                  "rerank_score": -6.221312999725342,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 1,
+                  "vector_score": 0.1555409063861484,
+                  "rerank_score": -7.87314510345459,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "web-foundations.pdf",
+                  "page_number": 3,
+                  "vector_score": 0.2005502018316753,
+                  "rerank_score": -8.164495468139648,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-106.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.15293809136049397,
+                  "rerank_score": -11.091410636901855,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-200.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.13935382980809924,
+                  "rerank_score": -11.093327522277832,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-105.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.15256920093759715,
+                  "rerank_score": -11.096906661987305,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-104.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.13042182822401585,
+                  "rerank_score": -11.097079277038574,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-102.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.1535337961182473,
+                  "rerank_score": -11.099190711975098,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "equipment-PMP-101.pdf",
+                  "page_number": 2,
+                  "vector_score": 0.1588380918051776,
+                  "rerank_score": -11.11097526550293,
+                  "passed_gate": false,
+                  "excerpt": null
+                },
+                {
+                  "document_name": "identity-security.pdf",
+                  "page_number": 5,
+                  "vector_score": 0.15305001653480377,
+                  "rerank_score": -11.198620796203613,
+                  "passed_gate": false,
+                  "excerpt": null
+                }
+              ],
+              "expected_fragments_present": null
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "methodology": {
+    "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+    "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "baseline_revision": null,
+    "splits": [
+      "development"
+    ],
+    "comparison_code_sha256": {
+      "app/services/citation_service.py": "c0669559f3747e32c8e7ef4eca1251a92a3d7f6b9dd6d672738b5bd6ba04dab3",
+      "app/services/rerank_service.py": "372582ba87e587144eca135722d2bee8942d699505db0bbaeb6d685ae3a19d59"
+    },
+    "retrieval_candidates_sha256": "f0136a0e18b0bf5e3a75808a9a28da5bcf2ca5d81e1c47bedcda7586d2994ff7",
+    "evidence_min_score": 0.35,
+    "profiles": {
+      "identifier_10_verified": {
+        "candidate_limit": 10,
+        "identifier_lookup": true,
+        "identifier_verification": true
+      }
+    },
+    "dataset_sha256": {
+      "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+      "evaluation/questions-evidence-context.json": "6a0b39b926a44de0db78cc7c2532932bc3a2137abb5b633364c8a20f3788295d"
+    },
+    "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+    "limitations": [
+      "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+      "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+      "Source fragments are checked by exact text presence, not semantic correctness.",
+      "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+      "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+    ]
+  }
+}

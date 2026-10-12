@@ -1,0 +1,129 @@
+{
+  "prototype_only": true,
+  "provider_requests": 0,
+  "generation_requests": 0,
+  "evidence_min_score": 0.35,
+  "candidate_report_sha256": "ee4ecad8d6a99cd93d2c24581137cf73d3653c61ce5d5f51791efd6e7ce15a19",
+  "question_sha256": "6a0b39b926a44de0db78cc7c2532932bc3a2137abb5b633364c8a20f3788295d",
+  "limitations": [
+    "Development-only; not an independent held-out gain.",
+    "Fixed reconstructed candidate pool, not a fresh vector search or end-to-end API test.",
+    "Narrow explicit Compare/Contrast A with B syntax only; not general semantic decomposition.",
+    "Missing-attribute checks are not solved; scores measure relevance, not answerability.",
+    "Hosted use would require two rerank requests for matched comparisons; API behavior is unchanged."
+  ],
+  "results": [
+    {
+      "id": "ec01",
+      "should_refuse": false,
+      "facets": [
+        "the identity checks in a TLS certificate",
+        "authorization checks on a private PDF"
+      ],
+      "source_complete_before": false,
+      "source_complete_after": true,
+      "gate_refused_before": false,
+      "gate_refused_after": false,
+      "expected_fragments_present": true,
+      "top_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 2
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 2
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "identity-security.pdf",
+          "page_number": 3
+        }
+      ]
+    },
+    {
+      "id": "ec02",
+      "should_refuse": false,
+      "facets": [
+        "what SQL transactions roll back",
+        "how compensating cleanup removes partial Qdrant writes"
+      ],
+      "source_complete_before": true,
+      "source_complete_after": true,
+      "gate_refused_before": false,
+      "gate_refused_after": false,
+      "expected_fragments_present": true,
+      "top_sources": [
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "data-reliability.pdf",
+          "page_number": 4
+        }
+      ]
+    },
+    {
+      "id": "ec03",
+      "should_refuse": false,
+      "facets": [
+        "DNS cache expiry",
+        "the no-store directive for HTTP responses"
+      ],
+      "source_complete_before": true,
+      "source_complete_after": true,
+      "gate_refused_before": false,
+      "gate_refused_after": false,
+      "expected_fragments_present": true,
+      "top_sources": [
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 4
+        },
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 5
+        },
+        {
+          "document_name": "web-foundations.pdf",
+          "page_number": 6
+        }
+      ]
+    },
+    {
+      "id": "ec04",
+      "should_refuse": true,
+      "facets": [],
+      "source_complete_before": false,
+      "source_complete_after": null,
+      "gate_refused_before": false,
+      "gate_refused_after": false,
+      "expected_fragments_present": null,
+      "top_sources": [
+        {
+          "document_name": "equipment-PMP-104.pdf",
+          "page_number": 1
+        },
+        {
+          "document_name": "equipment-PMP-104.pdf",
+          "page_number": 2
+        }
+      ]
+    },
+    {
+      "id": "ec05",
+      "should_refuse": true,
+      "facets": [],
+      "source_complete_before": false,
+      "source_complete_after": null,
+      "gate_refused_before": true,
+      "gate_refused_after": true,
+      "expected_fragments_present": null,
+      "top_sources": []
+    }
+  ]
+}

@@ -15,7 +15,7 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from app.services.citation_service import assess_evidence, build_sources, prepare_evidence
 from app.services.rag_service import RetrievalService
 from app.services.rerank_service import RerankService
-from app.services.retrieval_candidates import fuse_candidates, identifier_supported, identifier_terms
+from app.services.retrieval_candidates import fuse_candidates, identifier_supported, identifier_terms, rerank_passages
 from scripts.run_evaluation import load_dataset, score_retrieval_result, summarize_retrieval
 
 
@@ -73,7 +73,7 @@ class RetrievalScalingTests(unittest.TestCase):
     def test_local_reranker_sees_a_bounded_relevant_tail_without_mutating_chunks(self):
         text = "Background material. " * 200 + "PMP-104 has an approved pressure limit of 11.0 bar."
         service = RerankService()
-        predict = Mock(return_value=[5.])
+        predict = Mock(side_effect=lambda pairs: [5.] * len(pairs))
         service._model = SimpleNamespace(predict=predict)
         chunks = [{"text": text, "score": .7}]
         result = service._rerank_locally("PMP104 pressure?", chunks)
@@ -237,6 +237,215 @@ class RetrievalScalingTests(unittest.TestCase):
         self.assertIn("smaller set", confidence["reason"])
 
 
+class EvidenceSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch("app.core.config.settings.evidence_min_score", .35))
+        self.enterContext(patch("app.core.config.settings.retrieval_verify_identifiers", True))
+
+    @staticmethod
+    def chunk(text, upload="allowed", page=1, **scores):
+        return {"text": text, "score": .6, "rerank_score": 4.,
+                "metadata": {"upload_id": upload, "page_number": page}, **scores}
+
+    def test_identifier_comparison_keeps_complementary_context(self):
+        chunks = [self.chunk("HTTP 429 indicates too many requests."),
+                  self.chunk("Readiness checks whether dependencies can serve useful traffic.", page=2)]
+        sources, confidence = prepare_evidence("How is readiness different from HTTP 429?", chunks)
+        self.assertEqual({source["page_number"] for source in sources}, {1, 2})
+        self.assertNotEqual(confidence["level"], "insufficient")
+
+    def test_complementary_context_cannot_bypass_missing_identifier(self):
+        sources, confidence = prepare_evidence("PMP-99999 pressure?", [
+            self.chunk("Pressure limits are recorded in the operating manual.")])
+        self.assertEqual(sources, [])
+        self.assertEqual(confidence["level"], "insufficient")
+
+    def test_other_equipment_is_not_accepted_as_complementary_context(self):
+        sources, _ = prepare_evidence("PMP-104 pressure?", [
+            self.chunk("PMP-104 pressure is 11 bar."),
+            self.chunk("PMP-105 pressure is 16 bar.", page=2)])
+        self.assertEqual(len(sources), 1)
+        self.assertNotIn("PMP-105", sources[0]["supporting_passage"])
+
+    def test_complementary_context_still_has_to_pass_threshold(self):
+        sources, _ = prepare_evidence("How is readiness different from HTTP 429?", [
+            self.chunk("HTTP 429 means slow down."),
+            self.chunk("Readiness checks dependencies.", page=2, score=.1, rerank_score=-10.)])
+        self.assertEqual(len(sources), 1)
+
+    def test_windows_are_bounded_literal_and_preserve_negation_context(self):
+        text = "General introduction. HTTP 429 signals rate limiting. It does not prove readiness. Check dependencies separately."
+        windows = rerank_passages(text, "HTTP 429 readiness?")
+        self.assertLessEqual(len(windows), 3)
+        self.assertTrue(all(window in text and len(window) <= 1600 for window in windows))
+        self.assertTrue(any("HTTP 429" in window and "does not" in window for window in windows))
+
+    def test_sentence_windows_do_not_split_decimal_values(self):
+        text = "Background information. PMP-104 pressure is 11.0 bar. Do not exceed it. Other background."
+        windows = rerank_passages(text, "PMP-104 pressure?")
+        self.assertTrue(all("11.0 bar" in window for window in windows))
+        self.assertFalse(any(window.startswith("0 bar") for window in windows))
+
+    def test_best_window_becomes_citation_without_mutating_original_chunk(self):
+        text = "Unrelated introductory material. Readiness checks dependencies. It does not prove provider quota. Other background."
+        chunk = self.chunk(text, page=6)
+        service = RerankService()
+        def predict(pairs):
+            return [4. if passage.startswith("Readiness") else -8. for _, passage in pairs]
+        service._model = SimpleNamespace(predict=predict)
+        ranked = service._rerank_locally("Readiness provider quota?", [chunk])
+        sources, _ = prepare_evidence("Readiness provider quota?", ranked)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["supporting_passage"], ranked[0]["rerank_passage"])
+        self.assertIn("does not prove", sources[0]["supporting_passage"])
+        self.assertEqual(sources[0]["page_number"], 6)
+        self.assertEqual(ranked[0]["text"], text)
+        self.assertNotIn("rerank_passage", chunk)
+
+    def test_citation_identifier_must_exist_in_selected_window(self):
+        chunk = self.chunk("PMP-104 pressure is 11 bar. Generic safety guidance.")
+        chunk["rerank_passage"] = "Generic safety guidance."
+        sources, confidence = prepare_evidence("PMP-104 pressure?", [chunk])
+        self.assertEqual(sources, [])
+        self.assertEqual(confidence["level"], "insufficient")
+
+    def test_citation_never_uses_a_window_that_is_not_source_text(self):
+        chunk = self.chunk("PMP-104 pressure is 11 bar.")
+        chunk["rerank_passage"] = "PMP-104 pressure is 99 bar."
+        sources, _ = prepare_evidence("PMP-104 pressure?", [chunk])
+        self.assertEqual(sources[0]["supporting_passage"], chunk["text"])
+
+    def test_hosted_windows_map_back_to_their_original_documents(self):
+        async def check():
+            def response(request):
+                payload = json.loads(request.content)
+                self.assertLessEqual(len(payload["documents"]), 6)
+                return httpx.Response(200, json={"results": [
+                    {"index": index, "relevance_score": .95 if "TLS protects" in text else .01}
+                    for index, text in reversed(list(enumerate(payload["documents"]))) ]})
+            async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as client:
+                with patch("app.core.config.settings.cohere_api_key", SecretStr("test")):
+                    ranked = await RerankService(client)._rerank_with_cohere("TLS protects?", [
+                        self.chunk("DNS resolves names.", upload="dns"),
+                        self.chunk("Background text. TLS protects data. It checks integrity. More background.", upload="tls")])
+            self.assertEqual(len(ranked), 2)
+            self.assertEqual(ranked[0]["metadata"]["upload_id"], "tls")
+            self.assertIn("TLS protects", ranked[0]["rerank_passage"])
+        asyncio.run(check())
+
+    def test_incomplete_hosted_window_response_is_rejected(self):
+        async def check():
+            async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(
+                    200, json={"results": [{"index": 0, "relevance_score": .9}]}))) as client:
+                with patch("app.core.config.settings.cohere_api_key", SecretStr("test")):
+                    with self.assertRaisesRegex(RuntimeError, "incomplete"):
+                        await RerankService(client)._rerank_with_cohere("TLS integrity?", [self.chunk(
+                            "Background text. TLS protects data. It checks integrity. More background.")])
+        asyncio.run(check())
+
+    def test_generic_question_does_not_add_unfocused_windows(self):
+        self.assertEqual(len(rerank_passages(
+            "Background information. More unrelated text. Another sentence.", "What is this?")), 1)
+
+    def test_other_identifier_does_not_spend_extra_window_work(self):
+        text = "PMP-105 operating pressure is 16 bar. Record pressure in bar. Stop above this pressure."
+        self.assertEqual(rerank_passages(text, "PMP-104 operating pressure?"), [text])
+
+    def test_citation_budget_reserves_evidence_for_each_requested_identifier(self):
+        chunks = [self.chunk(f"PMP-104 pressure inspection note {i}.", page=i + 1)
+                  for i in range(5)]
+        chunks.append(self.chunk("PMP-106 inspection occurs every 7 days.", upload="second", rerank_score=3.))
+        sources, confidence = prepare_evidence("Compare PMP-104 and PMP-106 inspection", chunks)
+        self.assertEqual(len(sources), 5)
+        self.assertEqual({source["document_id"] for source in sources}, {"allowed", "second"})
+        self.assertNotEqual(confidence["level"], "insufficient")
+        self.assertEqual(sources[0]["page_number"], 1)
+        self.assertEqual([source["source_id"] for source in sources],
+                         [f"source-{index}" for index in range(1, 6)])
+        self.assertNotIn("source_id", chunks[0])
+
+    def test_multi_identifier_coverage_does_not_waste_slots_on_greedy_choice(self):
+        required = [f"pmp{i}" for i in range(101, 107)]
+        chunks = [self.chunk(text, page=index) for index, text in enumerate([
+            "PMP-101 PMP-102 PMP-103 PMP-104 operating instructions.",
+            "PMP-101 PMP-102 PMP-105 operating instructions.",
+            "PMP-103 PMP-104 PMP-106 operating instructions.",
+        ], 1)]
+        sources = build_sources(chunks, limit=2, required_identifiers=required)
+        self.assertEqual([source["page_number"] for source in sources], [2, 3])
+        self.assertTrue(all(any(identifier_supported(term, source["supporting_passage"])
+                               for source in sources) for term in required))
+
+    def test_complete_ranked_citations_are_not_replaced_by_lower_ranked_cover(self):
+        chunks = [self.chunk(f"PMP-{index} operating instructions.", page=index)
+                  for index in range(101, 106)]
+        chunks.append(self.chunk("PMP-101 PMP-102 PMP-103 PMP-104 PMP-105 summary.", page=106))
+        sources = build_sources(chunks, required_identifiers=[f"pmp{i}" for i in range(101, 106)])
+        self.assertEqual([source["page_number"] for source in sources], list(range(101, 106)))
+
+    def test_citation_reservation_never_rescues_below_threshold_evidence(self):
+        chunks = [self.chunk(f"PMP-104 inspection note {i}.", page=i + 1) for i in range(5)]
+        chunks.append(self.chunk("PMP-106 inspection every 7 days.", upload="second", rerank_score=-10.))
+        sources, confidence = prepare_evidence("Compare PMP-104 and PMP-106 inspection", chunks)
+        self.assertEqual(sources, [])
+        self.assertEqual(confidence["level"], "insufficient")
+
+    def test_non_identifier_questions_keep_ranked_citation_budget(self):
+        chunks = [self.chunk(f"Document guidance {i}.", upload=str(i)) for i in range(6)]
+        sources, _ = prepare_evidence("Explain the document guidance", chunks)
+        self.assertEqual([source["document_id"] for source in sources], [str(i) for i in range(5)])
+
+    def test_selected_excerpt_cannot_hide_conflicting_identifier_in_original_chunk(self):
+        conflicting = self.chunk("PMP-104 is listed elsewhere. PMP-105 pressure is 99 bar.", page=2)
+        conflicting["rerank_passage"] = "PMP-105 pressure is 99 bar."
+        sources, _ = prepare_evidence("PMP-104 pressure?", [
+            self.chunk("PMP-104 pressure is 11 bar."), conflicting])
+        self.assertEqual(len(sources), 1)
+        self.assertNotIn("PMP-105", sources[0]["supporting_passage"])
+
+    def test_missing_identifier_cannot_be_verified_from_unselected_background(self):
+        chunk = self.chunk("PMP-104 is listed elsewhere. PMP-105 pressure is 99 bar.")
+        chunk["rerank_passage"] = "PMP-105 pressure is 99 bar."
+        sources, confidence = prepare_evidence("PMP-104 pressure?", [chunk])
+        self.assertEqual(sources, [])
+        self.assertEqual(confidence["level"], "insufficient")
+
+    def test_generator_receives_the_exact_passage_scored_by_reranker(self):
+        text = "Pressure guidance applies to PMP-104. " + "Background safety discussion. " * 45
+        text += "PMP-104 approved pressure is 11.0 bar. Do not exceed this pressure."
+        service = RerankService()
+        service._model = SimpleNamespace(predict=lambda pairs: [4.] + [-8.] * (len(pairs) - 1))
+        ranked = service._rerank_locally("PMP-104 pressure guidance?", [self.chunk(text)])
+        sources, _ = prepare_evidence("PMP-104 pressure guidance?", ranked)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["supporting_passage"], ranked[0]["rerank_passage"])
+        self.assertLessEqual(len(ranked[0]["rerank_passage"]), 900)
+
+    def test_final_sentence_window_keeps_preceding_context(self):
+        text = "The following operation is an unsafe example. Do not attempt it. Run PMP-104 above its approved pressure limit."
+        windows = rerank_passages(text, "Run PMP-104 above its approved pressure limit?")
+        self.assertNotIn("Run PMP-104 above its approved pressure limit.", windows)
+        self.assertTrue(any("Do not attempt it." in window and "Run PMP-104" in window for window in windows))
+
+    def test_hosted_reranker_scores_the_same_bounded_text_as_final_citations(self):
+        async def check():
+            submitted = []
+            def response(request):
+                payload = json.loads(request.content)
+                submitted.extend(payload["documents"])
+                return httpx.Response(200, json={"results": [
+                    {"index": index, "relevance_score": .9 if index == 0 else .01}
+                    for index in range(len(submitted))]})
+            async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as client:
+                with patch("app.core.config.settings.cohere_api_key", SecretStr("test")):
+                    ranked = await RerankService(client)._rerank_with_cohere("PMP-104 pressure guidance?", [
+                        self.chunk("PMP-104 pressure guidance. " + "Background discussion. " * 70)])
+            sources, _ = prepare_evidence("PMP-104 pressure guidance?", ranked)
+            self.assertTrue(all(len(text) <= 900 for text in submitted))
+            self.assertEqual(sources[0]["supporting_passage"], submitted[0])
+        asyncio.run(check())
+
+
 class QueryEvidenceTests(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_identifier_never_calls_answer_generation(self):
         from app.api.endpoints import query
@@ -257,6 +466,65 @@ class QueryEvidenceTests(unittest.IsolatedAsyncioTestCase):
 
 
 class RetrievalMetricTests(unittest.TestCase):
+    def test_comparison_prototype_recognizes_only_explicit_two_part_syntax(self):
+        from scripts.experiment_evidence_facets import comparison_facets
+        self.assertEqual(comparison_facets("Contrast certificate checks with PDF permissions."),
+                         ["certificate checks", "PDF permissions"])
+        self.assertEqual(comparison_facets("How do certificate checks work?"), [])
+
+    def test_comparison_prototype_refuses_when_one_part_lacks_evidence(self):
+        from scripts.experiment_evidence_facets import merge_facet_sources
+        source = {"document_id": "a", "document_name": "a.pdf", "page_number": 1,
+                  "supporting_passage": "Literal text.", "source_id": "original"}
+        self.assertEqual(merge_facet_sources([[source], []]), [])
+        result = merge_facet_sources([[source], [source]])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["source_id"], "source-1")
+        self.assertEqual(source["source_id"], "original")
+
+    def test_context_challenge_labels_match_authored_source_text(self):
+        root = Path(__file__).resolve().parents[1]
+        challenge = load_dataset(root / "evaluation/questions-evidence-context.json")
+        course = json.loads((root / "evaluation/course.json").read_text())
+        pages = {(document["filename"], number): page["text"] for document in course["documents"]
+                 for number, page in enumerate(document["pages"], 1)}
+        from scripts.evaluate_retrieval_scaling import equipment_pdf
+        import pymupdf
+        for record in json.loads((root / "evaluation/questions-scaling.json").read_text())["documents"]:
+            filename, content = equipment_pdf(record)
+            with pymupdf.open(stream=content, filetype="pdf") as pdf:
+                pages.update({(filename, number): " ".join(page.get_text().split())
+                              for number, page in enumerate(pdf, 1)})
+        for case in challenge["questions"]:
+            self.assertIn(case["split"], ("development", "held_out"))
+            if case["should_refuse"]:
+                continue
+            text = " ".join(pages[source["document_name"], source["page_number"]]
+                            for source in case["expected_sources"])
+            for fragment in case["expected_passage_fragments"]:
+                with self.subTest(case=case["id"], fragment=fragment):
+                    self.assertIn(fragment.casefold(), text.casefold())
+
+    def test_source_loss_diagnostics_distinguish_pipeline_stages(self):
+        from scripts.evaluate_retrieval_scaling import diagnose_source_losses
+        expected = [{"document_name": "fixture.pdf", "page_number": page} for page in range(1, 6)]
+        chunks = [{"metadata": source} for source in expected]
+        losses = diagnose_source_losses(expected, chunks[1:], chunks[2:], chunks[3:], expected[4:])
+        self.assertEqual([loss["stage"] for loss in losses],
+                         ["search", "reranking", "evidence_gate", "citation_selection"])
+
+    def test_source_loss_diagnostics_include_candidates_below_top_five(self):
+        from scripts.evaluate_retrieval_scaling import diagnose_source_losses
+        expected = [{"document_name": "second.pdf", "page_number": 1}]
+        chunks = [{"metadata": {"document_name": "first.pdf", "page_number": i}}
+                  for i in range(5)] + [{"metadata": expected[0]}]
+        self.assertEqual(diagnose_source_losses(expected, chunks, chunks, chunks, expected), [])
+
+    def test_scaling_pdf_fixtures_have_reproducible_bytes(self):
+        from scripts.evaluate_retrieval_scaling import equipment_pdf
+        record = {"id": "PMP-104", "pressure": "11.0", "interval": 60}
+        self.assertEqual(equipment_pdf(record), equipment_pdf(record))
+
     def test_bad_labels_are_rejected_before_evaluation(self):
         cases = [
             {"question": "Question", "should_refuse": "false"},

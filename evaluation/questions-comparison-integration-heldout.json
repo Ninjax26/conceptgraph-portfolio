@@ -1,0 +1,12 @@
+{
+  "name": "Authored comparison integration holdout v1",
+  "annotation_note": "New authored questions fixed before their first measured run. Used to verify the integrated two-facet policy, not to tune thresholds. Independent of prior question files, but not independently human-annotated customer data. Complex qualified comparisons intentionally remain on the full-question path.",
+  "questions": [
+    {"id": "ci01", "split": "held_out", "question": "Compare browser certificate hostname validation with PDF owner permission checks.", "category": "multi_document", "expected_sources": [{"document_name": "web-foundations.pdf", "page_number": 2}, {"document_name": "identity-security.pdf", "page_number": 2}], "expected_passage_fragments": ["hostname", "document owner"], "should_refuse": false},
+    {"id": "ci02", "split": "held_out", "question": "Contrast conditional HTTP response caching with a DNS resolver's cached name resolution.", "category": "multi_page", "expected_sources": [{"document_name": "web-foundations.pdf", "page_number": 5}, {"document_name": "web-foundations.pdf", "page_number": 4}], "expected_passage_fragments": ["ETag", "time to live"], "should_refuse": false},
+    {"id": "ci03", "split": "held_out", "question": "Compare dependency readiness checks with HTTP 429 request limiting.", "category": "multi_document", "expected_sources": [{"document_name": "data-reliability.pdf", "page_number": 6}, {"document_name": "web-foundations.pdf", "page_number": 6}], "expected_passage_fragments": ["Required dependencies", "HTTP 429"], "should_refuse": false},
+    {"id": "ci04", "split": "held_out", "question": "Compare the maximum pressure of PMP-101 with the maximum pressure of PMP-106.", "category": "identifier_multisource", "expected_sources": [{"document_name": "equipment-PMP-101.pdf", "page_number": 1}, {"document_name": "equipment-PMP-106.pdf", "page_number": 1}], "expected_passage_fragments": ["12.5 bar", "8.0 bar"], "should_refuse": false},
+    {"id": "ci05", "split": "held_out", "question": "Compare the inspection interval of PMP-104 with the inspection interval of PMP-88888.", "category": "unsupported_identifier_comparison", "should_refuse": true},
+    {"id": "ci06", "split": "held_out", "question": "Contrast DNS cache expiry with the ingredients in an apple pie.", "category": "unsupported_comparison", "should_refuse": true}
+  ]
+}

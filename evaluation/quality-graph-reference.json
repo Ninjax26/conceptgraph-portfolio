@@ -1,0 +1,11 @@
+{
+  "annotation_note": "Partial gold reference: six explicitly stated prerequisite links. Other extracted edges are unreviewed, not automatically wrong. Aliases below are manual annotations for these fixture concepts, not runtime entity resolution. This reference does not establish complete graph precision/recall.",
+  "edges": [
+    {"document_name": "web-foundations.pdf", "source_names": ["HTTP"], "target_names": ["TLS"], "relation_type": "PREREQUISITE_OF", "page_number": 1, "quote": "HTTP is a prerequisite for understanding TLS in web communication"},
+    {"document_name": "web-foundations.pdf", "source_names": ["TLS"], "target_names": ["HTTPS"], "relation_type": "PREREQUISITE_OF", "page_number": 2, "quote": "TLS is a prerequisite for HTTPS"},
+    {"document_name": "identity-security.pdf", "source_names": ["Authentication"], "target_names": ["Authorization"], "relation_type": "PREREQUISITE_OF", "page_number": 1, "quote": "authentication is a prerequisite for authorization"},
+    {"document_name": "identity-security.pdf", "source_names": ["Authorization"], "target_names": ["Document Access Control"], "relation_type": "PREREQUISITE_OF", "page_number": 2, "quote": "Authorization is a prerequisite for document access control"},
+    {"document_name": "data-reliability.pdf", "source_names": ["Transactions", "Database Transaction"], "target_names": ["Idempotency"], "relation_type": "PREREQUISITE_OF", "page_number": 2, "quote": "Transactions are a prerequisite for studying idempotency in this workflow"},
+    {"document_name": "data-reliability.pdf", "source_names": ["Idempotency"], "target_names": ["Safe Retries"], "relation_type": "PREREQUISITE_OF", "page_number": 2, "quote": "idempotency is a prerequisite for safe retries"}
+  ]
+}
