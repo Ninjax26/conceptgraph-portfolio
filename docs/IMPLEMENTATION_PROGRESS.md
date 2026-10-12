@@ -19,7 +19,7 @@ Updated: 2026-10-12. This is the current roadmap; older numbered scaling phases 
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Started: code-path audit | Shared PostgreSQL budgets currently count LLM attempts only. No token reservations, hosted embedding/rerank reservations or interactive capacity reserve. Existing checkpoint reload is per-upload; cross-upload versioned cache is not implemented. Next: characterize budget/deferral contracts before changes. |
+| 3 — Provider-safe ingestion | Started: audit and admission characterization | Shared PostgreSQL budgets currently count LLM attempts only. No token reservations, hosted embedding/rerank reservations or interactive capacity reserve. Existing checkpoint reload is per-upload; cross-upload versioned cache is not implemented. Three new offline tests preserve admission-before-execution, failover/repair metadata, cancellation and fail-closed budget storage. Next: implement interactive capacity reservation and token admission with isolated persistence/concurrency tests. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -36,6 +36,10 @@ Updated: 2026-10-12. This is the current roadmap; older numbered scaling phases 
 - [ ] Account explicitly for hosted embedding and reranking work and its independent limits.
 - [ ] Cache only validated extraction results with content, provider/model, prompt and schema versions; rebind provenance safely and invalidate stale entries.
 - [ ] Test concurrent reservations, quota reset, failure/cancellation, restart/resume, priority and cache invalidation before deployment.
+
+The initial characterization suite is `tests/test_provider_admission_contract.py`. It makes no database or provider requests. These tests protect existing boundaries; they do not demonstrate separate-process operation or the new priority/token/cache features.
+
+Implementation order for the next run: (1) characterize PostgreSQL reservation windows and concurrent locking using an isolated local database; (2) add per-operation capacity reservation for interactive requests with conservative token limits; (3) persist retry eligibility without replacing lease expiry as the fencing mechanism; (4) cache versioned validated graph batches while safely rebinding upload provenance. Hosted Qdrant inference is executed inside vector operations and needs its own admission boundary; Cohere's comparison path makes two distinct requests. Do not count one user question as one universal provider request.
 
 More workers cannot create additional free provider capacity. Current entry points: `app/services/shared_provider_service.py`, `provider_metrics.py`, `document_processing_service.py`, `ingestion_service.py`, `app/core/processing_coordinator.py`, `app/services/upload_service.py`, `app/worker.py`, `scripts/start_local.py`.
 
@@ -88,5 +92,6 @@ App heartbeat `conceptgraph-phases-3-8`: every four hours, returning to this cha
 ## Release checkpoint
 
 - Release preparation: 362 backend tests, nine frontend tests, TypeScript/Vite build and compile checks passed. Phase 1 report hashes match current runtime code; Phase 2 evaluator hashes match the saved offline report.
-- Phase 1–2 deployment requested on 2026-10-12. Before push, live API reports revision `9d830b3fca94cedefad9b088237dcead20951635`, ready with no degraded services. Record the new commit and verified live revision after deployment; do not infer completion from a successful push.
+- Phase 1–2 release `9c8568cc66a076baf7d6cab05859115d3a3e2f7e` was pushed only to the portfolio repository. Both existing free Render services report Live. API readiness independently returns this exact revision with no degraded services, health returns 200, and unauthenticated protected course discovery returns 401. The public equipment preview renders its saved answer, citations and three-node/two-edge graph without AI calls. Render startup logs show successful startup and port binding; root 404 is expected because the API has no root route.
+- After the three Phase 3 characterization tests: all 365 backend tests, compile checks and diff checks pass; frontend remains unchanged with nine tests and TypeScript/Vite build passing. GitHub Actions run `38272293936` passed for release `9c8568c` (backend and frontend jobs).
 - Production semantic checks remain unmeasured; no provider quota was consumed by these release tests.

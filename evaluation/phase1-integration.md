@@ -34,4 +34,4 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/bin/python scripts/evaluate_retrie
 .venv/bin/python -m unittest discover -s tests -q
 ```
 
-Hosted behavior is verified with HTTP mocks, not paid/billed live requests. All changes remain local.
+Hosted behavior is verified with HTTP mocks, not paid/billed live requests. These measurements were made locally before release; subsequent deployment verification is recorded separately in the [implementation ledger](../docs/IMPLEMENTATION_PROGRESS.md).
