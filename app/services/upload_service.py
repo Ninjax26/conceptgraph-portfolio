@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import desc, func, or_, select
@@ -21,6 +22,9 @@ from app.models.document_upload import (
     ProcessingAttempt,
 )
 from app.services.graph_retry_policy import GraphRetryNotDue, retry_not_before, retry_wait_seconds
+
+if TYPE_CHECKING:
+    from app.services.parser_service import DocumentChunk
 
 
 class UploadService:
@@ -605,6 +609,7 @@ class UploadService:
         result_json: dict[str, Any],
         *,
         lease_owner: str | None = None,
+        graph_continuation_chunks: Sequence[DocumentChunk] | None = None,
     ) -> bool:
         record = await self._get_current_upload(
             session, upload_id, task_id, lease_owner=lease_owner
@@ -649,6 +654,12 @@ class UploadService:
             attempt.stage = ProcessingStage.READY.value
             attempt.completed_at = record.completed_at
             attempt.last_heartbeat_at = record.completed_at
+        if graph_continuation_chunks is not None and delay is not None:
+            from app.services.graph_continuation_service import GraphContinuationService
+            await GraphContinuationService().stage_for_ready(
+                session, record=record, chunks=graph_continuation_chunks,
+                retry_after_seconds=delay,
+            )
         await session.commit()
         return True
 

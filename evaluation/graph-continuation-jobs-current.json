@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-13T12:25:37.590008+00:00",
+  "generated_at_utc": "2026-10-13T16:16:11.227706+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -25,14 +25,14 @@
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 6.968,
+  "duration_seconds": 4.4666,
   "code_sha256": {
     "app/models/document_upload.py": "41869727f662080fc728d0b3f6d07cee9af63f236586624ca8121a7db076052c",
-    "app/services/graph_continuation_service.py": "5508bf42ae9217fe268a36c174b107ae6e6821869400e5a390fb6fa28a87490a",
+    "app/services/graph_continuation_service.py": "65146f724705298654a2db3c9de9e2164dd4dbfabaa66bd6af50b61f8dfdeb03",
     "scripts/evaluate_graph_continuation_jobs.py": "41bf0e7a3c8d31b3962e30b21e91f412e96c57364cb0801aefe9ecb7e51b17b9",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
     "app/services/ingestion_service.py": "ad6d1b4d3fef94c4d1c83c22f95b3632c6ea5ead678e94a17627a75f077ef4e5",
-    "app/services/upload_service.py": "3df7358627cd5d0d3f8261fb11994687b980665fd33613044e089c6daceb1031"
+    "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1"
   },
   "limitations": [
     "Three fresh claim processes and a SIGKILL claimant test metadata leases only, not actual API/ingestion-worker operation.",

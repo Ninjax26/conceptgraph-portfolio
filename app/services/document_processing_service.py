@@ -282,6 +282,12 @@ class DocumentProcessingService:
             }
             if graph.provider_retry_after_seconds is not None:
                 result["graph_retry_after_seconds"] = graph.provider_retry_after_seconds
+            continuation_options = (
+                {"graph_continuation_chunks": chunks}
+                if self.config.graph_continuation_snapshots_enabled
+                and graph.provider_limited and graph.provider_retry_after_seconds is not None
+                else {}
+            )
             completed = await self._run_with_session(
                 lambda session: self.upload_service.mark_completed(
                     session,
@@ -289,6 +295,7 @@ class DocumentProcessingService:
                     task_id,
                     result,
                     lease_owner=lease_owner,
+                    **continuation_options,
                 )
             )
             if not completed:

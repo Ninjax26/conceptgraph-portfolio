@@ -227,6 +227,8 @@ class Settings(BaseSettings):
         alias="PROVIDER_TIMEOUT_SECONDS",
     )
     graph_json_repair_enabled: bool = Field(default=True, alias="GRAPH_JSON_REPAIR_ENABLED")
+    # Snapshot staging only; no automatic graph dispatcher is enabled by this.
+    graph_continuation_snapshots_enabled: bool = Field(default=False, alias="GRAPH_CONTINUATION_SNAPSHOTS_ENABLED")
     graph_batch_size: int = Field(
         default=4,
         ge=2,

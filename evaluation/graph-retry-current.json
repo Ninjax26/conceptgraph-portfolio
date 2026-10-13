@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-13T05:28:33.970029+00:00",
+  "generated_at": "2026-10-13T16:16:59.831884+00:00",
   "postgres_version": "18.4 (Homebrew)",
   "checks": {
     "deadline_persisted_from_database_clock": true,
@@ -17,9 +17,9 @@
   "test_schema_removed": true,
   "code_sha256": {
     "app/services/graph_retry_policy.py": "db9160cb983c6ecc6d5cb9d102fc27e03cf99f3a4516adf85793240f63d5ac93",
-    "app/services/upload_service.py": "3df7358627cd5d0d3f8261fb11994687b980665fd33613044e089c6daceb1031",
-    "app/services/ingestion_service.py": "e52a81ffd2eb61cd465c969e865e0f124f9dec9bdb81021fd07e7646cb509e37",
-    "app/services/document_processing_service.py": "62b72c1e2e6d8e0ed9453aa975dc237a524b4a3ec091d713541b0384e05c63b3",
+    "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1",
+    "app/services/ingestion_service.py": "ad6d1b4d3fef94c4d1c83c22f95b3632c6ea5ead678e94a17627a75f077ef4e5",
+    "app/services/document_processing_service.py": "911d19cdfedc80aaf07d6e7dd74e2f927d693c700493ef408973584e83a559f7",
     "app/schemas/extraction.py": "caa26ca7f12d8dd71b121cdedfde69478d933e598aeb49060a0b1de0deca149f",
     "app/api/endpoints/ingest.py": "ceae059ba7f249a125a5db91a33adfba191dbf5630a89e06f7178d04e991ab29",
     "scripts/evaluate_graph_retry.py": "65f71a62de95b9462bb9b2fb94bcc727a31769291dad5d761ed8d56c05140f9f"

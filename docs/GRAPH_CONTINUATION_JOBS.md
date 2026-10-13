@@ -1,6 +1,6 @@
 # Durable graph-job foundation — not activated
 
-Phase 3 increment, 13 October 2026. This implements **PostgreSQL job metadata, source snapshots, claiming and section-checkpoint fencing only**. It is not connected to an API route, the coordinator or a graph-only processor. Existing production uploads still use the original pipeline and manual retry behavior. No automatic production graph work is enabled.
+Phase 3 increment, 13 October 2026. This implements **PostgreSQL job metadata, source snapshots, claiming and section-checkpoint fencing**. [Opt-in atomic READY/snapshot staging](GRAPH_SNAPSHOT_STAGING.md) is now connected to completion, but defaults off. It is not connected to an API route, the coordinator or a graph-only processor. Existing production uploads retain the original pipeline/manual retry behavior. No automatic production graph work is enabled.
 
 ## What is implemented
 
@@ -58,7 +58,7 @@ The runner rejects ordinary database URLs and accepts only an owned, private `/p
 
 The following are **not implemented** and must be completed before activating automatic graph work:
 
-1. Persist the job/snapshot atomically with a quota-limited READY transition. Do not backfill existing production PDFs or schedule a demo batch-budget result automatically.
+1. Atomic job/snapshot staging with a quota-limited READY transition is implemented and locally verified behind a default-off staging flag. Do not enable it yet, backfill existing production PDFs or schedule a demo batch-budget result automatically.
 2. Connect bounded due-job dispatch to the existing coordinator/separate worker and implement a graph-only processor using this snapshot. Do not rotate the document evidence task, reparse/OCR, re-embed, clean up vectors, or make READY documents ineligible while waiting/processing.
 3. Add recovery-pass checkpoint support and a completion/publish path. Projection must be source/task/job fenced, atomic in Neo4j, and cancellation-safe against concurrent deletion/retry; never release the document fence before external writes have actually settled.
 4. Integrate snapshot storage accounting and retention with installation budgets. Terminal snapshots should not become unbounded retained copies.

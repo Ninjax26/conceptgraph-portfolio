@@ -1,0 +1,34 @@
+{
+  "generated_at_utc": "2026-10-13T16:13:21.733332+00:00",
+  "kind": "isolated READY/snapshot atomicity checks",
+  "postgres_version": "18.4 (Homebrew)",
+  "checks": {
+    "default_completion_does_not_create_job": true,
+    "ready_attempt_and_snapshot_become_visible_together": true,
+    "ready_identity_scope_and_persisted_reset_preserved": true,
+    "failure_after_flush_rolls_back_ready_attempt_and_job": true,
+    "same_fenced_execution_can_complete_after_rollback": true,
+    "invalid_source_snapshot_cannot_partially_commit_ready": true,
+    "existing_ingestion_lease_fence_precedes_snapshot_staging": true,
+    "demo_batch_budget_does_not_stage_provider_job": true,
+    "restart_preserves_atomically_staged_jobs": true
+  },
+  "checks_passed": 9,
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "test_schema_removed": true,
+  "code_sha256": {
+    "app/core/config.py": "f09dde8c27d2a6ce75ea82e1ab7b5d7225701888653d678326134a5e61c1d136",
+    "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1",
+    "app/services/document_processing_service.py": "911d19cdfedc80aaf07d6e7dd74e2f927d693c700493ef408973584e83a559f7",
+    "app/services/graph_continuation_service.py": "65146f724705298654a2db3c9de9e2164dd4dbfabaa66bd6af50b61f8dfdeb03",
+    "scripts/evaluate_graph_snapshot_staging.py": "da7f810ab529555507b868a97c6b01ce75c91cff8eb96918a439916aaedf6b3d",
+    "tests/test_graph_snapshot_staging.py": "c87f023e695655bd1c271118adf93dce6c145da36c5487210979cd6bf944fdd0"
+  },
+  "limitations": [
+    "Committed index/source/graph counts are fixtures; no full processor, provider or cross-store consistency test.",
+    "Staging flag defaults off; dispatcher, graph-only worker and atomic graph publication remain unimplemented.",
+    "New snapshot storage/retention budgets and full split-worker/hard-kill checks remain acceptance gates.",
+    "Rollback is an injected pre-commit failure, not a simulation of an ambiguous network failure after commit."
+  ]
+}

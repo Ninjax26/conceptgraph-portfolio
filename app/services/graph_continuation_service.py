@@ -1,6 +1,7 @@
 """Durable graph-job admission/claim/checkpoint foundation.
 
-Not connected to the coordinator or any API route yet. This module performs
+Not connected to the coordinator or any API route yet. Opt-in READY completion
+can stage snapshots atomically, but this module performs
 PostgreSQL operations only; it never generates or projects a graph. A future
 graph-only worker must publish under the document/job fence before activation.
 """
@@ -130,8 +131,26 @@ class GraphContinuationService:
         if not self._ready(record) or record.task_id != document_task_id:
             await session.rollback()
             return None
-        if not isinstance(record.result_json, dict) or record.result_json.get("graph_provider_limited") is not True:
+        job = await self.stage_for_ready(session, record=record, chunks=chunks,
+                                         retry_after_seconds=retry_after_seconds)
+        if job is None:
             await session.rollback()
+        else:
+            await session.commit()
+        return job
+
+    async def stage_for_ready(
+        self, session: AsyncSession, *, record: DocumentUpload,
+        chunks: Sequence[DocumentChunk], retry_after_seconds: float,
+    ) -> GraphContinuationJob | None:
+        """Caller owns the document row lock and the commit/rollback boundary.
+
+        Do not reread the document here: populate_existing with autoflush=False
+        would discard the caller's uncommitted READY transition. No external I/O.
+        """
+        if not self._ready(record):
+            return None
+        if not isinstance(record.result_json, dict) or record.result_json.get("graph_provider_limited") is not True:
             return None  # A free-demo batch budget alone is not a provider reset.
         now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
         deadline = retry_not_before(retry_after_seconds, now)
@@ -144,21 +163,19 @@ class GraphContinuationService:
             deadline = max(datetime.fromisoformat(deadline), now + timedelta(seconds=remaining)).isoformat()
         payload = create_snapshot(record, chunks)
         digest, contract = snapshot_digest(payload), extraction_contract(chunks)
-        existing = await self._job(session, upload_id)
-        if existing is not None and existing.document_task_id == document_task_id:
+        existing = await self._job(session, record.upload_id)
+        if existing is not None and existing.document_task_id == record.task_id:
             if existing.snapshot_sha256 != digest or existing.contract_sha256 != contract:
                 raise ValueError("An existing graph job cannot be reset with different evidence or configuration.")
-            await session.commit()
             return existing  # Duplicate scheduling cannot reset due time/attempts.
         if existing is not None:
             await session.delete(existing)
             await session.flush()
-        job = GraphContinuationJob(id=str(uuid4()), upload_id=upload_id, document_task_id=document_task_id,
+        job = GraphContinuationJob(id=str(uuid4()), upload_id=record.upload_id, document_task_id=record.task_id,
             snapshot_json=payload, snapshot_sha256=digest, contract_sha256=contract,
             status="pending", next_attempt_at=datetime.fromisoformat(deadline), attempt_count=0,
             max_attempts=MAX_GRAPH_PROCESSING_ATTEMPTS - record.attempt_count)
         session.add(job)
-        await session.commit()
         return job
 
     async def claim_next(self, session: AsyncSession, *, lease_owner: str, lease_seconds: int) -> GraphJobClaim | None:

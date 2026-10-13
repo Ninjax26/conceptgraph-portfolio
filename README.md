@@ -216,6 +216,8 @@ The [retry-eligibility increment](docs/GRAPH_RETRY_ELIGIBILITY.md) stores quota 
 
 The [durable graph-job foundation](docs/GRAPH_CONTINUATION_JOBS.md) adds independent PostgreSQL leases, source-bound snapshots, bounded attempts/due times and section-checkpoint fencing without changing READY evidence identity. [Sixteen isolated database checks](evaluation/graph-continuation-jobs-current.md) cover concurrent claim processes, a killed metadata claimant, retention and SQL deletion cascade. **It is not yet connected to a scheduler or graph-only processor; automatic production continuation remains disabled.** These checks do not establish full ingestion-worker recovery or cross-store consistency.
 
+[Atomic READY/snapshot staging](docs/GRAPH_SNAPSHOT_STAGING.md) now saves the optional continuation job in the same completion transaction; [nine database checks](evaluation/graph-snapshot-staging-current.md) verify visibility and rollback. The staging option defaults off, and production settings were not changed. It does not yet run or publish a continued graph.
+
 The dashboard loads 25 documents per page, with Previous/Next controls and page-local filters/counts. The original array-returning upload endpoint remains compatible. The new keyset endpoint deduplicates canonical records in SQL; it bounds client memory but its ranking step can still scan the corpus. Graph display limits do not make every Neo4j traversal constant-time.
 
 Run separate local processes, using the existing local PostgreSQL and Neo4j containers:
