@@ -1,0 +1,31 @@
+# Graph continuation jobs — isolated metadata checks
+
+Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
+
+16 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+
+- additive_schema_restart_and_due_lease_indexes: passed
+- database_rejects_incomplete_running_lease_and_excess_attempts: passed
+- persisted_delay_and_idempotent_scheduling_no_hot_retry: passed
+- three_processes_one_claim_with_ready_identity_and_scope_unchanged: passed
+- independent_claim_token_and_owner_fence_checkpoint_writes: passed
+- defer_persists_reset_and_invalidates_old_claim_without_changing_ready_result: passed
+- killed_claimant_recovers_after_fixture_lease_expiry_and_retains_checkpoint: passed
+- attempt_limit_stops_automatic_requeue: passed
+- duplicate_scheduling_cannot_restart_exhausted_job: passed
+- tampered_snapshot_is_stopped_without_reparsing_or_provider_calls: passed
+- changed_model_contract_requires_explicit_rebuild: passed
+- superseded_document_task_stops_old_job: passed
+- expired_retention_is_not_resurrected: passed
+- deletion_lock_skipped_and_fk_cascade_fences_old_claim: passed
+- batch_budget_only_result_does_not_schedule_provider_retry: passed
+- old_document_sql_and_schema_restart_preserve_jobs: passed
+
+## Limits
+
+- Three fresh claim processes and a SIGKILL claimant test metadata leases only, not actual API/ingestion-worker operation.
+- Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.
+- Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.
+- Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.
+- Snapshot JSON is bounded at 8 MiB but its future installation-wide storage accounting still needs integration.
+- Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.

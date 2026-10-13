@@ -214,6 +214,8 @@ The [retry-eligibility increment](docs/GRAPH_RETRY_ELIGIBILITY.md) stores quota 
 
 [Versioned per-upload graph checkpoints](docs/GRAPH_CHECKPOINT_COMPATIBILITY.md) include the source, configured model route, prompt and schema in their identities, revalidate saved relationships before normalization, and rebind provenance to current chunks. [Twenty offline checks](evaluation/graph-checkpoint-compatibility-current.md) verify compatibility, invalidation and quota resume without provider calls. Old unversioned rows are retained but may require fresh bounded extraction on a requested rebuild. This is not yet a cross-upload cache or automatic graph-only continuation.
 
+The [durable graph-job foundation](docs/GRAPH_CONTINUATION_JOBS.md) adds independent PostgreSQL leases, source-bound snapshots, bounded attempts/due times and section-checkpoint fencing without changing READY evidence identity. [Sixteen isolated database checks](evaluation/graph-continuation-jobs-current.md) cover concurrent claim processes, a killed metadata claimant, retention and SQL deletion cascade. **It is not yet connected to a scheduler or graph-only processor; automatic production continuation remains disabled.** These checks do not establish full ingestion-worker recovery or cross-store consistency.
+
 The dashboard loads 25 documents per page, with Previous/Next controls and page-local filters/counts. The original array-returning upload endpoint remains compatible. The new keyset endpoint deduplicates canonical records in SQL; it bounds client memory but its ranking step can still scan the corpus. Graph display limits do not make every Neo4j traversal constant-time.
 
 Run separate local processes, using the existing local PostgreSQL and Neo4j containers:

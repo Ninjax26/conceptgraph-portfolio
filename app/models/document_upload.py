@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -118,6 +118,37 @@ class WorkerPresence(Base):
     instance_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     concurrency: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class GraphContinuationJob(Base):
+    """Independent graph lease; never repurposes the READY evidence task token."""
+
+    __tablename__ = "graph_continuation_jobs"
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'running', 'stopped', 'completed')", name="ck_graph_job_status"),
+        CheckConstraint("attempt_count >= 0 AND attempt_count <= max_attempts AND max_attempts BETWEEN 1 AND 8", name="ck_graph_job_attempts"),
+        CheckConstraint("(status = 'running' AND claim_token IS NOT NULL AND lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL) OR "
+                        "(status <> 'running' AND claim_token IS NULL AND lease_owner IS NULL AND lease_expires_at IS NULL)", name="ck_graph_job_lease"),
+        Index("ix_graph_job_due", "status", "next_attempt_at"),
+        Index("ix_graph_job_lease", "status", "lease_expires_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    upload_id: Mapped[str] = mapped_column(String(64), ForeignKey("document_uploads.upload_id", ondelete="CASCADE"), unique=True, nullable=False)
+    document_task_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    snapshot_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    contract_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class ProviderBudget(Base):
