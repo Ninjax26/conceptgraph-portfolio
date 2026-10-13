@@ -20,6 +20,7 @@ from app.models.document_upload import (
     GraphExtractionCheckpoint,
     ProcessingAttempt,
 )
+from app.services.graph_retry_policy import GraphRetryNotDue, retry_not_before, retry_wait_seconds
 
 
 class UploadService:
@@ -323,6 +324,7 @@ class UploadService:
                 ),
             )
             .with_for_update(skip_locked=True)
+            .execution_options(populate_existing=True)
         )
         recovered: list[DocumentUpload] = []
         for record in result.scalars().all():
@@ -397,6 +399,7 @@ class UploadService:
                 DocumentUpload.task_id == task_id,
             )
             .with_for_update(skip_locked=True)
+            .execution_options(populate_existing=True)
         )
         record = result.scalar_one_or_none()
         now = datetime.now(timezone.utc)
@@ -441,10 +444,20 @@ class UploadService:
             select(DocumentUpload)
             .where(DocumentUpload.upload_id == upload_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         record = result.scalar_one_or_none()
         if record is None or not self.can_reprocess(record):
             return None
+        if isinstance(record.result_json, dict) and "graph_retry_not_before" in record.result_json:
+            # Recheck while holding the same document/resource locks that guard
+            # retry and deletion. A premature request must not spend an attempt,
+            # erase the READY result or disturb a completed graph checkpoint.
+            now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
+            wait = retry_wait_seconds(record.result_json, now)
+            if wait:
+                await session.rollback()
+                raise GraphRetryNotDue(wait)
         record.task_id = task_id
         record.status = "active"
         record.stage = ProcessingStage.UPLOADED.value
@@ -507,6 +520,7 @@ class UploadService:
             select(DocumentUpload)
             .where(DocumentUpload.upload_id == upload_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         record = result.scalar_one_or_none()
         if record is None or record.stage not in self.DELETABLE_STAGES:
@@ -618,6 +632,12 @@ class UploadService:
         record.graph_edge_count = int(result_json.get("relationships_upserted", 0))
         record.graph_status = graph_status
         record.completed_at = datetime.now(timezone.utc)
+        delay = result_json.get("graph_retry_after_seconds")
+        if delay is not None:
+            now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
+            deadline = retry_not_before(delay, now)
+            if deadline is not None:
+                record.result_json = {**result_json, "graph_retry_not_before": deadline}
         record.error_message = None
         record.failure_category = None
         record.retryable = False
@@ -709,7 +729,7 @@ class UploadService:
         ]
         if lease_owner is not None:
             conditions.append(DocumentUpload.lease_owner == lease_owner)
-        result = await session.execute(select(DocumentUpload).where(*conditions).with_for_update())
+        result = await session.execute(select(DocumentUpload).where(*conditions).with_for_update().execution_options(populate_existing=True))
         return result.scalar_one_or_none()
 
     async def _current_attempt(

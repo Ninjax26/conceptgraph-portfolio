@@ -15,6 +15,7 @@ from app.core.blocking import run_blocking_safely
 from app.core.config import settings
 from app.schemas.ingest import CourseSummaryResponse, IngestResponse, UploadStatusResponse, UploadPageResponse
 from app.services.upload_service import UploadService
+from app.services.graph_retry_policy import GraphRetryNotDue
 from app.services.course_service import CourseService
 from app.services.resource_budget_service import ResourceBudgetExceeded, resource_budget_service
 from app.services.storage_service import (
@@ -257,6 +258,8 @@ async def retry_upload(
     task_id = str(uuid4())
     try:
         record = await upload_service.retry_upload(db, upload_id, task_id)
+    except GraphRetryNotDue as exc:
+        raise HTTPException(status_code=429, detail=str(exc), headers={"Retry-After": str(exc.retry_after_seconds)}) from exc
     except ResourceBudgetExceeded as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     if record is None:

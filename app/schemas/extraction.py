@@ -86,6 +86,7 @@ class GraphExtractionResponse(BaseModel):
     batches_failed: int = Field(default=0, ge=0)
     batches_skipped: int = Field(default=0, ge=0)
     provider_limited: bool = False
+    provider_retry_after_seconds: float | None = Field(default=None, ge=1, le=604800, allow_inf_nan=False)
     extraction_budget_applied: bool = False
     global_linking_attempted: bool = False
     global_linking_succeeded: bool = False

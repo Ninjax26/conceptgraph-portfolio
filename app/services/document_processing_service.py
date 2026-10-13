@@ -279,6 +279,8 @@ class DocumentProcessingService:
                 "queue_wait_seconds": max(0, (record.started_at - record.last_attempted_at).total_seconds())
                 if getattr(record, "started_at", None) is not None and getattr(record, "last_attempted_at", None) is not None else None,
             }
+            if graph.provider_retry_after_seconds is not None:
+                result["graph_retry_after_seconds"] = graph.provider_retry_after_seconds
             completed = await self._run_with_session(
                 lambda session: self.upload_service.mark_completed(
                     session,

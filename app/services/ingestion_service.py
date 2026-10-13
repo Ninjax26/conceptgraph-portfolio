@@ -58,6 +58,7 @@ from app.services.parser_service import DocumentChunk
 from app.services.provider_failover import provider_circuit_breaker
 from app.services.shared_provider_service import observe_provider_call
 from app.services.retrieval_candidates import identifier_terms
+from app.services.graph_retry_policy import quota_retry_delay
 
 
 logger = logging.getLogger(__name__)
@@ -180,6 +181,7 @@ class IngestionService:
         skipped_batches = len(missing_batches) - len(batches)
         budget_applied = skipped_batches > 0
         provider_limited = False
+        provider_retry_after = None
         consecutive_timeouts = 0
         partials: list[GraphExtractionResponse] = []
         completed_section_batches: list[GraphSectionBatch] = []
@@ -223,6 +225,7 @@ class IngestionService:
             except (RateLimitError, LLMProviderRateLimitError) as exc:
                 failed_batches += 1
                 provider_limited = True
+                provider_retry_after = quota_retry_delay(exc)
                 category = self._graph_failure_category(exc)
                 diagnostic(batch, "failed", category)
                 skipped_batches += len(batches) - batch_index - 1
@@ -380,6 +383,9 @@ class IngestionService:
                         BadRequestError,
                         GraphStructureError,
                     ) as exc:
+                        if isinstance(exc, (RateLimitError, LLMProviderRateLimitError)):
+                            provider_retry_after = quota_retry_delay(exc)
+                            merged = merged.model_copy(update={"provider_limited": True})
                         diagnostic(global_batch, "failed", self._graph_failure_category(exc))
                         logger.warning(
                             "Optional graph relationship pass was skipped; "
@@ -413,6 +419,7 @@ class IngestionService:
                 "global_linking_attempted": global_attempted,
                 "global_linking_succeeded": global_succeeded,
                 "global_linking_processed": global_processed,
+                "provider_retry_after_seconds": provider_retry_after,
                 "sections_processed": len(processed_sections),
                 "sections_empty": len(empty_sections),
                 "batches_empty": empty_batches,

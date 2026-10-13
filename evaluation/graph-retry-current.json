@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-10-13T05:28:33.970029+00:00",
+  "postgres_version": "18.4 (Homebrew)",
+  "checks": {
+    "deadline_persisted_from_database_clock": true,
+    "fresh_process_cannot_bypass_persisted_deadline": true,
+    "premature_concurrent_api_retries_preserve_ready_state_attempts_and_checkpoint": true,
+    "ready_document_remains_query_eligible_during_wait": true,
+    "expired_deadline_allows_exactly_one_concurrent_attempt": true,
+    "checkpoint_survives_retry_and_stale_task_is_fenced": true,
+    "cached_unclaimed_read_cannot_steal_current_worker_lease": true,
+    "waiting_ready_document_deletion_cascades_checkpoint": true,
+    "legacy_record_without_deadline_keeps_existing_retry_behavior": true,
+    "cached_ready_deletion_read_cannot_delete_new_active_attempt": true
+  },
+  "provider_calls": 0,
+  "test_schema_removed": true,
+  "code_sha256": {
+    "app/services/graph_retry_policy.py": "db9160cb983c6ecc6d5cb9d102fc27e03cf99f3a4516adf85793240f63d5ac93",
+    "app/services/upload_service.py": "3df7358627cd5d0d3f8261fb11994687b980665fd33613044e089c6daceb1031",
+    "app/services/ingestion_service.py": "e52a81ffd2eb61cd465c969e865e0f124f9dec9bdb81021fd07e7646cb509e37",
+    "app/services/document_processing_service.py": "62b72c1e2e6d8e0ed9453aa975dc237a524b4a3ec091d713541b0384e05c63b3",
+    "app/schemas/extraction.py": "caa26ca7f12d8dd71b121cdedfde69478d933e598aeb49060a0b1de0deca149f",
+    "app/api/endpoints/ingest.py": "ceae059ba7f249a125a5db91a33adfba191dbf5630a89e06f7178d04e991ab29",
+    "scripts/evaluate_graph_retry.py": "65f71a62de95b9462bb9b2fb94bcc727a31769291dad5d761ed8d56c05140f9f"
+  },
+  "limitations": [
+    "Real PostgreSQL and ASGI endpoints, with source-existence and enqueue test doubles.",
+    "A separate process enforces the persisted deadline; no real API/ingestion-worker or hard-kill test.",
+    "Auth and middleware are covered by the normal suite; this isolated ASGI app tests retry endpoints only.",
+    "Committed vector/graph counts are authored fixtures; no Qdrant, Neo4j or R2 mutation or consistency claim.",
+    "Automatic delayed graph continuation is not implemented; this increment prevents premature manual retries."
+  ]
+}
