@@ -1,0 +1,106 @@
+{
+  "generated_at_utc": "2026-10-13T09:21:09.716484+00:00",
+  "kind": "offline synthetic checkpoint contract checks",
+  "passed": true,
+  "tests_run": 20,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "tests": [
+    {
+      "name": "test_cached_provenance_is_rebound_not_used_as_authority",
+      "passed": true
+    },
+    {
+      "name": "test_compatible_serialized_checkpoint_avoids_model_call",
+      "passed": true
+    },
+    {
+      "name": "test_configured_model_changes_invalidate",
+      "passed": true
+    },
+    {
+      "name": "test_context_output_and_repair_changes_invalidate",
+      "passed": true
+    },
+    {
+      "name": "test_corrupted_cached_graph_is_regenerated",
+      "passed": true
+    },
+    {
+      "name": "test_explicit_empty_success_is_reused_but_implicit_empty_is_not",
+      "passed": true
+    },
+    {
+      "name": "test_keys_are_stable_and_fit_existing_database_column",
+      "passed": true
+    },
+    {
+      "name": "test_model_change_regenerates_instead_of_reusing_stale_checkpoint",
+      "passed": true
+    },
+    {
+      "name": "test_prompt_schema_and_validator_version_changes_invalidate",
+      "passed": true
+    },
+    {
+      "name": "test_quota_limited_output_is_not_a_completed_batch",
+      "passed": true
+    },
+    {
+      "name": "test_quota_resume_calls_only_unfinished_compatible_batch",
+      "passed": true
+    },
+    {
+      "name": "test_raw_unsupported_edges_and_missing_endpoints_are_rejected",
+      "passed": true
+    },
+    {
+      "name": "test_recovery_key_includes_preceding_concept_names",
+      "passed": true
+    },
+    {
+      "name": "test_recovery_recomputes_when_section_concepts_change",
+      "passed": true
+    },
+    {
+      "name": "test_route_uses_same_primary_and_backup_precedence_as_generation",
+      "passed": true
+    },
+    {
+      "name": "test_secret_rotation_quota_and_task_changes_do_not_invalidate",
+      "passed": true
+    },
+    {
+      "name": "test_serialized_checkpoint_reuses_in_a_fresh_process",
+      "passed": true
+    },
+    {
+      "name": "test_source_text_identity_and_provenance_changes_invalidate",
+      "passed": true
+    },
+    {
+      "name": "test_unknown_cached_sources_are_regenerated",
+      "passed": true
+    },
+    {
+      "name": "test_unversioned_checkpoint_is_retained_but_not_trusted",
+      "passed": true
+    }
+  ],
+  "code_sha256": {
+    "app/services/ingestion_service.py": "ad6d1b4d3fef94c4d1c83c22f95b3632c6ea5ead678e94a17627a75f077ef4e5",
+    "app/services/document_processing_service.py": "8faac4e2cf8c21a2abd3ea18e710d2f5673fa3483e2dee463d3e42a4f7ab4e4f",
+    "app/schemas/extraction.py": "caa26ca7f12d8dd71b121cdedfde69478d933e598aeb49060a0b1de0deca149f",
+    "tests/test_graph_checkpoint_compatibility.py": "a1bdf16956182e4cbecc05eef0d6d073644d68232be0f6de7ed061d986d360f4",
+    "scripts/evaluate_graph_checkpoint_compatibility.py": "18bb600715478eeb6313a98bc5214f7aadd4760bea71d83bf02be4e9110c6269"
+  },
+  "limits": [
+    "Model outputs are authored fixtures; no semantic correctness score or actual quota measurement.",
+    "Fresh subprocess checks Python restart/serialization only, not split API/worker operation or hard-kill recovery.",
+    "Per-upload checkpoints only; cross-upload caching and automatic graph-only continuation remain pending.",
+    "Existing unversioned checkpoint rows are retained but not reused; a requested rebuild may need bounded fresh calls."
+  ]
+}

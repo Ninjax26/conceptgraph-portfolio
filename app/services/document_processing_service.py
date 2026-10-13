@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, settings
+from app.core.exceptions import GraphStructureError
 from app.core.blocking import run_blocking_safely
 from app.core.database import AsyncSessionLocal
 from app.core.processing import ProcessingStage, assess_graph_status, classify_failure
@@ -170,11 +171,11 @@ class DocumentProcessingService:
                 for checkpoint in checkpoint_rows:
                     try:
                         completed_batches[checkpoint.batch_key] = (
-                            GraphExtractionResponse.model_validate(
+                            IngestionService.decode_graph_checkpoint(
                                 checkpoint.extraction_json
                             )
                         )
-                    except (ValueError, TypeError):
+                    except (GraphStructureError, ValueError, TypeError, KeyError):
                         logger.warning(
                             "Ignored invalid graph checkpoint %s for upload %s",
                             checkpoint.batch_key,

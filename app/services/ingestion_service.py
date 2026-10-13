@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from groq import (
     APIConnectionError,
@@ -77,6 +77,10 @@ class IngestionService:
     MAX_CONCEPTS_PER_BATCH = 8
     MAX_RELATIONSHIPS_PER_BATCH = 10
     MAX_GRAPH_OUTPUT_TOKENS = 2_000
+    GRAPH_CONTEXT_LIMITS = (5000, 3000)
+    # Bump when validation/provenance changes are not captured by prompt/schema
+    # hashes. Secrets and operating quotas never belong in checkpoint identities.
+    GRAPH_CHECKPOINT_CONTRACT_VERSION = 1
 
     def __init__(
         self,
@@ -157,12 +161,12 @@ class IngestionService:
             chunks,
             batch_size=settings.graph_batch_size,
         )
-        candidate_keys = {batch.batch_key for batch in candidate_batches}
         cached_by_key = {
-            key: extraction
-            for key, extraction in completed_batches.items()
-            if key in candidate_keys
-            and (extraction.nodes or extraction.empty_extraction)
+            batch.batch_key: checked
+            for batch in candidate_batches
+            if (checked := self._validated_checkpoint(
+                completed_batches.get(batch.batch_key), batch
+            )) is not None
         }
         missing_batches = [
             batch for batch in candidate_batches if batch.batch_key not in cached_by_key
@@ -335,31 +339,16 @@ class IngestionService:
             global_batch = self._global_linking_batch(completed_section_batches)
             if global_batch is not None:
                 global_attempted = True
-                linked = completed_batches.get(global_batch.batch_key)
+                context = self._relationship_recovery_context(global_batch.chunks, merged.nodes)
+                # Recovery depends on preceding concepts as well as source text.
+                global_batch = replace(global_batch, batch_key=self._checkpoint_key(
+                    "global:v5", global_batch.section_key, global_batch.chunks,
+                    recovery_context=context,
+                ))
+                linked = self._validated_checkpoint(
+                    completed_batches.get(global_batch.batch_key), global_batch
+                )
                 if linked is None:
-                    source_chunk_ids = {chunk.id for chunk in global_batch.chunks}
-                    candidate_names = [
-                        node.name for node in merged.nodes
-                        if node.source_chunk_id in source_chunk_ids
-                    ][: self.MAX_CONCEPTS_PER_BATCH]
-                    if not candidate_names:
-                        candidate_names = [
-                            node.name for node in merged.nodes[: self.MAX_CONCEPTS_PER_BATCH]
-                        ]
-                    context = (
-                        "Relationship recovery pass. These concepts were already extracted "
-                        "from the source excerpts: "
-                        + ", ".join(candidate_names)
-                        + ". Return a complete graph JSON with both nodes and relationships; "
-                        "include every relationship endpoint in the nodes array. "
-                        "Return only relationships directly supported by the excerpts. "
-                        "Use the allowed relationship types and exact source chunk IDs. "
-                        "Do not connect concepts merely because they share a section.\n\n"
-                        + "\n\n".join(
-                            self._format_graph_excerpt(chunk)
-                            for chunk in global_batch.chunks
-                        )
-                    )
                     try:
                         extraction = await self.extract_graph_from_text(context)
                         linked = self._attach_provenance(
@@ -480,13 +469,7 @@ class IngestionService:
         return result
 
     async def _extract_with_failover(self, text: str) -> GraphExtractionResponse:
-        providers = []
-        if settings.groq_api_key:
-            providers.append("groq")
-        if settings.gemini_api_key:
-            providers.append("gemini")
-        elif cerebras_service.configured:
-            providers.append("cerebras")
+        providers = self._graph_provider_route()
         if not providers:
             raise LLMConfigurationError(
                 "GROQ_API_KEY, CEREBRAS_API_KEY, or GEMINI_API_KEY is required when LLM_PROVIDER=groq"
@@ -877,7 +860,7 @@ class IngestionService:
         parts = [part.strip() for part in re.split(r"(?m)(?=^\[Source chunk ID:)", text) if part.strip()]
         excerpts = [part for part in parts if part.startswith("[Source chunk ID:")]
         prologue = "\n\n".join(part for part in parts if not part.startswith("[Source chunk ID:"))
-        for limit in (5000, 3000):
+        for limit in IngestionService.GRAPH_CONTEXT_LIMITS:
             if not excerpts:
                 shortened = text.strip()[:limit].strip()
             else:
@@ -1164,19 +1147,108 @@ class IngestionService:
                 )
         return batches
 
-    @staticmethod
+    @classmethod
     def _graph_batch_key(
+        cls,
         section_key: str,
         chunks: Sequence[DocumentChunk],
     ) -> str:
-        digest = hashlib.sha256()
-        digest.update(section_key.encode("utf-8"))
-        for chunk in chunks:
-            digest.update(b"\0")
-            digest.update(chunk.id.encode("utf-8"))
-            digest.update(b"\0")
-            digest.update(chunk.text.encode("utf-8"))
-        return f"section:{digest.hexdigest()}"
+        return cls._checkpoint_key("section:v2", section_key, chunks)
+
+    @staticmethod
+    def _graph_provider_route() -> list[str]:
+        if settings.llm_provider.lower() != "groq":
+            return [settings.llm_provider.lower()]
+        providers = ["groq"] if settings.groq_api_key else []
+        if settings.gemini_api_key:
+            providers.append("gemini")
+        elif cerebras_service.configured:
+            providers.append("cerebras")
+        return providers
+
+    @classmethod
+    def _checkpoint_key(
+        cls, kind: str, section_key: str, chunks: Sequence[DocumentChunk],
+        *, recovery_context: str = "",
+    ) -> str:
+        models = {
+            "groq": settings.groq_model,
+            "gemini": settings.gemini_model,
+            "cerebras": settings.cerebras_model,
+        }
+        route = cls._graph_provider_route()
+        contract = {
+            "version": cls.GRAPH_CHECKPOINT_CONTRACT_VERSION,
+            "route": [(provider, models.get(provider)) for provider in route],
+            "cerebras_endpoint": settings.cerebras_base_url if "cerebras" in route else None,
+            "prompt": cls._extraction_system_prompt(),
+            "schema": cls._graph_extraction_schema(),
+            "cerebras_schema": cls._cerebras_graph_extraction_schema() if "cerebras" in route else None,
+            "repair_enabled": settings.graph_json_repair_enabled,
+            "context_limits": cls.GRAPH_CONTEXT_LIMITS,
+            "output_tokens": cls.MAX_GRAPH_OUTPUT_TOKENS,
+            "section": section_key,
+            "sources": [
+                {"excerpt": cls._format_graph_excerpt(chunk),
+                 "upload_id": str(chunk.metadata.get("upload_id") or "")}
+                for chunk in chunks
+            ],
+            "recovery_context": recovery_context,
+        }
+        encoded = json.dumps(contract, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return f"{kind}:{hashlib.sha256(encoded.encode('utf-8')).hexdigest()}"
+
+    @classmethod
+    def decode_graph_checkpoint(cls, payload: dict) -> GraphExtractionResponse:
+        # Check raw endpoints/types/size before Pydantic's normalizer can discard
+        # bad relationships and make corrupted saved JSON look successful.
+        cls._parse_provider_graph(json.dumps({
+            "nodes": payload["nodes"], "relationships": payload["relationships"],
+        }))
+        return GraphExtractionResponse.model_validate(payload)
+
+    @classmethod
+    def _validated_checkpoint(
+        cls, extraction: GraphExtractionResponse | None, batch: GraphSectionBatch,
+    ) -> GraphExtractionResponse | None:
+        """Recheck persisted output and bind source metadata to this execution."""
+        if extraction is None or (not extraction.nodes and not extraction.empty_extraction):
+            return None
+        if extraction.provider_limited or extraction.provider_retry_after_seconds is not None:
+            return None
+        try:
+            checked = cls.decode_graph_checkpoint(extraction.model_dump(mode="json"))
+        except (GraphStructureError, TypeError, ValueError):
+            logger.warning("Ignored invalid persisted graph batch")
+            return None
+        source_ids = {chunk.id for chunk in batch.chunks}
+        if any(node.source_chunk_id not in source_ids for node in checked.nodes):
+            logger.warning("Ignored persisted graph batch with mismatched sources")
+            return None
+        rebound = cls._attach_provenance(checked, batch.chunks)
+        return rebound.model_copy(update={"batch_diagnostics": extraction.batch_diagnostics})
+
+    @classmethod
+    def _relationship_recovery_context(
+        cls, chunks: Sequence[DocumentChunk], nodes: Sequence[ConceptNode],
+    ) -> str:
+        source_chunk_ids = {chunk.id for chunk in chunks}
+        candidate_names = [
+            node.name for node in nodes if node.source_chunk_id in source_chunk_ids
+        ][:cls.MAX_CONCEPTS_PER_BATCH]
+        if not candidate_names:
+            candidate_names = [node.name for node in nodes[:cls.MAX_CONCEPTS_PER_BATCH]]
+        return (
+            "Relationship recovery pass. These concepts were already extracted "
+            "from the source excerpts: "
+            + ", ".join(candidate_names)
+            + ". Return a complete graph JSON with both nodes and relationships; "
+            "include every relationship endpoint in the nodes array. "
+            "Return only relationships directly supported by the excerpts. "
+            "Use the allowed relationship types and exact source chunk IDs. "
+            "Do not connect concepts merely because they share a section.\n\n"
+            + "\n\n".join(cls._format_graph_excerpt(chunk) for chunk in chunks)
+        )
 
     @classmethod
     def _global_linking_batch(
@@ -1210,13 +1282,9 @@ class IngestionService:
                 min(cls.MAX_CONCEPTS_PER_BATCH, len(unique_chunks)),
             )
             selected = [chunks_by_id[unique_chunks[position]] for position in positions]
-        digest = hashlib.sha256()
-        for chunk in selected:
-            digest.update(chunk.id.encode("utf-8"))
-            digest.update(b"\0")
-            digest.update(chunk.text.encode("utf-8"))
         return GraphSectionBatch(
-            batch_key=f"global:v4:{digest.hexdigest()}",
+            # The caller adds the concepts/recovery prompt before cache lookup.
+            batch_key=cls._checkpoint_key("global:v5", "__global__", selected),
             section_key="__global__",
             section_label="Relationship recovery",
             chunks=tuple(selected),
