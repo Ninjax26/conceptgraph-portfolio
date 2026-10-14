@@ -35,7 +35,6 @@ from app.services.cerebras_service import CerebrasService
 from app.services.course_service import CourseNotReadyError, CourseService
 from app.services.document_processing_service import DocumentProcessingService
 from app.services.demo_retention_service import DemoRetentionService
-from app.services.exam_service import ExamService
 from app.services.ingestion_service import IngestionService
 from app.services.parser_service import (
     DocumentChunk,
@@ -51,7 +50,6 @@ from app.services.security_service import DemoAccessService, RateLimitResult, Ra
 from app.services.synthesis_service import SynthesisService
 from app.services.storage_service import ObjectStorageError, StorageService
 from app.services.upload_service import UploadService
-from app.schemas.exam import ExamSource
 from app.schemas.extraction import (
     ALLOWED_RELATIONSHIP_TYPES,
     ConceptNode,
@@ -2156,97 +2154,6 @@ class ProcessingRulesTests(unittest.TestCase):
         self.assertEqual([chunk["text"] for chunk in chunks], [relevant["text"]])
         self.assertEqual(confidence["evidence_count"], 1)
         self.assertIn(confidence["level"], {"medium", "low"})
-
-    def test_exam_sources_are_balanced_and_citations_are_enriched(self):
-        chunks = [
-            {
-                "text": "Alpha evidence",
-                "metadata": {
-                    "document_name": "A.pdf",
-                    "page_number": 1,
-                    "section_heading": "Alpha",
-                    "chunk_index": 0,
-                },
-            },
-            {
-                "text": "Beta evidence",
-                "metadata": {
-                    "document_name": "B.pdf",
-                    "page_number": 4,
-                    "section_heading": "Beta",
-                    "chunk_index": 0,
-                },
-            },
-        ]
-        sources = ExamService._select_exam_sources(chunks)
-        raw = """{
-          "questions": [{
-            "question_text": "Which statement is supported?",
-            "options": ["Alpha", "One", "Two", "Three"],
-            "correct_answer": "Alpha",
-            "explanation": "Alpha is supported by the cited passage.",
-            "topic": "Alpha",
-            "citation_ids": ["exam-source-1"]
-          }]
-        }"""
-
-        questions = ExamService._parse_questions(raw, sources)
-
-        self.assertEqual({source.document_name for source in sources}, {"A.pdf", "B.pdf"})
-        self.assertEqual(questions[0].sources[0].source_id, "exam-source-1")
-        self.assertTrue(questions[0].sources[0].supporting_passage)
-
-    def test_exam_generation_uses_cerebras_when_groq_quota_is_exhausted(self):
-        rate_limit = RateLimitError(
-            "Daily token quota reached",
-            response=httpx.Response(
-                429,
-                request=httpx.Request(
-                    "POST", "https://api.groq.com/openai/v1/chat/completions"
-                ),
-            ),
-            body={"error": {"code": "rate_limit_exceeded"}},
-        )
-        service = ExamService(vector_client=SimpleNamespace())
-        expected = [Mock()]
-        with (
-            patch("app.services.exam_service.settings.llm_provider", "groq"),
-            patch("app.services.exam_service.settings.groq_api_key", "test-key"),
-            patch(
-                "app.services.cerebras_service.settings.cerebras_api_key",
-                SecretStr("cerebras-secret"),
-            ),
-            patch.object(service, "_generate_with_groq", side_effect=rate_limit),
-            patch.object(
-                service, "_generate_with_cerebras", return_value=expected
-            ) as cerebras,
-        ):
-            questions = asyncio.run(
-                service._generate_questions("context", 1, [])
-            )
-
-        self.assertIs(questions, expected)
-        cerebras.assert_called_once()
-
-    def test_exam_question_without_valid_citation_is_rejected(self):
-        source = ExamSource(
-            source_id="exam-source-1",
-            document_name="Course.pdf",
-            page_number=1,
-            supporting_passage="Evidence",
-        )
-        raw = """{
-          "questions": [{
-            "question_text": "Unsupported?",
-            "options": ["A", "B", "C", "D"],
-            "correct_answer": "A",
-            "explanation": "No valid citation.",
-            "topic": "Test",
-            "citation_ids": ["invented-source"]
-          }]
-        }"""
-
-        self.assertEqual(ExamService._parse_questions(raw, [source]), [])
 
     def test_render_postgres_url_uses_asyncpg_driver(self):
         config = Settings(DATABASE_URL="postgresql://user:password@db/course")

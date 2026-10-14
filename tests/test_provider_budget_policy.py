@@ -26,7 +26,6 @@ class ProviderBudgetPolicyTests(unittest.TestCase):
         self.assertEqual(admission_denial(cfg, usage, operation="graph_extraction", estimated_tokens=0, epoch=61),
                          ("minute request", 59))
         self.assertIsNone(admission_denial(cfg, usage, operation="answer_synthesis", estimated_tokens=0, epoch=61))
-        self.assertIsNone(admission_denial(cfg, usage, operation="exam_generation", estimated_tokens=0, epoch=61))
 
     def test_interactive_cannot_exceed_total_request_limit(self):
         cfg = config(PROVIDER_INTERACTIVE_REQUEST_RESERVE_PER_DAY=20)
@@ -56,7 +55,6 @@ class ProviderBudgetPolicyTests(unittest.TestCase):
     def test_operation_allowances_are_explicit_estimates(self):
         self.assertEqual(estimated_reservation(5, "answer_synthesis"), 1202)
         self.assertEqual(estimated_reservation(5, "graph_extraction"), 2002)
-        self.assertEqual(estimated_reservation(5, "exam_generation"), 2502)
         self.assertEqual(estimated_reservation(0, "other"), 0)
 
     def test_invalid_input_counts_are_rejected(self):

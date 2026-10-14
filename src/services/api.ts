@@ -342,51 +342,6 @@ export async function getReadiness(): Promise<ReadinessStatus> {
   });
 }
 
-export interface MockQuestion {
-  question_text: string;
-  options: string[];
-  correct_answer: string;
-  explanation: string;
-  topic: string;
-  sources: ExamSource[];
-}
-
-export interface ExamSource {
-  source_id: string;
-  document_name: string;
-  page_number: number | null;
-  section_heading: string | null;
-  supporting_passage: string;
-}
-
-export interface ExamResponse {
-  course_id: string;
-  questions: MockQuestion[];
-  source_count: number;
-  coverage: {
-    topics?: string[];
-    documents?: string[];
-    pages_by_document?: Record<string, number[]>;
-  };
-}
-
-export async function generateExam(
-  courseId: string,
-  numQuestions: number = 5
-): Promise<ExamResponse> {
-  return fetchJson<ExamResponse>(`${API_BASE_URL}/exam/generate`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      course_id: courseId,
-      num_questions: numQuestions,
-    }),
-    timeout: 60000, // 60s timeout for LLM exam generation
-  });
-}
-
 export interface IngestResponse {
   message: string;
   task_id: string;

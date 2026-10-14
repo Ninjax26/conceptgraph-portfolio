@@ -13,7 +13,6 @@ from app.schemas.extraction import ConceptNode, GraphExtractionResponse
 from app.services.cerebras_service import CerebrasService
 from app.services.ingestion_service import IngestionService
 from app.services.gemini_service import GeminiService
-from app.services.exam_service import ExamService
 from app.services.provider_failover import ProviderCircuitBreaker, provider_circuit_breaker, retry_after_seconds
 from app.services.synthesis_service import InvalidAnswerError, SynthesisService
 
@@ -282,19 +281,6 @@ class ProviderQuotaTests(unittest.TestCase):
              patch.object(service, "_extract_with_groq", return_value=invalid), \
              patch.object(service, "_extract_with_gemini", return_value=expected) as backup:
             result = asyncio.run(service._extract_with_failover(source))
-        self.assertIs(result, expected)
-        backup.assert_called_once()
-
-    def test_gemini_exam_failover_after_groq_quota(self):
-        error = RateLimitError("quota", response=httpx.Response(429,
-            request=httpx.Request("POST", "https://example.test")), body=None)
-        expected = [Mock()]
-        service = ExamService(vector_client=SimpleNamespace())
-        with patch("app.services.exam_service.settings.groq_api_key", "test"), \
-             patch("app.services.exam_service.settings.gemini_api_key", "gemini-test"), \
-             patch.object(service, "_generate_with_groq", side_effect=error), \
-             patch.object(service, "_generate_with_gemini", return_value=expected) as backup:
-            result = asyncio.run(service._generate_with_failover("text", 1, []))
         self.assertIs(result, expected)
         backup.assert_called_once()
 

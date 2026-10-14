@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from app.core.config import Settings
 
 BACKGROUND_OPERATIONS = frozenset({"graph_extraction", "document_embedding"})
-OUTPUT_ALLOWANCES = {"graph_extraction": 2_000, "answer_synthesis": 1_200, "exam_generation": 2_500}
+OUTPUT_ALLOWANCES = {"graph_extraction": 2_000, "answer_synthesis": 1_200}
 
 
 @dataclass(frozen=True)

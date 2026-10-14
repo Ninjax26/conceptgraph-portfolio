@@ -39,7 +39,6 @@ import {
 } from "../services/api";
 
 const ConceptGraphCanvas = lazy(() => import("../components/ConceptGraphCanvas"));
-const ExamPanel = lazy(() => import("../components/ExamPanel"));
 const QUESTION_STARTERS = [
   "Summarize the most important concepts in this course.",
   "What should I learn first, and why?",
@@ -725,9 +724,6 @@ export default function Dashboard(): JSX.Element {
           ) : null}
         </div>
 
-        <Suspense fallback={<div className="border-b border-slate-200 p-4 text-xs text-slate-500">Loading practice tools...</div>}>
-          <ExamPanel courseId={courseId} />
-        </Suspense>
 
         <details className="group border-b border-slate-200 bg-slate-50/40">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 transition hover:bg-slate-50">

@@ -29,9 +29,9 @@ Reserves must be smaller than the corresponding enabled limit. API and workers s
 
 ## Estimation limitations
 
-The current reservation is `ceil(input_characters / 4)` plus an operation allowance: graph extraction 2,000, answer synthesis 1,200, exam generation 2,500. The allowance stays reserved even when less output was generated. Unknown operations have no assumed output allowance and must supply a deliberate estimate when integrating a new provider boundary.
+The current reservation is `ceil(input_characters / 4)` plus an operation allowance: graph extraction 2,000, answer synthesis 1,200. The allowance stays reserved even when less output was generated. Unknown operations have no assumed output allowance and must supply a deliberate estimate when integrating a new provider boundary.
 
-This is approximate—not a tokenizer or a worst-case bound. Language, formatting, system-prompt accounting and model reasoning affect real usage. Groq answer/exam generation does not currently enforce these output allowances as hard completion limits. SDK response token usage is not yet persisted. Therefore these budgets cannot promise prevention of vendor token-limit errors or charges; existing request limits and vendor protections still apply.
+This is approximate—not a tokenizer or a worst-case bound. Language, formatting, system-prompt accounting and model reasoning affect real usage. Groq answer generation does not currently enforce these output allowances as hard completion limits. SDK response token usage is not yet persisted. Therefore these budgets cannot promise prevention of vendor token-limit errors or charges; existing request limits and vendor protections still apply.
 
 Hosted Qdrant embedding and Cohere reranking are **not yet integrated** into this shared admission path. They need separate operation/provider boundaries and accounting. The comparison reranker performs two requests, which must eventually be counted individually. Durable delayed graph scheduling, versioned cross-upload caching and real API/ingestion-worker validation remain unfinished Phase 3 work.
 

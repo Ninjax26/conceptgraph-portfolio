@@ -18,7 +18,6 @@ PUBLIC_METHOD_PATHS = {
 }
 EXPENSIVE_PATHS = {
     "/api/v1/query",
-    "/api/v1/exam/generate",
     "/api/v1/ingest/upload",
 }
 

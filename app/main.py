@@ -7,7 +7,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.endpoints.auth import router as auth_router
-from app.api.endpoints.exam import router as exam_router
 from app.api.endpoints.ingest import router as ingest_router
 from app.api.endpoints.query import router as query_router
 from app.api.endpoints.public_demo import router as public_demo_router
@@ -70,7 +69,6 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(query_router)
 app.include_router(public_demo_router)
-app.include_router(exam_router)
 app.include_router(ingest_router)
 
 

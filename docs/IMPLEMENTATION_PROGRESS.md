@@ -4,6 +4,7 @@ Updated: 2026-10-14 (India). This is the current roadmap; older numbered scaling
 
 ## Operating boundaries
 
+- User scope update, 14 October 2026: remove practice-exam generation and its generated-answer/retrieval service. Do not reintroduce it during scheduled phases. Main PDF Q&A, vector/graph retrieval and citations remain in scope and are preserved. Removal checks: 445 backend tests, nine frontend tests and the production build pass. Record release/deployment verification separately; historical reports describe their own prior revisions.
 - Continue in small, tested groups. Resume an unfinished phase rather than advancing merely because a scheduled run ended.
 - The user selected offline checks only. Do not make hosted LLM, embedding or reranking test calls without a separately approved quota budget. Do not manufacture semantic scores or human annotations.
 - Use isolated local data for worker, hard-kill, cleanup and benchmark tests. Never delete, rebuild or reassign production uploads for testing.
