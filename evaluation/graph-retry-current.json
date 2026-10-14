@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-14T14:30:51.942483+00:00",
+  "generated_at": "2026-10-14T14:37:30.012685+00:00",
   "postgres_version": "18.4 (Homebrew)",
   "checks": {
     "deadline_persisted_from_database_clock": true,

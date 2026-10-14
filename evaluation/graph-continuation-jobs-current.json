@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-14T14:30:06.425415+00:00",
+  "generated_at_utc": "2026-10-14T14:37:23.791171+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -30,13 +30,13 @@
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 6.3148,
+  "duration_seconds": 5.8483,
   "code_sha256": {
     "app/models/document_upload.py": "41869727f662080fc728d0b3f6d07cee9af63f236586624ca8121a7db076052c",
     "app/services/graph_continuation_service.py": "da8286edf6ad3dad81b8e2225539095677c07c05f2c503272cd559ad9ba47308",
     "scripts/evaluate_graph_continuation_jobs.py": "4c37a676465a60cb8841ff71080043a710ad9be366118e15071137bd1a655908",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
-    "tests/test_graph_job_checkpoint_reads.py": "f3d16023f3d334b366213b192691dc8c901ded37bd4089bef5472bf86d942e19",
+    "tests/test_graph_job_checkpoint_reads.py": "2c4e940edf697c7bae322deb2ffd00086edf42807f5f64e77da4d81257d9b585",
     "app/services/ingestion_service.py": "08f5bd034e66987ef0fa0a15069868f9c5391d4c962ad143482cab373c05c076",
     "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1"
   },

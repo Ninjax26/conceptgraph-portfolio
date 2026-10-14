@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-14T14:30:47.660861+00:00",
+  "generated_at_utc": "2026-10-14T14:37:25.789400+00:00",
   "kind": "isolated READY/snapshot atomicity checks",
   "postgres_version": "18.4 (Homebrew)",
   "checks": {

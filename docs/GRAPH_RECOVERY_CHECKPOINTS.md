@@ -49,9 +49,9 @@ eligible claim with no accepted checkpoints (`{}`). Snapshot/contract corruption
 raises and still releases locks; the future processor must classify that failure
 rather than treat it as an empty cache and make calls.
 
-Seven new offline tests and [21 isolated PostgreSQL checks](../evaluation/graph-continuation-jobs-current.md)
+Eight new offline tests and [21 isolated PostgreSQL checks](../evaluation/graph-continuation-jobs-current.md)
 pass, including stale read rejection, persisted-source authority, read-lock release,
-legacy filtering and recovery invalidation after section changes. All **446**
+legacy filtering and recovery invalidation after section changes. All **447**
 backend tests, nine frontend tests/build/compile/diff checks pass. The twenty
 compatibility tests, nine staging and ten manual-retry checks were rerun.
 
@@ -59,3 +59,9 @@ This reader is not wired to a processor/dispatcher. It does not publish a graph,
 verify source-object/vector existence, change READY state or complete a job.
 Metadata-claim tests are not full split-worker or cross-store crash tests. No schema,
 environment, credentials, hosted calls or production data were changed.
+
+The read fixture explicitly configures synthetic provider settings and is also
+run from a directory without the project's `.env`. CI initially exposed a fixture
+assumption: an unused Groq model cannot invalidate a route when Groq is not
+configured. Both configured-model invalidation and unconfigured-model stability
+are now tested. No production routing behavior was changed to satisfy the test.

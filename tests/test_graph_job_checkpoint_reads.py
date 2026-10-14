@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, patch
 
+from app.core.config import Settings
 from app.schemas.extraction import ConceptNode, GraphExtractionResponse
 from app.services.graph_continuation_service import GraphContinuationService, validated_job_checkpoints
 from app.services.ingestion_service import IngestionService
@@ -12,7 +13,11 @@ from app.services.parser_service import DocumentChunk
 
 class QualifiedCheckpointReads(unittest.TestCase):
     def setUp(self):
-        self.enterContext(patch("app.services.ingestion_service.settings.graph_global_linking_enabled", True))
+        cfg = Settings(_env_file=None, LLM_PROVIDER="groq", GROQ_API_KEY="fixture-key",
+            GROQ_MODEL="fixture-model", GEMINI_API_KEY="", CEREBRAS_API_KEY="",
+            RERANK_PROVIDER="local", GRAPH_BATCH_SIZE=3, GRAPH_GLOBAL_LINKING_ENABLED=True)
+        self.enterContext(patch("app.services.ingestion_service.settings", cfg))
+        self.enterContext(patch("app.services.graph_continuation_service.settings", cfg))
         self.chunks = [DocumentChunk(id=f"chunk-{i}", text=f"DNS evidence {i}", metadata={
             "upload_id":"fixture", "document_name":"fixture.pdf", "page_number":1,
             "section_heading":"DNS"}) for i in range(2)]
@@ -51,6 +56,13 @@ class QualifiedCheckpointReads(unittest.TestCase):
     def test_changed_model_route_does_not_reuse_older_section(self):
         with patch("app.services.ingestion_service.settings.groq_model", "different-model"):
             self.assertEqual(validated_job_checkpoints(self.chunks, self.payloads), {})
+
+    def test_unconfigured_provider_model_is_not_an_extraction_identity(self):
+        with patch("app.services.ingestion_service.settings.groq_api_key", ""):
+            batch = IngestionService._graph_section_batches(self.chunks)[0]
+            payloads = {batch.batch_key:self.graph.model_dump(mode="json")}
+            with patch("app.services.ingestion_service.settings.groq_model", "unused-model"):
+                self.assertIn(batch.batch_key, validated_job_checkpoints(self.chunks, payloads))
 
 
 class ReadTransactionBoundary(unittest.IsolatedAsyncioTestCase):
