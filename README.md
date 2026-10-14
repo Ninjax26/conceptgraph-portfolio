@@ -218,7 +218,7 @@ The [durable graph-job foundation](docs/GRAPH_CONTINUATION_JOBS.md) adds indepen
 
 [Atomic READY/snapshot staging](docs/GRAPH_SNAPSHOT_STAGING.md) now saves the optional continuation job in the same completion transaction; [nine database checks](evaluation/graph-snapshot-staging-current.md) verify visibility and rollback. The staging option defaults off, and production settings were not changed. It does not yet run or publish a continued graph.
 
-[Recovery-pass checkpoints](docs/GRAPH_RECOVERY_CHECKPOINTS.md) now enforce the same graph-job fence and exact source/concept-derived request identity as section checkpoints. Persisted explicit empty recovery results are reused without repeated model calls. This still does not activate automatic graph continuation or establish semantic relationship accuracy.
+[Recovery-pass checkpoints](docs/GRAPH_RECOVERY_CHECKPOINTS.md) enforce the graph-job fence and exact source/concept-derived identity. A qualified reader reloads from the persisted snapshot, filters incompatible results and releases locks before extraction; valid explicit empty recovery results remain reusable. This does not activate automatic continuation or establish semantic accuracy.
 
 An internal [transactional graph-replacement primitive](docs/GRAPH_PROJECTION_REPLACEMENT.md) groups an upload's deletion and replacement in one Neo4j transaction and drains cancellation before returning. Ten offline tests and [seven isolated Neo4j checks](evaluation/graph-projection-current.md) cover rollback, replay, scope preservation and cancellation. Fenced cross-system completion and hard-kill recovery remain unverified. It is not yet connected to processing or scheduling and does not activate automatic continuation.
 

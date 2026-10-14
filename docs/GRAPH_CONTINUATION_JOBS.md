@@ -16,6 +16,7 @@ Phase 3 increment, 13 October 2026. This implements **PostgreSQL job metadata, s
 - A provider reset defers the job durably and clears its old claim. An expired running lease can be claimed with a new token; exhausted jobs stop instead of looping.
 - Changed document tasks, expired retention, corrupted snapshots and changed extraction contracts stop the job without altering READY evidence or calling providers.
 - Validated section outputs can be saved to the existing per-upload checkpoint table under the independent graph-job fence. Unknown source/structure output is rejected. The original ingestion worker's active-task/lease guards are not weakened.
+- [Qualified checkpoint reads](GRAPH_RECOVERY_CHECKPOINTS.md#qualified-reads-for-the-future-graph-only-processor) reload from the persisted snapshot under a fresh claim fence, filter incompatible section/recovery rows and release the read transaction before extraction. A lost claim returns `None`, not an empty cache. This still is not a running graph-only processor.
 
 | Identity | Purpose | Changed by a graph-only claim? |
 | --- | --- | --- |

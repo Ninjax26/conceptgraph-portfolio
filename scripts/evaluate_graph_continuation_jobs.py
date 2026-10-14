@@ -197,8 +197,12 @@ async def run(args):
             checks["recovery_checkpoint_is_source_concept_and_claim_fenced"] = True
 
             async with sessions() as session:
-                saved_rows = await UploadService().load_graph_checkpoints(session, upload_id)
-                completed = {row.batch_key:ingestion.IngestionService.decode_graph_checkpoint(row.extraction_json) for row in saved_rows}
+                assert await service.load_checkpoints(session, replace(claim, claim_token="stale")) is None
+                completed = await service.load_checkpoints(session, replace(claim, chunks=()))
+                assert set(completed) == {batch.batch_key, recovery_batch.batch_key}
+                assert not session.in_transaction()
+                assert completed[batch.batch_key].nodes[0].upload_id == upload_id
+            checks["fenced_read_uses_persisted_snapshot_filters_legacy_and_releases_locks"] = True
             extractor = ingestion.IngestionService(SimpleNamespace(), SimpleNamespace())
             extractor.extract_graph_from_text = AsyncMock(side_effect=AssertionError("Unexpected provider call"))
             resumed = await extractor.extract_graph_from_chunks(chunks, completed_batches=completed)
@@ -209,6 +213,8 @@ async def run(args):
             changed_graph = graph.model_copy(update={"nodes":[graph.nodes[0].model_copy(update={"name":"Domain Name System"}), graph.nodes[1]]})
             async with sessions() as session:
                 assert await service.save_section_checkpoint(session, claim, batch=batch, extraction=changed_graph)
+                changed_completed = await service.load_checkpoints(session, claim)
+                assert recovery_batch.batch_key not in changed_completed
                 try:
                     await service.save_checkpoint(session, claim, batch=recovery_batch, extraction=graph)
                 except ValueError:
@@ -217,6 +223,7 @@ async def run(args):
                     raise AssertionError("Recovery identity from older concepts accepted")
                 assert await service.save_section_checkpoint(session, claim, batch=batch, extraction=graph)
             checks["changed_section_concepts_invalidate_recovery_save"] = True
+            checks["changed_section_concepts_invalidate_recovery_read"] = True
 
             async with sessions() as session:
                 assert await service.defer(session, claim, retry_after_seconds=90)
@@ -359,7 +366,8 @@ async def run(args):
         "test_schema_removed": True, "duration_seconds": round(time.perf_counter() - started, 4),
         "code_sha256": {path: hashlib.sha256((ROOT/path).read_bytes()).hexdigest() for path in (
             "app/models/document_upload.py", "app/services/graph_continuation_service.py", "scripts/evaluate_graph_continuation_jobs.py",
-            "tests/test_graph_continuation_snapshot.py", "app/services/ingestion_service.py", "app/services/upload_service.py")},
+            "tests/test_graph_continuation_snapshot.py", "tests/test_graph_job_checkpoint_reads.py",
+            "app/services/ingestion_service.py", "app/services/upload_service.py")},
         "limitations": [
             "Three fresh claim processes and a SIGKILL claimant test metadata leases only, not actual API/ingestion-worker operation.",
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",

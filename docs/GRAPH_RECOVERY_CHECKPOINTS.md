@@ -12,7 +12,7 @@ Phase 3 increment, 14 October 2026 (India). This extends the internal graph-job 
 
 The recovery helper does not infer new relationships or validate semantic truth. It only verifies that a saved response belongs to the request that the current source/section outputs would produce. Human-reviewed relationship correctness remains pending.
 
-## Evidence and limits
+## Initial save-boundary evidence — 664f882
 
 - Seven new offline identity tests: actual extraction callback identity, changed concepts, invalid/foreign sources, ignored global rows, stable source order, disabled recovery and no unnecessary single-section recovery.
 - [Nineteen isolated PostgreSQL job checks](../evaluation/graph-continuation-jobs-current.md), including valid/forged/stale recovery saves, changed-concept rejection, and reuse of persisted sections plus an explicit empty recovery response with **zero model calls**.
@@ -29,3 +29,33 @@ npm run build
 ```
 
 Keep `GRAPH_CONTINUATION_SNAPSHOTS_ENABLED=false`. Next: graph-only processing, cancellation-safe atomic publication/completion, bounded dispatch and snapshot storage/retention accounting, then real split-worker and cross-store recovery verification. Phase 3 remains partial; phases 4–8 are not marked complete.
+
+## Qualified reads for the future graph-only processor
+
+`GraphContinuationService.load_checkpoints` now owns a read-only transaction:
+it checks the current document/job task, owner, claim token and lease, verifies
+the persisted snapshot and extraction contract, and reads only that upload's rows.
+It returns detached validated models, then rolls back to release its row locks
+**before** extraction. Use a dedicated session; do not call it inside a transaction
+with pending publication/completion changes. No provider or external-store I/O
+occurs while reading.
+
+The persisted snapshot is authoritative, not the caller's `claim.chunks`. Only
+matching current section identities are accepted. Recovery identity is rebuilt
+from those accepted sections; legacy, malformed, foreign-source, quota-limited
+or incompatible results cannot authorize reuse. Valid explicit empty results
+remain reusable. Stale authority returns `None`, which is different from an
+eligible claim with no accepted checkpoints (`{}`). Snapshot/contract corruption
+raises and still releases locks; the future processor must classify that failure
+rather than treat it as an empty cache and make calls.
+
+Seven new offline tests and [21 isolated PostgreSQL checks](../evaluation/graph-continuation-jobs-current.md)
+pass, including stale read rejection, persisted-source authority, read-lock release,
+legacy filtering and recovery invalidation after section changes. All **446**
+backend tests, nine frontend tests/build/compile/diff checks pass. The twenty
+compatibility tests, nine staging and ten manual-retry checks were rerun.
+
+This reader is not wired to a processor/dispatcher. It does not publish a graph,
+verify source-object/vector existence, change READY state or complete a job.
+Metadata-claim tests are not full split-worker or cross-store crash tests. No schema,
+environment, credentials, hosted calls or production data were changed.

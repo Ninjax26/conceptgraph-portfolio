@@ -90,6 +90,27 @@ def extraction_contract(chunks: Sequence[DocumentChunk]) -> str:
     return snapshot_digest({"keys": keys, "global_linking_enabled": settings.graph_global_linking_enabled})
 
 
+def validated_job_checkpoints(chunks: Sequence[DocumentChunk], payloads: dict) -> dict[str, GraphExtractionResponse]:
+    """Accept only current section/recovery identities and rebind provenance."""
+    decoded = {}
+    for key, payload in payloads.items():
+        try:
+            decoded[key] = IngestionService.decode_graph_checkpoint(payload)
+        except (GraphStructureError, ValueError, TypeError, KeyError):
+            continue
+    completed = {}
+    for batch in IngestionService._graph_section_batches(chunks, batch_size=settings.graph_batch_size):
+        checked = IngestionService._validated_checkpoint(decoded.get(batch.batch_key), batch)
+        if checked is not None:
+            completed[batch.batch_key] = checked
+    recovery = IngestionService.recovery_checkpoint_batch(chunks, completed)
+    if recovery is not None:
+        checked = IngestionService._validated_checkpoint(decoded.get(recovery.batch_key), recovery)
+        if checked is not None:
+            completed[recovery.batch_key] = checked
+    return completed
+
+
 @dataclass(frozen=True, slots=True)
 class GraphJobClaim:
     job_id: str
@@ -271,6 +292,29 @@ class GraphContinuationService:
         extraction: GraphExtractionResponse,
     ) -> bool:
         return await self.save_checkpoint(session, claim, batch=batch, extraction=extraction, allow_global=False)
+
+    async def load_checkpoints(
+        self, session: AsyncSession, claim: GraphJobClaim,
+    ) -> dict[str, GraphExtractionResponse] | None:
+        """Read under the current claim, then release locks before extraction.
+
+        None means lost authority, not an empty cache. Ignore claim.chunks: the
+        persisted source/contract is authoritative. No external I/O or mutation.
+        """
+        try:
+            locked = await self._locked_claim(session, claim)
+            if locked is None:
+                return None
+            record, job, _ = locked
+            chunks = snapshot_chunks(job.snapshot_json, record)
+            if snapshot_digest(job.snapshot_json) != job.snapshot_sha256 or extraction_contract(chunks) != job.contract_sha256:
+                raise ValueError("Graph snapshot/configuration changed.")
+            rows = (await session.execute(select(GraphExtractionCheckpoint).where(
+                GraphExtractionCheckpoint.upload_id == record.upload_id)
+                .execution_options(populate_existing=True))).scalars().all()
+            return validated_job_checkpoints(chunks, {row.batch_key: row.extraction_json for row in rows})
+        finally:
+            await session.rollback()  # Read-only boundary; release document/job locks.
 
     async def save_checkpoint(
         self, session: AsyncSession, claim: GraphJobClaim, *, batch: GraphSectionBatch,

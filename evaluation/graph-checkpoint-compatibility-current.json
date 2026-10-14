@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-14T06:02:11.567999+00:00",
+  "generated_at_utc": "2026-10-14T14:30:18.870966+00:00",
   "kind": "offline synthetic checkpoint contract checks",
   "passed": true,
   "tests_run": 20,
@@ -91,7 +91,7 @@
     }
   ],
   "code_sha256": {
-    "app/services/ingestion_service.py": "5b6dd4f18829aac066c85dc5e0eb791634dbe5303854eebeb253819a836b5784",
+    "app/services/ingestion_service.py": "08f5bd034e66987ef0fa0a15069868f9c5391d4c962ad143482cab373c05c076",
     "app/services/document_processing_service.py": "911d19cdfedc80aaf07d6e7dd74e2f927d693c700493ef408973584e83a559f7",
     "app/schemas/extraction.py": "caa26ca7f12d8dd71b121cdedfde69478d933e598aeb49060a0b1de0deca149f",
     "tests/test_graph_checkpoint_compatibility.py": "a1bdf16956182e4cbecc05eef0d6d073644d68232be0f6de7ed061d986d360f4",
