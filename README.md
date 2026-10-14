@@ -220,6 +220,8 @@ The [durable graph-job foundation](docs/GRAPH_CONTINUATION_JOBS.md) adds indepen
 
 [Recovery-pass checkpoints](docs/GRAPH_RECOVERY_CHECKPOINTS.md) now enforce the same graph-job fence and exact source/concept-derived request identity as section checkpoints. Persisted explicit empty recovery results are reused without repeated model calls. This still does not activate automatic graph continuation or establish semantic relationship accuracy.
 
+An internal [transactional graph-replacement primitive](docs/GRAPH_PROJECTION_REPLACEMENT.md) groups an upload's deletion and replacement in one Neo4j write transaction and drains cancellation before returning. Ten offline boundary tests pass; real-store rollback and fenced cross-system completion remain unverified. It is not yet connected to processing or scheduling and does not activate automatic continuation.
+
 The dashboard loads 25 documents per page, with Previous/Next controls and page-local filters/counts. The original array-returning upload endpoint remains compatible. The new keyset endpoint deduplicates canonical records in SQL; it bounds client memory but its ranking step can still scan the corpus. Graph display limits do not make every Neo4j traversal constant-time.
 
 Run separate local processes, using the existing local PostgreSQL and Neo4j containers:

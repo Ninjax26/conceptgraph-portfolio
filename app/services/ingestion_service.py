@@ -540,89 +540,161 @@ class IngestionService:
         execution_token: str = "",
     ) -> None:
         async with self.graph_driver.session() as session:
-            await session.run(
-                """
-                MERGE (course:Course {id: $course_id})
-                SET course.name = $course_name,
-                    course.updated_at = datetime()
-                """,
-                course_id=course_id,
-                course_name=course_name,
+            await self._write_graph_extraction(
+                session, extraction, course_id, upload_id=upload_id,
+                document_name=document_name, course_name=course_name,
+                execution_token=execution_token,
             )
 
-            for node in extraction.nodes:
-                await session.run(
-                    """
-                    MERGE (c:Concept {id: $id})
-                    SET c.name = $name,
-                        c.normalized_name = $normalized_name,
-                        c.type = $type,
-                        c.description = $description,
-                        c.source_id = $source_id,
-                        c.source_chunk_id = $source_chunk_id,
-                        c.course_id = $course_id,
-                        c.upload_id = $upload_id,
-                        c.execution_token = $execution_token,
-                        c.document_name = $document_name,
-                        c.page_number = $page_number,
-                        c.section_heading = $section_heading,
-                        c.source_chunk_ids = $source_chunk_ids,
-                        c.page_numbers = $page_numbers,
-                        c.section_headings = $section_headings
-                    WITH c
-                    MATCH (course:Course {id: $course_id})
-                    MERGE (course)-[:CONTAINS]->(c)
-                    """,
-                    id=self._scoped_concept_id(course_id, upload_id, node.id),
-                    source_id=node.id,
-                    name=node.name,
-                    normalized_name=node.normalized_name,
-                    type=node.type,
-                    description=node.description,
-                    source_chunk_id=node.source_chunk_id,
-                    course_id=course_id,
-                    upload_id=node.upload_id or upload_id,
-                    execution_token=execution_token,
-                    document_name=node.document_name or document_name,
-                    page_number=node.page_number,
-                    section_heading=node.section_heading,
-                    source_chunk_ids=node.source_chunk_ids,
-                    page_numbers=node.page_numbers,
-                    section_headings=node.section_headings,
-                )
+    async def _write_graph_extraction(
+        self, session, extraction: GraphExtractionResponse, course_id: str, *,
+        upload_id: str, document_name: str, course_name: str, execution_token: str,
+    ) -> None:
+        # Shared query shape for the existing auto-commit ingestion path and the
+        # future continuation path's managed transaction. Do not change scope.
+        await session.run(
+            """
+            MERGE (course:Course {id: $course_id})
+            SET course.name = $course_name,
+                course.updated_at = datetime()
+            """,
+            course_id=course_id,
+            course_name=course_name,
+        )
 
-            for relationship in extraction.relationships:
-                relation_type = self._safe_relationship_type(relationship.relation_type)
-                await session.run(
-                    f"""
-                    MATCH (course:Course {{id: $course_id}})
-                    MATCH (source:Concept {{id: $source_node_id}})
-                    MATCH (target:Concept {{id: $target_node_id}})
-                    MATCH (course)-[:CONTAINS]->(source)
-                    MATCH (course)-[:CONTAINS]->(target)
-                    MERGE (source)-[r:{relation_type} {{course_id: $course_id}}]->(target)
-                    SET r.relation_type = $relation_type,
-                        r.course_id = $course_id,
-                        r.upload_id = $upload_id,
-                        r.execution_token = $execution_token,
-                        r.document_name = $document_name
-                    """,
-                    course_id=course_id,
-                    source_node_id=self._scoped_concept_id(
-                        course_id,
-                        upload_id,
-                        relationship.source_node_id,
-                    ),
-                    target_node_id=self._scoped_concept_id(
-                        course_id,
-                        upload_id,
-                        relationship.target_node_id,
-                    ),
-                    relation_type=relationship.relation_type,
-                    upload_id=upload_id,
-                    execution_token=execution_token,
-                    document_name=document_name,
-                )
+        for node in extraction.nodes:
+            await session.run(
+                """
+                MERGE (c:Concept {id: $id})
+                SET c.name = $name,
+                    c.normalized_name = $normalized_name,
+                    c.type = $type,
+                    c.description = $description,
+                    c.source_id = $source_id,
+                    c.source_chunk_id = $source_chunk_id,
+                    c.course_id = $course_id,
+                    c.upload_id = $upload_id,
+                    c.execution_token = $execution_token,
+                    c.document_name = $document_name,
+                    c.page_number = $page_number,
+                    c.section_heading = $section_heading,
+                    c.source_chunk_ids = $source_chunk_ids,
+                    c.page_numbers = $page_numbers,
+                    c.section_headings = $section_headings
+                WITH c
+                MATCH (course:Course {id: $course_id})
+                MERGE (course)-[:CONTAINS]->(c)
+                """,
+                id=self._scoped_concept_id(course_id, upload_id, node.id),
+                source_id=node.id,
+                name=node.name,
+                normalized_name=node.normalized_name,
+                type=node.type,
+                description=node.description,
+                source_chunk_id=node.source_chunk_id,
+                course_id=course_id,
+                upload_id=node.upload_id or upload_id,
+                execution_token=execution_token,
+                document_name=node.document_name or document_name,
+                page_number=node.page_number,
+                section_heading=node.section_heading,
+                source_chunk_ids=node.source_chunk_ids,
+                page_numbers=node.page_numbers,
+                section_headings=node.section_headings,
+            )
+
+        for relationship in extraction.relationships:
+            relation_type = self._safe_relationship_type(relationship.relation_type)
+            await session.run(
+                f"""
+                MATCH (course:Course {{id: $course_id}})
+                MATCH (source:Concept {{id: $source_node_id}})
+                MATCH (target:Concept {{id: $target_node_id}})
+                MATCH (course)-[:CONTAINS]->(source)
+                MATCH (course)-[:CONTAINS]->(target)
+                MERGE (source)-[r:{relation_type} {{course_id: $course_id}}]->(target)
+                SET r.relation_type = $relation_type,
+                    r.course_id = $course_id,
+                    r.upload_id = $upload_id,
+                    r.execution_token = $execution_token,
+                    r.document_name = $document_name
+                """,
+                course_id=course_id,
+                source_node_id=self._scoped_concept_id(
+                    course_id,
+                    upload_id,
+                    relationship.source_node_id,
+                ),
+                target_node_id=self._scoped_concept_id(
+                    course_id,
+                    upload_id,
+                    relationship.target_node_id,
+                ),
+                relation_type=relationship.relation_type,
+                upload_id=upload_id,
+                execution_token=execution_token,
+                document_name=document_name,
+            )
+
+    async def replace_graph_extraction(
+        self, extraction: GraphExtractionResponse, course_id: str, *,
+        upload_id: str, document_name: str, course_name: str,
+        execution_token: str,
+    ) -> None:
+        """Replace one upload projection atomically; caller owns its PG fence.
+
+        Not wired to automatic continuation yet. The original READY execution
+        token must be retained so vectors and concepts remain in the same scope.
+        """
+        from app.core.blocking import run_async_safely
+
+        if not all(isinstance(value, str) and value.strip() for value in (
+            course_id, upload_id, document_name, execution_token,
+        )):
+            raise ValueError("Graph replacement requires a complete document identity.")
+        # This is the merged upload graph, not one provider batch: applying the
+        # 8-node/10-edge batch limits here would reject valid larger documents.
+        payload = extraction.model_dump(mode="json")
+        if any(row["relation_type"] not in ALLOWED_RELATIONSHIP_TYPES for row in payload["relationships"]):
+            raise ValueError("Graph replacement contains an unsupported relationship.")
+        checked = GraphExtractionResponse.model_validate(payload)
+        if len(checked.nodes) != len(extraction.nodes) or len(checked.relationships) != len(extraction.relationships):
+            raise ValueError("Graph replacement must already be normalized and validated.")
+        if any(node.upload_id != upload_id or node.document_name != document_name
+               or not node.source_chunk_id or node.page_number is None for node in checked.nodes):
+            raise ValueError("Graph replacement requires bound source provenance.")
+
+        async def replace(tx):
+            result = await tx.run(
+                """
+                MATCH (concept:Concept {course_id: $course_id, upload_id: $upload_id})
+                DETACH DELETE concept
+                """, course_id=course_id, upload_id=upload_id,
+            )
+            await result.consume()
+            await self._write_graph_extraction(
+                tx, checked, course_id, upload_id=upload_id,
+                document_name=document_name, course_name=course_name,
+                execution_token=execution_token,
+            )
+            # Empty replacement must not leave a phantom course; other uploads
+            # in the same course retain their nodes, edges and CONTAINS links.
+            result = await tx.run(
+                """
+                MATCH (course:Course {id: $course_id})
+                WHERE NOT (course)-[:CONTAINS]->(:Concept)
+                DETACH DELETE course
+                """, course_id=course_id,
+            )
+            await result.consume()
+
+        async def publish():
+            async with self.graph_driver.session() as session:
+                # Managed retries repeat the entire idempotent replacement;
+                # never retry deletion and insertion as separate transactions.
+                await session.execute_write(replace)
+
+        await run_async_safely(publish())
 
     async def ingest_chunks(self, chunks: Sequence[DocumentChunk]) -> dict[str, int]:
         self._validate_llm_configured()
