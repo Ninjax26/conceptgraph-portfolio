@@ -43,7 +43,7 @@ need implementation and tests. No graph-only completion or dispatcher was added.
 No parsing, OCR, embedding, vector deletion, schema/environment change, provider
 call or production test-data mutation is performed by this increment.
 
-## Verification
+## Initial offline verification — c29706a
 
 Ten new tests use an **authored managed-transaction double**, not a Neo4j server.
 They protect the one-callback query boundary, scope parameters and original writer
@@ -64,9 +64,52 @@ draining preserving cancellation.
 | `git diff --check` | Passed |
 | `docker info --format '{{.ServerVersion}}'` | Could not connect to local daemon |
 
-No daemon was started or packages installed. **Actual Neo4j rollback, other-upload
-preservation, managed transient retry and cross-store crash behavior remain
-unverified**. The double is a call-boundary regression check, not an atomicity,
+No daemon was started or packages installed in that initial run. Actual Neo4j
+rollback, other-upload preservation and managed retry had not yet been verified;
+the subsequent isolated run below checks those boundaries. Cross-store crash
+behavior remains unverified. The double is a call-boundary check, not an atomicity,
 capacity, semantic accuracy or production recovery measurement. Earlier PostgreSQL
 reports were not rerun this increment; their hashes remain historical evidence
 for their releases. Deployment checks are recorded separately after pushing.
+
+## Subsequent isolated Neo4j verification — 14 October 2026
+
+[Seven checks](../evaluation/graph-projection-current.md) now pass against a real
+Neo4j **5.26.26** server using the installed official image, with source/image
+hashes recorded in the adjacent JSON. Reproduce with:
+
+```bash
+.venv/bin/python scripts/evaluate_graph_projection.py
+```
+
+The runner creates its own labelled Docker network and container, publishes Bolt
+only on a random loopback port, disables usage reporting, uses memory-backed data
+and no host volume, and removes its exact created IDs afterward. It does not
+accept an existing database URL or access existing application containers.
+
+- A merged 13-node/12-edge projection retains original READY task scope and
+  preserves other uploads' concepts, relationships and containment links.
+- Repeating replacement creates no duplicate content or edges.
+- Real server state rolls back after both an injected callback exception and an
+  actual invalid-Cypher error following deletion/uncommitted insertion.
+- The actual driver retries the entire managed callback after one injected
+  `ServiceUnavailable`; this is not a measured network outage.
+- Repeated cancellation waits for the actual transaction to settle before
+  propagating. The fully committed replacement is then readable.
+- Empty replacement preserves a nonempty shared course and removes only a course
+  left empty after its last upload is removed.
+
+The first test-only network configuration did not expose a port, and an initial
+256 MiB memory-backed database exhausted space during transaction-log
+preallocation. These were harness failures, not application failures. The runner
+was corrected to use its own ordinary Docker network, retain startup diagnostics,
+clean up even after failures, and bound test-only transaction-log allocation.
+No production configuration changed. Docker Desktop was started; its saved
+restart policies also started existing user containers, which were left untouched.
+
+All 439 backend tests, nine frontend tests, TypeScript/Vite build, compile and diff
+checks pass again. No hosted AI calls, image pulls, paid services, environment
+edits or production test-data writes were made. The seven checks use authored
+graphs/faults and do **not** verify PostgreSQL job fences, Qdrant/R2 consistency,
+hard-kill recovery, ambiguous commits between stores, semantic quality or scale.
+The primitive remains disconnected from processing/dispatch and defaults stay off.
