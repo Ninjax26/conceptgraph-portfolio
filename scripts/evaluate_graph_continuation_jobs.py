@@ -15,7 +15,8 @@ import os
 from pathlib import Path
 import sys
 import time
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -171,7 +172,8 @@ async def run(args):
             checks["three_processes_one_claim_with_ready_identity_and_scope_unchanged"] = True
 
             batch = ingestion.IngestionService._graph_section_batches(chunks, batch_size=3)[0]
-            graph = GraphExtractionResponse(nodes=[ConceptNode(id="dns", name="DNS", type="concept", source_chunk_id=chunks[0].id)])
+            graph = GraphExtractionResponse(nodes=[ConceptNode(id="dns", name="DNS", type="concept", source_chunk_id=chunks[0].id),
+                ConceptNode(id="ip", name="IP address", type="concept", source_chunk_id=chunks[1].id)])
             async with sessions() as session:
                 assert not await service.heartbeat(session, replace(claim, claim_token="wrong"), lease_seconds=180)
                 assert not await service.save_section_checkpoint(session, replace(claim, lease_owner="wrong"), batch=batch, extraction=graph)
@@ -180,6 +182,41 @@ async def run(args):
                     GraphExtractionCheckpoint.upload_id == upload_id, GraphExtractionCheckpoint.batch_key == batch.batch_key))).scalar_one()
                 assert checkpoint.extraction_json["nodes"][0]["upload_id"] == upload_id
             checks["independent_claim_token_and_owner_fence_checkpoint_writes"] = True
+
+            recovery_batch = ingestion.IngestionService.recovery_checkpoint_batch(chunks, {batch.batch_key:graph})
+            assert recovery_batch is not None
+            async with sessions() as session:
+                assert await service.save_checkpoint(session, claim, batch=recovery_batch, extraction=GraphExtractionResponse(empty_extraction=True))
+                try:
+                    await service.save_checkpoint(session, claim, batch=replace(recovery_batch, batch_key="global:v5:"+"0"*64), extraction=graph)
+                except ValueError:
+                    await session.rollback()
+                else:
+                    raise AssertionError("Forged recovery identity accepted")
+                assert not await service.save_checkpoint(session, replace(claim, claim_token="stale"), batch=recovery_batch, extraction=graph)
+            checks["recovery_checkpoint_is_source_concept_and_claim_fenced"] = True
+
+            async with sessions() as session:
+                saved_rows = await UploadService().load_graph_checkpoints(session, upload_id)
+                completed = {row.batch_key:ingestion.IngestionService.decode_graph_checkpoint(row.extraction_json) for row in saved_rows}
+            extractor = ingestion.IngestionService(SimpleNamespace(), SimpleNamespace())
+            extractor.extract_graph_from_text = AsyncMock(side_effect=AssertionError("Unexpected provider call"))
+            resumed = await extractor.extract_graph_from_chunks(chunks, completed_batches=completed)
+            extractor.extract_graph_from_text.assert_not_awaited()
+            assert resumed.global_linking_processed and len(resumed.nodes) == 2
+            checks["persisted_empty_recovery_and_sections_resume_without_provider_calls"] = True
+
+            changed_graph = graph.model_copy(update={"nodes":[graph.nodes[0].model_copy(update={"name":"Domain Name System"}), graph.nodes[1]]})
+            async with sessions() as session:
+                assert await service.save_section_checkpoint(session, claim, batch=batch, extraction=changed_graph)
+                try:
+                    await service.save_checkpoint(session, claim, batch=recovery_batch, extraction=graph)
+                except ValueError:
+                    await session.rollback()
+                else:
+                    raise AssertionError("Recovery identity from older concepts accepted")
+                assert await service.save_section_checkpoint(session, claim, batch=batch, extraction=graph)
+            checks["changed_section_concepts_invalidate_recovery_save"] = True
 
             async with sessions() as session:
                 assert await service.defer(session, claim, retry_after_seconds=90)
@@ -211,7 +248,7 @@ async def run(args):
                 assert not await service.save_section_checkpoint(session, claim, batch=batch, extraction=graph)
                 assert await service.heartbeat(session, recovered, lease_seconds=180)
                 assert await service.save_section_checkpoint(session, recovered, batch=batch, extraction=graph)
-                assert len(await UploadService().load_graph_checkpoints(session, upload_id)) == 2  # existing fixture + validated batch
+                assert len(await UploadService().load_graph_checkpoints(session, upload_id)) == 3  # fixture + section + recovery
                 job = (await session.execute(select(GraphContinuationJob).where(GraphContinuationJob.upload_id == upload_id))).scalar_one()
                 job.max_attempts = job.attempt_count
                 await session.commit()

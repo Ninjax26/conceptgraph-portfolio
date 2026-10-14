@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-13T16:16:11.227706+00:00",
+  "generated_at_utc": "2026-10-14T06:00:53.937945+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -9,6 +9,9 @@
     "persisted_delay_and_idempotent_scheduling_no_hot_retry": true,
     "three_processes_one_claim_with_ready_identity_and_scope_unchanged": true,
     "independent_claim_token_and_owner_fence_checkpoint_writes": true,
+    "recovery_checkpoint_is_source_concept_and_claim_fenced": true,
+    "persisted_empty_recovery_and_sections_resume_without_provider_calls": true,
+    "changed_section_concepts_invalidate_recovery_save": true,
     "defer_persists_reset_and_invalidates_old_claim_without_changing_ready_result": true,
     "killed_claimant_recovers_after_fixture_lease_expiry_and_retains_checkpoint": true,
     "attempt_limit_stops_automatic_requeue": true,
@@ -21,17 +24,17 @@
     "batch_budget_only_result_does_not_schedule_provider_retry": true,
     "old_document_sql_and_schema_restart_preserve_jobs": true
   },
-  "checks_passed": 16,
+  "checks_passed": 19,
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 4.4666,
+  "duration_seconds": 10.7629,
   "code_sha256": {
     "app/models/document_upload.py": "41869727f662080fc728d0b3f6d07cee9af63f236586624ca8121a7db076052c",
-    "app/services/graph_continuation_service.py": "65146f724705298654a2db3c9de9e2164dd4dbfabaa66bd6af50b61f8dfdeb03",
-    "scripts/evaluate_graph_continuation_jobs.py": "41bf0e7a3c8d31b3962e30b21e91f412e96c57364cb0801aefe9ecb7e51b17b9",
+    "app/services/graph_continuation_service.py": "a3596f3f18b869b881158a2efdcf8910443c4d0244a0944738c4160373829aac",
+    "scripts/evaluate_graph_continuation_jobs.py": "eb390f7007457650f6c689d899be66bab5f258e5a2f17bbb472108b3eb0f96d0",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
-    "app/services/ingestion_service.py": "ad6d1b4d3fef94c4d1c83c22f95b3632c6ea5ead678e94a17627a75f077ef4e5",
+    "app/services/ingestion_service.py": "5b6dd4f18829aac066c85dc5e0eb791634dbe5303854eebeb253819a836b5784",
     "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1"
   },
   "limitations": [

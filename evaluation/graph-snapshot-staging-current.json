@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-13T16:13:21.733332+00:00",
+  "generated_at_utc": "2026-10-14T06:02:13.058977+00:00",
   "kind": "isolated READY/snapshot atomicity checks",
   "postgres_version": "18.4 (Homebrew)",
   "checks": {
@@ -21,7 +21,7 @@
     "app/core/config.py": "f09dde8c27d2a6ce75ea82e1ab7b5d7225701888653d678326134a5e61c1d136",
     "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1",
     "app/services/document_processing_service.py": "911d19cdfedc80aaf07d6e7dd74e2f927d693c700493ef408973584e83a559f7",
-    "app/services/graph_continuation_service.py": "65146f724705298654a2db3c9de9e2164dd4dbfabaa66bd6af50b61f8dfdeb03",
+    "app/services/graph_continuation_service.py": "a3596f3f18b869b881158a2efdcf8910443c4d0244a0944738c4160373829aac",
     "scripts/evaluate_graph_snapshot_staging.py": "da7f810ab529555507b868a97c6b01ce75c91cff8eb96918a439916aaedf6b3d",
     "tests/test_graph_snapshot_staging.py": "c87f023e695655bd1c271118adf93dce6c145da36c5487210979cd6bf944fdd0"
   },

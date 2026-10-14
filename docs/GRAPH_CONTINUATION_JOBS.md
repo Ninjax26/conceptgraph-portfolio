@@ -60,7 +60,7 @@ The following are **not implemented** and must be completed before activating au
 
 1. Atomic job/snapshot staging with a quota-limited READY transition is implemented and locally verified behind a default-off staging flag. Do not enable it yet, backfill existing production PDFs or schedule a demo batch-budget result automatically.
 2. Connect bounded due-job dispatch to the existing coordinator/separate worker and implement a graph-only processor using this snapshot. Do not rotate the document evidence task, reparse/OCR, re-embed, clean up vectors, or make READY documents ineligible while waiting/processing.
-3. Add recovery-pass checkpoint support and a completion/publish path. Projection must be source/task/job fenced, atomic in Neo4j, and cancellation-safe against concurrent deletion/retry; never release the document fence before external writes have actually settled.
+3. [Recovery-pass checkpoint support](GRAPH_RECOVERY_CHECKPOINTS.md) is now implemented and verified. Add a completion/publish path: projection must be source/task/job fenced, atomic in Neo4j, and cancellation-safe against concurrent deletion/retry; never release the document fence before external writes have actually settled.
 4. Integrate snapshot storage accounting and retention with installation budgets. Terminal snapshots should not become unbounded retained copies.
 5. Verify real separate API/ingestion processes, full worker hard-kill recovery and interrupted deletion/projection consistency against isolated stores. The current metadata checks do not satisfy those acceptance criteria.
 6. Keep production scheduling disabled until the operating quota policy and all above tests are verified. Continue the existing free combined deployment; no paid worker is authorized.

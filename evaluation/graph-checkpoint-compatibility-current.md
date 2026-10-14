@@ -1,6 +1,6 @@
 # Graph checkpoint compatibility — offline checks
 
-Generated: 2026-10-13T09:21:09.716484+00:00.
+Generated: 2026-10-14T06:02:11.567999+00:00.
 
 Command: `.venv/bin/python scripts/evaluate_graph_checkpoint_compatibility.py`.
 

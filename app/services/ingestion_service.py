@@ -336,15 +336,10 @@ class IngestionService:
                 or len(merged.relationships) < minimum_graph_relationships(len(merged.nodes))
             )
         ):
-            global_batch = self._global_linking_batch(completed_section_batches)
-            if global_batch is not None:
+            recovery = self._relationship_recovery_request(completed_section_batches, merged.nodes)
+            if recovery is not None:
+                global_batch, context = recovery
                 global_attempted = True
-                context = self._relationship_recovery_context(global_batch.chunks, merged.nodes)
-                # Recovery depends on preceding concepts as well as source text.
-                global_batch = replace(global_batch, batch_key=self._checkpoint_key(
-                    "global:v5", global_batch.section_key, global_batch.chunks,
-                    recovery_context=context,
-                ))
                 linked = self._validated_checkpoint(
                     completed_batches.get(global_batch.batch_key), global_batch
                 )
@@ -1227,6 +1222,46 @@ class IngestionService:
             return None
         rebound = cls._attach_provenance(checked, batch.chunks)
         return rebound.model_copy(update={"batch_diagnostics": extraction.batch_diagnostics})
+
+    @classmethod
+    def _relationship_recovery_request(
+        cls, batches: Sequence[GraphSectionBatch], nodes: Sequence[ConceptNode],
+    ) -> tuple[GraphSectionBatch, str] | None:
+        batch = cls._global_linking_batch(batches)
+        if batch is None:
+            return None
+        context = cls._relationship_recovery_context(batch.chunks, nodes)
+        batch = replace(batch, batch_key=cls._checkpoint_key(
+            "global:v5", batch.section_key, batch.chunks, recovery_context=context))
+        return batch, context
+
+    @classmethod
+    def recovery_checkpoint_batch(
+        cls, chunks: Sequence[DocumentChunk], completed: Mapping[str, GraphExtractionResponse],
+    ) -> GraphSectionBatch | None:
+        """Reconstruct the exact recovery identity from saved section evidence.
+
+        Ignore global/unversioned/invalid rows; they cannot authorize themselves.
+        Uses the same order, merge and request builder as actual extraction.
+        """
+        if not settings.graph_global_linking_enabled:
+            return None
+        batches, partials = [], []
+        for batch in cls._graph_section_batches(chunks, batch_size=settings.graph_batch_size):
+            extraction = cls._validated_checkpoint(completed.get(batch.batch_key), batch)
+            if extraction is not None and extraction.nodes:
+                batches.append(batch)
+                partials.append(extraction)
+        merged = cls._merge_graph_extractions(partials, sections_total=0, sections_succeeded=0,
+            sections_failed=0, batches_total=0, batches_succeeded=0, batches_failed=0,
+            batches_skipped=0, provider_limited=False, extraction_budget_applied=False, failed_section_labels=[])
+        if len(merged.nodes) < 2 or (
+            len({batch.section_key for batch in batches}) < 2
+            and len(merged.relationships) >= minimum_graph_relationships(len(merged.nodes))
+        ):
+            return None
+        recovery = cls._relationship_recovery_request(batches, merged.nodes)
+        return recovery[0] if recovery is not None else None
 
     @classmethod
     def _relationship_recovery_context(

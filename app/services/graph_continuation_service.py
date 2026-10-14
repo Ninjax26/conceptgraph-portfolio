@@ -17,6 +17,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.exceptions import GraphStructureError
 from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
 from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
@@ -269,6 +270,12 @@ class GraphContinuationService:
         self, session: AsyncSession, claim: GraphJobClaim, *, batch: GraphSectionBatch,
         extraction: GraphExtractionResponse,
     ) -> bool:
+        return await self.save_checkpoint(session, claim, batch=batch, extraction=extraction, allow_global=False)
+
+    async def save_checkpoint(
+        self, session: AsyncSession, claim: GraphJobClaim, *, batch: GraphSectionBatch,
+        extraction: GraphExtractionResponse, allow_global: bool = True,
+    ) -> bool:
         locked = await self._locked_claim(session, claim)
         if locked is None:
             return False
@@ -278,8 +285,18 @@ class GraphContinuationService:
             raise ValueError("Graph snapshot/configuration changed.")
         expected = next((candidate for candidate in IngestionService._graph_section_batches(
             chunks, batch_size=settings.graph_batch_size) if candidate.batch_key == batch.batch_key), None)
-        if batch.kind != "section" or expected is None:
-            raise ValueError("Checkpoint is not a section of this graph job.")
+        if batch.kind == "global" and allow_global:
+            rows = (await session.execute(select(GraphExtractionCheckpoint).where(
+                GraphExtractionCheckpoint.upload_id == record.upload_id))).scalars().all()
+            completed = {}
+            for row in rows:
+                try:
+                    completed[row.batch_key] = IngestionService.decode_graph_checkpoint(row.extraction_json)
+                except (GraphStructureError, ValueError, TypeError, KeyError):
+                    continue
+            expected = IngestionService.recovery_checkpoint_batch(chunks, completed)
+        if expected is None or expected.kind != batch.kind or expected.batch_key != batch.batch_key:
+            raise ValueError("Checkpoint does not match this graph job's current source and concepts.")
         checked = IngestionService._validated_checkpoint(extraction, expected)
         if checked is None:
             raise ValueError("Graph checkpoint did not pass source/structure validation.")
