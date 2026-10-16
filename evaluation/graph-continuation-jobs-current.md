@@ -2,7 +2,7 @@
 
 Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
 
-21 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+23 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
 
 - additive_schema_restart_and_due_lease_indexes: passed
 - database_rejects_incomplete_running_lease_and_excess_attempts: passed
@@ -12,10 +12,12 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - recovery_checkpoint_is_source_concept_and_claim_fenced: passed
 - fenced_read_uses_persisted_snapshot_filters_legacy_and_releases_locks: passed
 - persisted_empty_recovery_and_sections_resume_without_provider_calls: passed
+- graph_only_stage_renews_real_lease_and_resumes_saved_batches: passed
 - changed_section_concepts_invalidate_recovery_save: passed
 - changed_section_concepts_invalidate_recovery_read: passed
+- graph_only_stage_durably_defers_known_quota_without_hot_retry: passed
 - defer_persists_reset_and_invalidates_old_claim_without_changing_ready_result: passed
-- killed_claimant_recovers_after_fixture_lease_expiry_and_retains_checkpoint: passed
+- killed_extraction_stage_recovers_after_fixture_lease_expiry_and_reuses_checkpoints: passed
 - attempt_limit_stops_automatic_requeue: passed
 - duplicate_scheduling_cannot_restart_exhausted_job: passed
 - tampered_snapshot_is_stopped_without_reparsing_or_provider_calls: passed
@@ -28,7 +30,7 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 
 ## Limits
 
-- Three fresh claim processes and a SIGKILL claimant test metadata leases only, not actual API/ingestion-worker operation.
+- Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.
 - Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.
 - Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.
 - Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.

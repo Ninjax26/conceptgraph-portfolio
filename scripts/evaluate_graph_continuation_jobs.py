@@ -1,7 +1,7 @@
-"""Isolated PostgreSQL graph-job fencing checks. No graph generation/projection.
+"""Isolated PostgreSQL graph-job/stage checks. No hosted generation/projection.
 
-Separate claim processes and one killed claimant exercise metadata leases only;
-they are NOT real API/ingestion workers or a cross-store consistency benchmark.
+Separate claim processes and one killed extraction-stage process use mocked AI;
+they are NOT full API/ingestion workers or a cross-store consistency benchmark.
 """
 
 import argparse
@@ -34,6 +34,7 @@ from app.services import ingestion_service as ingestion
 from app.services.course_service import CourseService
 from app.services.upload_service import UploadService
 from app.services.parser_service import DocumentChunk
+from app.services.graph_job_extraction import GraphJobDeferred, GraphJobExtraction
 from scripts.evaluate_provider_admission import engine_for
 from scripts.evaluate_graph_retry import fixture
 
@@ -54,9 +55,14 @@ async def child(args):
             configuration(stack)
             async with sessions() as session:
                 claim = await jobs.GraphContinuationService().claim_next(session, lease_owner=f"claimant-{os.getpid()}", lease_seconds=180)
-            print(json.dumps({"pid": os.getpid(), "claimed": claim is not None}), flush=True)
             if args.hold and claim is not None:
-                await asyncio.Event().wait()
+                async def pause(chunks, *, completed_batches, on_batch_completed):
+                    print(json.dumps({"pid": os.getpid(), "claimed": True, "stage_started": True,
+                        "chunks_loaded": len(chunks), "checkpoints_loaded": len(completed_batches)}), flush=True)
+                    await asyncio.Event().wait()
+                await GraphJobExtraction(sessions, SimpleNamespace(extract_graph_from_chunks=pause)).extract(claim)
+            else:
+                print(json.dumps({"pid": os.getpid(), "claimed": claim is not None}), flush=True)
     finally:
         await engine.dispose()
 
@@ -198,17 +204,24 @@ async def run(args):
 
             async with sessions() as session:
                 assert await service.load_checkpoints(session, replace(claim, claim_token="stale")) is None
-                completed = await service.load_checkpoints(session, replace(claim, chunks=()))
+                inputs = await service.load_input(session, replace(claim, chunks=()))
+                assert inputs is not None
+                assert inputs.chunks == tuple(chunks)
+                completed = inputs.checkpoints
                 assert set(completed) == {batch.batch_key, recovery_batch.batch_key}
                 assert not session.in_transaction()
                 assert completed[batch.batch_key].nodes[0].upload_id == upload_id
             checks["fenced_read_uses_persisted_snapshot_filters_legacy_and_releases_locks"] = True
             extractor = ingestion.IngestionService(SimpleNamespace(), SimpleNamespace())
             extractor.extract_graph_from_text = AsyncMock(side_effect=AssertionError("Unexpected provider call"))
-            resumed = await extractor.extract_graph_from_chunks(chunks, completed_batches=completed)
+            resumed = await extractor.extract_graph_from_chunks(inputs.chunks, completed_batches=completed)
             extractor.extract_graph_from_text.assert_not_awaited()
             assert resumed.global_linking_processed and len(resumed.nodes) == 2
             checks["persisted_empty_recovery_and_sections_resume_without_provider_calls"] = True
+            stage_result = await GraphJobExtraction(sessions, extractor).extract(replace(claim, chunks=()))
+            extractor.extract_graph_from_text.assert_not_awaited()
+            assert stage_result.global_linking_processed and len(stage_result.nodes) == 2
+            checks["graph_only_stage_renews_real_lease_and_resumes_saved_batches"] = True
 
             changed_graph = graph.model_copy(update={"nodes":[graph.nodes[0].model_copy(update={"name":"Domain Name System"}), graph.nodes[1]]})
             async with sessions() as session:
@@ -225,8 +238,17 @@ async def run(args):
             checks["changed_section_concepts_invalidate_recovery_save"] = True
             checks["changed_section_concepts_invalidate_recovery_read"] = True
 
+            limited = SimpleNamespace(extract_graph_from_chunks=AsyncMock(return_value=GraphExtractionResponse(
+                provider_limited=True, provider_retry_after_seconds=90)))
+            try:
+                await GraphJobExtraction(sessions, limited).extract(claim)
+            except GraphJobDeferred:
+                pass
+            else:
+                raise AssertionError("Quota-limited extraction returned a publishable result")
+            limited.extract_graph_from_chunks.assert_awaited_once()
+            checks["graph_only_stage_durably_defers_known_quota_without_hot_retry"] = True
             async with sessions() as session:
-                assert await service.defer(session, claim, retry_after_seconds=90)
                 assert not await service.heartbeat(session, claim, lease_seconds=180)
                 assert await service.claim_next(session, lease_owner="too-early", lease_seconds=180) is None
                 job = (await session.execute(select(GraphContinuationJob).where(GraphContinuationJob.upload_id == upload_id))).scalar_one()
@@ -241,6 +263,8 @@ async def run(args):
             try:
                 result = json.loads(await asyncio.wait_for(killed.stdout.readline(), 30))
                 assert result["claimed"]
+                assert result["stage_started"] and result["chunks_loaded"] == len(chunks)
+                assert result["checkpoints_loaded"] == 2
                 killed.kill()
                 await killed.wait()
                 assert killed.returncode == -9
@@ -256,6 +280,10 @@ async def run(args):
                 assert await service.heartbeat(session, recovered, lease_seconds=180)
                 assert await service.save_section_checkpoint(session, recovered, batch=batch, extraction=graph)
                 assert len(await UploadService().load_graph_checkpoints(session, upload_id)) == 3  # fixture + section + recovery
+                await session.rollback()
+                recovered_graph = await GraphJobExtraction(sessions, extractor).extract(recovered)
+                extractor.extract_graph_from_text.assert_not_awaited()
+                assert len(recovered_graph.nodes) == 2 and recovered_graph.global_linking_processed
                 job = (await session.execute(select(GraphContinuationJob).where(GraphContinuationJob.upload_id == upload_id))).scalar_one()
                 job.max_attempts = job.attempt_count
                 await session.commit()
@@ -267,7 +295,7 @@ async def run(args):
                 scheduled_again = await service.schedule(session, upload_id=upload_id, document_task_id=task,
                     chunks=chunks, retry_after_seconds=1)
                 assert scheduled_again.status == "stopped" and scheduled_again.attempt_count == stopped_attempts
-            checks["killed_claimant_recovers_after_fixture_lease_expiry_and_retains_checkpoint"] = True
+            checks["killed_extraction_stage_recovers_after_fixture_lease_expiry_and_reuses_checkpoints"] = True
             checks["attempt_limit_stops_automatic_requeue"] = True
             checks["duplicate_scheduling_cannot_restart_exhausted_job"] = True
 
@@ -367,9 +395,10 @@ async def run(args):
         "code_sha256": {path: hashlib.sha256((ROOT/path).read_bytes()).hexdigest() for path in (
             "app/models/document_upload.py", "app/services/graph_continuation_service.py", "scripts/evaluate_graph_continuation_jobs.py",
             "tests/test_graph_continuation_snapshot.py", "tests/test_graph_job_checkpoint_reads.py",
+            "app/services/graph_job_extraction.py", "tests/test_graph_job_extraction.py",
             "app/services/ingestion_service.py", "app/services/upload_service.py")},
         "limitations": [
-            "Three fresh claim processes and a SIGKILL claimant test metadata leases only, not actual API/ingestion-worker operation.",
+            "Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.",
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",

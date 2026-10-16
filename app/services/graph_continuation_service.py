@@ -121,6 +121,14 @@ class GraphJobClaim:
     chunks: tuple[DocumentChunk, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class GraphJobInput:
+    """Detached, validated inputs read together under the active job fence."""
+
+    chunks: tuple[DocumentChunk, ...]
+    checkpoints: dict[str, GraphExtractionResponse]
+
+
 class GraphContinuationService:
     """Lock order is document, then job, then checkpoint. Never the reverse."""
 
@@ -296,6 +304,12 @@ class GraphContinuationService:
     async def load_checkpoints(
         self, session: AsyncSession, claim: GraphJobClaim,
     ) -> dict[str, GraphExtractionResponse] | None:
+        inputs = await self.load_input(session, claim)
+        return None if inputs is None else inputs.checkpoints
+
+    async def load_input(
+        self, session: AsyncSession, claim: GraphJobClaim,
+    ) -> GraphJobInput | None:
         """Read under the current claim, then release locks before extraction.
 
         None means lost authority, not an empty cache. Ignore claim.chunks: the
@@ -312,7 +326,8 @@ class GraphContinuationService:
             rows = (await session.execute(select(GraphExtractionCheckpoint).where(
                 GraphExtractionCheckpoint.upload_id == record.upload_id)
                 .execution_options(populate_existing=True))).scalars().all()
-            return validated_job_checkpoints(chunks, {row.batch_key: row.extraction_json for row in rows})
+            return GraphJobInput(tuple(chunks), validated_job_checkpoints(
+                chunks, {row.batch_key: row.extraction_json for row in rows}))
         finally:
             await session.rollback()  # Read-only boundary; release document/job locks.
 

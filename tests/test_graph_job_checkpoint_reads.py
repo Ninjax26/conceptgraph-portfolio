@@ -1,8 +1,9 @@
 """Source/configuration-qualified reads; no provider or database requests."""
 
 from types import SimpleNamespace
+import asyncio
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.core.config import Settings
 from app.schemas.extraction import ConceptNode, GraphExtractionResponse
@@ -66,6 +67,47 @@ class QualifiedCheckpointReads(unittest.TestCase):
 
 
 class ReadTransactionBoundary(unittest.IsolatedAsyncioTestCase):
+    async def test_changed_snapshot_or_contract_is_not_returned_to_processor(self):
+        for digest, contract in (("stale", "contract"), ("digest", "stale")):
+            with self.subTest(digest=digest, contract=contract):
+                service = GraphContinuationService()
+                session = SimpleNamespace(rollback=AsyncMock(), execute=AsyncMock())
+                job = SimpleNamespace(snapshot_json={}, snapshot_sha256=digest, contract_sha256=contract)
+                with patch.object(service, "_locked_claim", AsyncMock(return_value=(SimpleNamespace(), job, None))), \
+                     patch("app.services.graph_continuation_service.snapshot_chunks", return_value=()), \
+                     patch("app.services.graph_continuation_service.snapshot_digest", return_value="digest"), \
+                     patch("app.services.graph_continuation_service.extraction_contract", return_value="contract"):
+                    with self.assertRaisesRegex(ValueError, "changed"):
+                        await service.load_input(session, SimpleNamespace())
+                session.execute.assert_not_awaited()
+                session.rollback.assert_awaited_once()
+
+    async def test_cancelled_input_read_releases_transaction(self):
+        service = GraphContinuationService()
+        session = SimpleNamespace(rollback=AsyncMock())
+        with patch.object(service, "_locked_claim", AsyncMock(side_effect=asyncio.CancelledError)):
+            with self.assertRaises(asyncio.CancelledError):
+                await service.load_input(session, SimpleNamespace())
+        session.rollback.assert_awaited_once()
+
+    async def test_processor_input_uses_persisted_chunks_and_releases_locks(self):
+        service = GraphContinuationService()
+        chunks = (DocumentChunk(id="persisted", text="DNS", metadata={}),)
+        rows = MagicMock()
+        rows.scalars.return_value.all.return_value = []
+        session = SimpleNamespace(rollback=AsyncMock(), execute=AsyncMock(return_value=rows))
+        record = SimpleNamespace(upload_id="fixture")
+        job = SimpleNamespace(snapshot_json={}, snapshot_sha256="digest", contract_sha256="contract")
+        with patch.object(service, "_locked_claim", AsyncMock(return_value=(record, job, None))), \
+             patch("app.services.graph_continuation_service.snapshot_chunks", return_value=chunks), \
+             patch("app.services.graph_continuation_service.snapshot_digest", return_value="digest"), \
+             patch("app.services.graph_continuation_service.extraction_contract", return_value="contract"), \
+             patch("app.services.graph_continuation_service.validated_job_checkpoints", return_value={}):
+            inputs = await service.load_input(session, SimpleNamespace(chunks=("untrusted",)))
+        self.assertEqual(inputs.chunks, chunks)
+        self.assertEqual(inputs.checkpoints, {})
+        session.rollback.assert_awaited_once()
+
     async def test_lost_claim_returns_none_without_reading_checkpoints(self):
         service = GraphContinuationService()
         session = SimpleNamespace(rollback=AsyncMock(), execute=AsyncMock())
