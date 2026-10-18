@@ -222,6 +222,20 @@ async def run(args):
             extractor.extract_graph_from_text.assert_not_awaited()
             assert stage_result.global_linking_processed and len(stage_result.nodes) == 2
             checks["graph_only_stage_renews_real_lease_and_resumes_saved_batches"] = True
+            async with sessions() as session:
+                candidate = await service.prepare_publication(session, replace(claim, chunks=()), stage_result)
+                assert candidate is not None and len(candidate.sha256) == 64
+                assert session.in_transaction()
+                async with sessions() as other:
+                    assert (await other.execute(select(DocumentUpload.upload_id).where(
+                        DocumentUpload.upload_id == upload_id).with_for_update(skip_locked=True))).scalar_one_or_none() is None
+                await session.rollback()
+                async with sessions() as other:
+                    assert (await other.execute(select(DocumentUpload.upload_id).where(
+                        DocumentUpload.upload_id == upload_id).with_for_update(skip_locked=True))).scalar_one() == upload_id
+                assert await service.prepare_publication(session, replace(claim, claim_token="stale"), stage_result) is None
+                assert not session.in_transaction()
+            checks["publication_preflight_keeps_document_fence_and_rejects_stale_claim"] = True
 
             changed_graph = graph.model_copy(update={"nodes":[graph.nodes[0].model_copy(update={"name":"Domain Name System"}), graph.nodes[1]]})
             async with sessions() as session:
@@ -380,6 +394,69 @@ async def run(args):
             async with sessions() as session:
                 assert (await session.execute(select(func.count()).select_from(GraphContinuationJob))).scalar_one() == 5
             checks["old_document_sql_and_schema_restart_preserve_jobs"] = True
+
+            async with sessions() as session:
+                used = (await session.execute(text(
+                    "SELECT coalesce(sum(octet_length(snapshot_json::jsonb::text)),0) FROM graph_continuation_jobs"))).scalar_one()
+                with patch.object(jobs, "settings", jobs.settings.model_copy(update={"graph_snapshot_max_bytes": used + 2})):
+                    assert await service._snapshot_capacity(session, "not-an-upload", {})
+                await session.rollback()
+                with patch.object(jobs, "settings", jobs.settings.model_copy(update={"graph_snapshot_max_bytes": used + 1})):
+                    assert not await service._snapshot_capacity(session, "not-an-upload", {})
+                await session.rollback()
+            checks["logical_jsonb_byte_budget_enforces_exact_boundary"] = True
+
+            async def admission_candidate():
+                candidate_id, candidate_task, _ = await fixture(sessions, course)
+                async with sessions() as session:
+                    record = await UploadService().get_upload(session, candidate_id)
+                    record.result_json = {**record.result_json, "graph_provider_limited": True}
+                    await session.commit()
+                chunk = DocumentChunk(id=candidate_id+":0", text="Synthetic DNS source.", metadata={
+                    "upload_id": candidate_id, "document_name": record.original_filename,
+                    "chunk_id": candidate_id+":0", "document_id": course.id, "execution_token": candidate_task,
+                    "page_number": 1, "section_heading": "DNS"})
+                return candidate_id, candidate_task, [chunk]
+            candidates = [await admission_candidate(), await admission_candidate()]
+            async def admit(candidate):
+                candidate_id, candidate_task, candidate_chunks = candidate
+                async with sessions() as session:
+                    return await service.schedule(session, upload_id=candidate_id, document_task_id=candidate_task,
+                        chunks=candidate_chunks, retry_after_seconds=1)
+            async with sessions() as session:
+                retained = (await session.execute(select(func.count()).select_from(GraphContinuationJob))).scalar_one()
+            with patch.object(jobs, "settings", jobs.settings.model_copy(update={"graph_snapshot_max_jobs": retained+1})):
+                admitted = await asyncio.gather(*(admit(candidate) for candidate in candidates))
+            assert sum(job is not None for job in admitted) == 1
+            async with sessions() as session:
+                assert (await session.execute(select(func.count()).select_from(GraphContinuationJob))).scalar_one() == retained+1
+            checks["concurrent_snapshot_admission_cannot_exceed_retained_job_cap"] = True
+            async with sessions() as session:
+                terminal = (await session.execute(select(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == upload_id))).scalar_one()
+                terminal.updated_at = datetime.now(timezone.utc) - timedelta(days=8)
+                retained_attempts, retained_digest = terminal.attempt_count, terminal.snapshot_sha256
+                await session.commit()
+                assert await service.prune_terminal_snapshots(session, older_than_days=7, limit=1) == 1
+                await session.rollback()
+                terminal = (await session.execute(select(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == upload_id))).scalar_one()
+                assert terminal.snapshot_json
+                await session.rollback()
+                assert await service.prune_terminal_snapshots(session, older_than_days=7, limit=1) == 1
+                await session.commit()
+                terminal = (await session.execute(select(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == upload_id))).scalar_one()
+                assert terminal.snapshot_json == {} and terminal.attempt_count == retained_attempts
+                assert terminal.status == "stopped" and terminal.snapshot_sha256 == retained_digest
+                assert await service.prune_terminal_snapshots(session, older_than_days=7, limit=1) == 0
+                duplicate = await service.schedule(session, upload_id=upload_id, document_task_id=task,
+                    chunks=chunks, retry_after_seconds=1)
+                assert duplicate.status == "stopped" and duplicate.attempt_count == retained_attempts
+                assert duplicate.snapshot_json == {}
+                assert len(await UploadService().load_graph_checkpoints(session, upload_id)) == 3
+                assert (await UploadService().get_upload(session, upload_id)).result_json == original
+            checks["terminal_snapshot_cleanup_rolls_back_and_preserves_exhausted_tombstone"] = True
     finally:
         if engine is not None:
             await engine.dispose()
@@ -396,13 +473,15 @@ async def run(args):
             "app/models/document_upload.py", "app/services/graph_continuation_service.py", "scripts/evaluate_graph_continuation_jobs.py",
             "tests/test_graph_continuation_snapshot.py", "tests/test_graph_job_checkpoint_reads.py",
             "app/services/graph_job_extraction.py", "tests/test_graph_job_extraction.py",
+            "app/core/config.py", "tests/test_graph_snapshot_budget.py",
+            "app/services/graph_publication_candidate.py", "tests/test_graph_publication_candidate.py",
             "app/services/ingestion_service.py", "app/services/upload_service.py")},
         "limitations": [
             "Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.",
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-            "Snapshot JSON is bounded at 8 MiB but its future installation-wide storage accounting still needs integration.",
+            "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
             "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.",
         ],
     }

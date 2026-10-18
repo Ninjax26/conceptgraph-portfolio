@@ -6,6 +6,7 @@ import time
 from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any, TypeVar
 
@@ -21,6 +22,15 @@ from app.core.exceptions import (
 
 
 T = TypeVar("T")
+_reported_usage: ContextVar[list[tuple[int, int, int]] | None] = ContextVar("reported_provider_usage", default=None)
+
+
+def record_provider_usage(input_tokens, output_tokens, total_tokens) -> None:
+    """Capture only sanitized counts inside the current measured provider call."""
+    collector = _reported_usage.get()
+    values = (input_tokens, output_tokens, total_tokens)
+    if collector is not None and all(type(value) is int and value >= 0 for value in values):
+        collector.append(values)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +45,9 @@ class ProviderCallMetric:
     recorded_at: str
     failure_reason: str | None = None
     repair: bool = False
+    reported_input_tokens: int | None = None
+    reported_output_tokens: int | None = None
+    reported_total_tokens: int | None = None
 
 
 class ProviderMetrics:
@@ -57,6 +70,15 @@ class ProviderMetrics:
         failover: bool = False,
         repair: bool = False,
     ) -> T:
+        usage: list[tuple[int, int, int]] = []
+        token = _reported_usage.set(usage)
+        try:
+            return self._observe(provider, operation, func, input_characters=input_characters,
+                failover=failover, repair=repair, usage=usage)
+        finally:
+            _reported_usage.reset(token)
+
+    def _observe(self, provider, operation, func, *, input_characters, failover, repair, usage):
         started = time.perf_counter()
         try:
             result = func()
@@ -71,6 +93,7 @@ class ProviderMetrics:
                 output_characters=0,
                 failure_reason=exc.reason.value if isinstance(exc, GraphStructureError) else None,
                 repair=repair,
+                usage=usage,
             )
             raise
 
@@ -83,6 +106,7 @@ class ProviderMetrics:
             input_characters=input_characters,
             output_characters=self._output_size(result),
             repair=repair,
+            usage=usage,
         )
         return result
 
@@ -113,6 +137,11 @@ class ProviderMetrics:
                 "evidence_fallbacks": evidence_fallbacks,
                 "estimated_input_tokens": sum(event.estimated_input_tokens for event in events),
                 "estimated_output_tokens": sum(event.estimated_output_tokens for event in events),
+                "reported_usage_attempts": sum(event.reported_total_tokens is not None for event in events),
+                "unreported_usage_attempts": sum(event.reported_total_tokens is None for event in events),
+                "reported_input_tokens": sum(event.reported_input_tokens or 0 for event in events),
+                "reported_output_tokens": sum(event.reported_output_tokens or 0 for event in events),
+                "reported_total_tokens": sum(event.reported_total_tokens or 0 for event in events),
                 "average_latency_ms": self._average_latency(events),
                 "p95_latency_ms": self._percentile(latencies, 0.95),
             },
@@ -124,8 +153,12 @@ class ProviderMetrics:
                 "document identifiers, and credentials are never stored in these metrics."
             ),
             "accuracy_note": (
-                "Token counts are character-based estimates; provider billing dashboards "
-                "remain authoritative. Metrics reset whenever the API process restarts."
+                "estimated_* token counts are character-based estimates. reported_* counts cover only "
+                "responses whose adapters capture usage (Groq/Gemini); missing usage is unknown, "
+                "not zero. No cost or complete provider-quota accounting is implied. Provider billing "
+                "dashboards remain authoritative. Gemini reported output counts response candidates; "
+                "its reported total can additionally include thinking/tool-use tokens. "
+                "Metrics reset whenever the API process restarts."
             ),
         }
 
@@ -147,6 +180,7 @@ class ProviderMetrics:
         output_characters: int,
         failure_reason: str | None = None,
         repair: bool = False,
+        usage: list[tuple[int, int, int]] | None = None,
     ) -> None:
         event = ProviderCallMetric(
             provider=provider,
@@ -159,6 +193,9 @@ class ProviderMetrics:
             recorded_at=self._now(),
             failure_reason=failure_reason,
             repair=repair,
+            reported_input_tokens=sum(row[0] for row in usage) if usage else None,
+            reported_output_tokens=sum(row[1] for row in usage) if usage else None,
+            reported_total_tokens=sum(row[2] for row in usage) if usage else None,
         )
         with self._lock:
             self._events.append(event)
@@ -239,6 +276,10 @@ class ProviderMetrics:
                 "rate_limit_errors": sum(event.outcome == "rate_limited" for event in group),
                 "estimated_input_tokens": sum(event.estimated_input_tokens for event in group),
                 "estimated_output_tokens": sum(event.estimated_output_tokens for event in group),
+                "reported_usage_attempts": sum(event.reported_total_tokens is not None for event in group),
+                "reported_input_tokens": sum(event.reported_input_tokens or 0 for event in group),
+                "reported_output_tokens": sum(event.reported_output_tokens or 0 for event in group),
+                "reported_total_tokens": sum(event.reported_total_tokens or 0 for event in group),
                 "average_latency_ms": cls._average_latency(group),
             }
             for name, group in sorted(grouped.items())

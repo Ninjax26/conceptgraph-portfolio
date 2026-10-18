@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-16T13:36:42.867794+00:00",
+  "generated_at_utc": "2026-10-18T11:27:41.806235+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -13,6 +13,7 @@
     "fenced_read_uses_persisted_snapshot_filters_legacy_and_releases_locks": true,
     "persisted_empty_recovery_and_sections_resume_without_provider_calls": true,
     "graph_only_stage_renews_real_lease_and_resumes_saved_batches": true,
+    "publication_preflight_keeps_document_fence_and_rejects_stale_claim": true,
     "changed_section_concepts_invalidate_recovery_save": true,
     "changed_section_concepts_invalidate_recovery_read": true,
     "graph_only_stage_durably_defers_known_quota_without_hot_retry": true,
@@ -26,22 +27,29 @@
     "expired_retention_is_not_resurrected": true,
     "deletion_lock_skipped_and_fk_cascade_fences_old_claim": true,
     "batch_budget_only_result_does_not_schedule_provider_retry": true,
-    "old_document_sql_and_schema_restart_preserve_jobs": true
+    "old_document_sql_and_schema_restart_preserve_jobs": true,
+    "logical_jsonb_byte_budget_enforces_exact_boundary": true,
+    "concurrent_snapshot_admission_cannot_exceed_retained_job_cap": true,
+    "terminal_snapshot_cleanup_rolls_back_and_preserves_exhausted_tombstone": true
   },
-  "checks_passed": 23,
+  "checks_passed": 27,
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 7.2698,
+  "duration_seconds": 3.7158,
   "code_sha256": {
     "app/models/document_upload.py": "41869727f662080fc728d0b3f6d07cee9af63f236586624ca8121a7db076052c",
-    "app/services/graph_continuation_service.py": "5827921435638be4f31b596019e332add694275fac5576aac4ed85205fcc8f37",
-    "scripts/evaluate_graph_continuation_jobs.py": "caaf118398f93a18f938bc9dc4721343cf3f08c21c3ea7e8ff6ab220d4ce273b",
+    "app/services/graph_continuation_service.py": "0e1b91a6be392c8bd344a1ee7ebf4bb7e1b8d91c341e720badc3d20813e6f7a1",
+    "scripts/evaluate_graph_continuation_jobs.py": "e0e80d4245ac1ec6191b2637511c030c60be1368c2223edad267e1851dfb4db6",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
-    "tests/test_graph_job_checkpoint_reads.py": "2a806d22fd83a168872d9bc5786aa18a9a9558d41df5575f0cccdfe66a41ea86",
+    "tests/test_graph_job_checkpoint_reads.py": "d62cd3faca2fcb495bbfd3a8afec4d89d61a6b611a7515768d4d26960b63936d",
     "app/services/graph_job_extraction.py": "732d0108699b6daa2fcf59d215095b654a1b4081ef11e010c65922376941d758",
     "tests/test_graph_job_extraction.py": "ff77f02a63fad23bf86cc0c5aa7aa4479cc88f4b1cd66e22b648368c353fb9a6",
-    "app/services/ingestion_service.py": "08f5bd034e66987ef0fa0a15069868f9c5391d4c962ad143482cab373c05c076",
+    "app/core/config.py": "d15abcc6f514e1a101afb5e1837f4dc6ed5bb49c14066c691d9ccd8e3e81ec68",
+    "tests/test_graph_snapshot_budget.py": "1a8a15fb6f25eb08604abf4bdac3c0c775adc6c1e838fe17d2c7a5f2dc7a7f9f",
+    "app/services/graph_publication_candidate.py": "fba9ba330f2b9c1f88b41508e94459facd08456144c6cd42167855b0e224e172",
+    "tests/test_graph_publication_candidate.py": "b3e57df5ae9f4599dc9fc6dc901be4ea48f43091aa0d637151e3c6f35a9b0811",
+    "app/services/ingestion_service.py": "a08c24a0be63562e51a459cb82f0df396c9536c083fe7bba14dbea86effd41bd",
     "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1"
   },
   "limitations": [
@@ -49,7 +57,7 @@
     "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
     "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
     "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-    "Snapshot JSON is bounded at 8 MiB but its future installation-wide storage accounting still needs integration.",
+    "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
     "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric."
   ]
 }

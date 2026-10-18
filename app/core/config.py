@@ -229,6 +229,9 @@ class Settings(BaseSettings):
     graph_json_repair_enabled: bool = Field(default=True, alias="GRAPH_JSON_REPAIR_ENABLED")
     # Snapshot staging only; no automatic graph dispatcher is enabled by this.
     graph_continuation_snapshots_enabled: bool = Field(default=False, alias="GRAPH_CONTINUATION_SNAPSHOTS_ENABLED")
+    # Zero disables this optional installation-wide logical snapshot budget.
+    graph_snapshot_max_jobs: int = Field(default=0, ge=0, alias="GRAPH_SNAPSHOT_MAX_JOBS")
+    graph_snapshot_max_bytes: int = Field(default=0, ge=0, alias="GRAPH_SNAPSHOT_MAX_BYTES")
     graph_batch_size: int = Field(
         default=4,
         ge=2,

@@ -25,7 +25,7 @@ from app.core.exceptions import (
 from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.provider_failover import provider_circuit_breaker
-from app.services.provider_metrics import provider_metrics
+from app.services.provider_metrics import provider_metrics, record_provider_usage
 from app.services.shared_provider_service import observe_provider_call
 
 
@@ -251,6 +251,10 @@ class SynthesisService:
             ],
             temperature=0,
         )
+        usage = getattr(completion, "usage", None)
+        if usage is not None:
+            record_provider_usage(getattr(usage, "prompt_tokens", None), getattr(usage, "completion_tokens", None),
+                                  getattr(usage, "total_tokens", None))
         return completion.choices[0].message.content or ""
 
     def _synthesize_with_cerebras(

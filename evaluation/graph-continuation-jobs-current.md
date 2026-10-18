@@ -2,7 +2,7 @@
 
 Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
 
-23 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+27 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
 
 - additive_schema_restart_and_due_lease_indexes: passed
 - database_rejects_incomplete_running_lease_and_excess_attempts: passed
@@ -13,6 +13,7 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - fenced_read_uses_persisted_snapshot_filters_legacy_and_releases_locks: passed
 - persisted_empty_recovery_and_sections_resume_without_provider_calls: passed
 - graph_only_stage_renews_real_lease_and_resumes_saved_batches: passed
+- publication_preflight_keeps_document_fence_and_rejects_stale_claim: passed
 - changed_section_concepts_invalidate_recovery_save: passed
 - changed_section_concepts_invalidate_recovery_read: passed
 - graph_only_stage_durably_defers_known_quota_without_hot_retry: passed
@@ -27,6 +28,9 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - deletion_lock_skipped_and_fk_cascade_fences_old_claim: passed
 - batch_budget_only_result_does_not_schedule_provider_retry: passed
 - old_document_sql_and_schema_restart_preserve_jobs: passed
+- logical_jsonb_byte_budget_enforces_exact_boundary: passed
+- concurrent_snapshot_admission_cannot_exceed_retained_job_cap: passed
+- terminal_snapshot_cleanup_rolls_back_and_preserves_exhausted_tombstone: passed
 
 ## Limits
 
@@ -34,5 +38,5 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.
 - Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.
 - Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.
-- Snapshot JSON is bounded at 8 MiB but its future installation-wide storage accounting still needs integration.
+- Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.
 - Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.

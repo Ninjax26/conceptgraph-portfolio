@@ -12,6 +12,7 @@ from app.core.exceptions import (
     LLMProviderTruncatedResponseError,
 )
 from app.services.provider_failover import retry_after_seconds
+from app.services.provider_metrics import record_provider_usage
 
 
 class GeminiService:
@@ -89,6 +90,12 @@ class GeminiService:
 
         try:
             body = response.json()
+            usage = body.get("usageMetadata") if isinstance(body, dict) else None
+            if isinstance(usage, dict):
+                # Preserve the provider's total: it may include thinking/tool
+                # tokens beyond prompt + visible response candidates.
+                record_provider_usage(usage.get("promptTokenCount"), usage.get("candidatesTokenCount"),
+                                      usage.get("totalTokenCount"))
             candidate = body["candidates"][0]
             if require_complete and candidate.get("finishReason") == "MAX_TOKENS":
                 raise LLMProviderTruncatedResponseError("The structured response was truncated.")

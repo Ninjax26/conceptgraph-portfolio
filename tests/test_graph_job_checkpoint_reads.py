@@ -67,6 +67,30 @@ class QualifiedCheckpointReads(unittest.TestCase):
 
 
 class ReadTransactionBoundary(unittest.IsolatedAsyncioTestCase):
+    async def test_publication_lost_claim_never_builds_candidate(self):
+        service = GraphContinuationService()
+        session = SimpleNamespace()
+        with patch.object(service, "_locked_claim", AsyncMock(return_value=None)), \
+             patch("app.services.graph_continuation_service.prepare_graph_publication") as prepare:
+            self.assertIsNone(await service.prepare_publication(session, SimpleNamespace(), GraphExtractionResponse()))
+        prepare.assert_not_called()
+
+    async def test_publication_uses_current_identity_and_keeps_transaction(self):
+        service = GraphContinuationService()
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+        record = SimpleNamespace(upload_id="current", course_uuid="course", task_id="task", original_filename="source.pdf")
+        job = SimpleNamespace(snapshot_json={}, snapshot_sha256="digest", contract_sha256="contract")
+        with patch.object(service, "_locked_claim", AsyncMock(return_value=(record, job, None))), \
+             patch("app.services.graph_continuation_service.snapshot_chunks", return_value=("persisted",)), \
+             patch("app.services.graph_continuation_service.snapshot_digest", return_value="digest"), \
+             patch("app.services.graph_continuation_service.extraction_contract", return_value="contract"), \
+             patch("app.services.graph_continuation_service.prepare_graph_publication", return_value="candidate") as prepare:
+            self.assertEqual(await service.prepare_publication(session, SimpleNamespace(chunks=()), GraphExtractionResponse()), "candidate")
+        self.assertEqual(prepare.call_args.args[1], ("persisted",))
+        self.assertEqual(prepare.call_args.kwargs["upload_id"], "current")
+        session.commit.assert_not_awaited()
+        session.rollback.assert_not_awaited()
+
     async def test_changed_snapshot_or_contract_is_not_returned_to_processor(self):
         for digest, contract in (("stale", "contract"), ("digest", "stale")):
             with self.subTest(digest=digest, contract=contract):

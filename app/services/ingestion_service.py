@@ -56,6 +56,7 @@ from app.services.cerebras_service import cerebras_service
 from app.services.gemini_service import gemini_service
 from app.services.parser_service import DocumentChunk
 from app.services.provider_failover import provider_circuit_breaker
+from app.services.provider_metrics import record_provider_usage
 from app.services.shared_provider_service import observe_provider_call
 from app.services.retrieval_candidates import identifier_terms
 from app.services.graph_retry_policy import quota_retry_delay
@@ -869,6 +870,10 @@ class IngestionService:
                     },
                 },
             )
+            usage = getattr(completion, "usage", None)
+            if usage is not None:
+                record_provider_usage(getattr(usage, "prompt_tokens", None), getattr(usage, "completion_tokens", None),
+                                      getattr(usage, "total_tokens", None))
             choice = completion.choices[0]
             if getattr(choice, "finish_reason", None) == "length":
                 raise GraphStructureError("The graph response was truncated.", reason=GraphFailureReason.TRUNCATED_RESPONSE)

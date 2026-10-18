@@ -13,7 +13,7 @@ import hashlib
 import json
 from uuid import uuid4
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -22,6 +22,7 @@ from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
 from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
+from app.services.graph_publication_candidate import GraphPublicationCandidate, prepare_graph_publication
 from app.services.parser_service import DocumentChunk
 from app.services.upload_service import UploadService
 from app.schemas.extraction import GraphExtractionResponse
@@ -153,6 +154,59 @@ class GraphContinuationService:
         job.status, job.failure_category = "stopped", category
         job.claim_token = job.lease_owner = job.lease_expires_at = None
 
+    @staticmethod
+    async def _snapshot_capacity(session: AsyncSession, upload_id: str, payload: dict) -> bool:
+        """Caller holds its document/job fence; admission lock survives to commit.
+
+        Count all retained statuses. Exclude only the replaced upload, never
+        delete other jobs to make room. JSONB text bytes are a logical budget,
+        not PostgreSQL physical storage, WAL or Python memory usage.
+        """
+        max_jobs, max_bytes = settings.graph_snapshot_max_jobs, settings.graph_snapshot_max_bytes
+        if not max_jobs and not max_bytes:
+            return True
+        await session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+            {"key": "conceptgraph:graph-snapshot-admission"})
+        # Include earlier staging in this transaction; flush is not a commit.
+        await session.flush()
+        usage = (await session.execute(text(
+            "SELECT count(*) AS jobs, coalesce(sum(octet_length(snapshot_json::jsonb::text)), 0) AS bytes "
+            "FROM graph_continuation_jobs WHERE upload_id <> :upload_id "
+            "AND snapshot_json::jsonb <> '{}'::jsonb"),
+            {"upload_id": upload_id})).one()
+        candidate_bytes = (await session.execute(text(
+            "SELECT octet_length(CAST(:payload AS jsonb)::text)"),
+            {"payload": json.dumps(payload, ensure_ascii=False)})).scalar_one()
+        return (not max_jobs or usage.jobs + 1 <= max_jobs) and (
+            not max_bytes or usage.bytes + candidate_bytes <= max_bytes)
+
+    async def prune_terminal_snapshots(self, session: AsyncSession, *, older_than_days: int, limit: int = 50) -> int:
+        """Drop only old terminal snapshot bodies; caller owns commit/rollback.
+
+        Preserve job identity/digests/attempts as a tombstone against automatic
+        re-admission. This internal method is not scheduled in production.
+        """
+        if type(older_than_days) is not int or not 1 <= older_than_days <= 365:
+            raise ValueError("Invalid snapshot retention period.")
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("Invalid snapshot cleanup batch size.")
+        now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
+        cutoff = now - timedelta(days=older_than_days)
+        candidates = (await session.execute(select(DocumentUpload.upload_id).join(
+            GraphContinuationJob, GraphContinuationJob.upload_id == DocumentUpload.upload_id).where(
+                GraphContinuationJob.status.in_(("stopped", "completed")),
+                GraphContinuationJob.updated_at < cutoff,
+                text("graph_continuation_jobs.snapshot_json::jsonb <> '{}'::jsonb"))
+            .order_by(GraphContinuationJob.updated_at, DocumentUpload.upload_id).limit(limit)
+            .with_for_update(of=DocumentUpload, skip_locked=True))).scalars().all()
+        pruned = 0
+        for upload_id in candidates:
+            job = await self._job(session, upload_id)
+            if job is not None and job.status in {"stopped", "completed"} and job.updated_at < cutoff and job.snapshot_json:
+                job.snapshot_json = {}
+                pruned += 1
+        return pruned
+
     async def schedule(
         self, session: AsyncSession, *, upload_id: str, document_task_id: str,
         chunks: Sequence[DocumentChunk], retry_after_seconds: float,
@@ -198,6 +252,8 @@ class GraphContinuationService:
             if existing.snapshot_sha256 != digest or existing.contract_sha256 != contract:
                 raise ValueError("An existing graph job cannot be reset with different evidence or configuration.")
             return existing  # Duplicate scheduling cannot reset due time/attempts.
+        if not await self._snapshot_capacity(session, record.upload_id, payload):
+            return None
         if existing is not None:
             await session.delete(existing)
             await session.flush()
@@ -306,6 +362,26 @@ class GraphContinuationService:
     ) -> dict[str, GraphExtractionResponse] | None:
         inputs = await self.load_input(session, claim)
         return None if inputs is None else inputs.checkpoints
+
+    async def prepare_publication(
+        self, session: AsyncSession, claim: GraphJobClaim, extraction: GraphExtractionResponse,
+    ) -> GraphPublicationCandidate | None:
+        """Preflight under current document/job locks; caller owns transaction.
+
+        Unlike load_input, retain locks until caller commits/rolls back. The
+        returned value is not durable authority, a receipt or permission to
+        publish after releasing this transaction. No remote writes occur here.
+        """
+        locked = await self._locked_claim(session, claim)
+        if locked is None:
+            return None
+        record, job, _ = locked
+        chunks = snapshot_chunks(job.snapshot_json, record)
+        if snapshot_digest(job.snapshot_json) != job.snapshot_sha256 or extraction_contract(chunks) != job.contract_sha256:
+            raise ValueError("Graph snapshot/configuration changed.")
+        return prepare_graph_publication(extraction, chunks, upload_id=record.upload_id,
+            course_id=record.course_uuid, document_task_id=record.task_id,
+            document_name=record.original_filename)
 
     async def load_input(
         self, session: AsyncSession, claim: GraphJobClaim,
