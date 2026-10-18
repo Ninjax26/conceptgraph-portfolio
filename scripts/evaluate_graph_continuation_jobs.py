@@ -237,6 +237,21 @@ async def run(args):
                 assert not session.in_transaction()
             checks["publication_preflight_keeps_document_fence_and_rejects_stale_claim"] = True
 
+            async with sessions() as session:
+                restored = await service.restore_publication(session, replace(claim, chunks=()), candidate)
+                assert restored.model_dump() == stage_result.model_dump()
+                assert session.in_transaction()
+                async with sessions() as other:
+                    assert (await other.execute(select(DocumentUpload.upload_id).where(
+                        DocumentUpload.upload_id == upload_id).with_for_update(skip_locked=True))).scalar_one_or_none() is None
+                await session.rollback()
+                async with sessions() as other:
+                    assert (await other.execute(select(DocumentUpload.upload_id).where(
+                        DocumentUpload.upload_id == upload_id).with_for_update(skip_locked=True))).scalar_one() == upload_id
+                assert await service.restore_publication(session, replace(claim, claim_token="stale"), candidate) is None
+                assert not session.in_transaction()
+            checks["publication_replay_uses_current_sources_keeps_fence_and_rejects_stale_claim"] = True
+
             changed_graph = graph.model_copy(update={"nodes":[graph.nodes[0].model_copy(update={"name":"Domain Name System"}), graph.nodes[1]]})
             async with sessions() as session:
                 assert await service.save_section_checkpoint(session, claim, batch=batch, extraction=changed_graph)

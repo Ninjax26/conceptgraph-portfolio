@@ -15,6 +15,30 @@ class GraphPublicationCandidate:
     sha256: str
 
 
+def restore_graph_publication(candidate: GraphPublicationCandidate, chunks: Sequence[DocumentChunk], *,
+                              upload_id: str, course_id: str, document_task_id: str,
+                              document_name: str) -> GraphExtractionResponse:
+    """Revalidate an exact saved candidate against freshly fenced source input.
+
+    A digest detects corruption, not authority. Identity and sources must come
+    from the current locked document/job, never from the saved candidate itself.
+    This performs no persistence, remote writes, lease checks or reconciliation.
+    """
+    if (not isinstance(candidate.payload_json, str) or not isinstance(candidate.sha256, str)
+            or hashlib.sha256(candidate.payload_json.encode("utf-8")).hexdigest() != candidate.sha256):
+        raise ValueError("Saved publication candidate has an invalid digest.")
+    try:
+        payload = json.loads(candidate.payload_json)
+        extraction = GraphExtractionResponse.model_validate(payload["extraction"])
+    except (ValueError, TypeError, KeyError) as exc:
+        raise ValueError("Saved publication candidate has an invalid graph payload.") from exc
+    rebuilt = prepare_graph_publication(extraction, chunks, upload_id=upload_id, course_id=course_id,
+        document_task_id=document_task_id, document_name=document_name)
+    if rebuilt != candidate:
+        raise ValueError("Saved publication candidate does not match the current source execution.")
+    return extraction
+
+
 def prepare_graph_publication(extraction: GraphExtractionResponse, chunks: Sequence[DocumentChunk], *,
                               upload_id: str, course_id: str, document_task_id: str,
                               document_name: str) -> GraphPublicationCandidate:

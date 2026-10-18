@@ -43,6 +43,20 @@ need implementation and tests. No graph-only completion or dispatcher was added.
 No parsing, OCR, embedding, vector deletion, schema/environment change, provider
 call or production test-data mutation is performed by this increment.
 
+## Saved-candidate replay validation (internal, not dispatched)
+
+`graph_publication_candidate.restore_graph_publication` checks a saved candidate's
+exact JSON checksum, validates its graph, then rebuilds the canonical candidate
+against independently supplied current chunks and document identity. Changed
+source text/metadata or identity, malformed/coerced payloads and extra envelope
+fields fail closed. Restored output is independent of the saved JSON.
+
+The caller must obtain those inputs under the current document/job fence; trusting
+identity or chunks supplied by the saved payload would defeat the check. A checksum
+does not authenticate an author or establish graph correctness. This pure helper
+does not persist candidates, hold locks, publish graphs, complete jobs or reconcile
+ambiguous remote commits. There is no replay worker or activation change.
+
 ## Initial offline verification — c29706a
 
 Ten new tests use an **authored managed-transaction double**, not a Neo4j server.

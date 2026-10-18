@@ -1,9 +1,12 @@
 """Pure publication preflight, not semantic accuracy or database-fence tests."""
 
 import json
+import hashlib
 import unittest
 
-from app.services.graph_publication_candidate import prepare_graph_publication
+from app.services.graph_publication_candidate import (
+    GraphPublicationCandidate, prepare_graph_publication, restore_graph_publication,
+)
 from app.services.parser_service import DocumentChunk
 from tests.test_graph_projection_replacement import graph
 
@@ -85,3 +88,40 @@ class PublicationCandidateTests(unittest.TestCase):
     def test_aggregate_not_subject_to_provider_batch_limits(self):
         chunks = [DocumentChunk(id=f"chunk-{i}", text="Evidence", metadata=self.chunks[0].metadata) for i in range(13)]
         self.assertEqual(len(json.loads(self.candidate(graph(13), chunks).payload_json)["extraction"]["nodes"]), 13)
+
+    def test_saved_candidate_round_trip_returns_independent_validated_graph(self):
+        candidate = self.candidate()
+        restored = restore_graph_publication(candidate, self.chunks, **self.identity)
+        self.assertEqual(restored.model_dump(), graph().model_dump())
+        restored.nodes[0].description = "Local mutation"
+        self.assertEqual(restore_graph_publication(candidate, self.chunks, **self.identity).nodes[0].description, "")
+
+    def test_saved_candidate_rejects_corrupt_digest_or_payload(self):
+        candidate = self.candidate()
+        for payload, digest in ((candidate.payload_json, "0"*64), ("not json", None),
+                                ("[]", None), ('{"extraction":null}', None)):
+            digest = digest or hashlib.sha256(payload.encode()).hexdigest()
+            with self.subTest(payload=payload[:20]), self.assertRaises(ValueError):
+                restore_graph_publication(GraphPublicationCandidate(payload, digest), self.chunks, **self.identity)
+
+    def test_saved_candidate_cannot_authorize_another_execution_or_changed_sources(self):
+        candidate = self.candidate()
+        for key in self.identity:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                restore_graph_publication(candidate, self.chunks, **{**self.identity, key:"other"})
+        changed = [DocumentChunk(id=self.chunks[0].id, text="Changed evidence", metadata=self.chunks[0].metadata), self.chunks[1]]
+        with self.assertRaises(ValueError):
+            restore_graph_publication(candidate, changed, **self.identity)
+
+    def test_recomputed_digest_does_not_bypass_source_or_structure_validation(self):
+        for update in (lambda p: p["extraction"]["nodes"][0].update(page_number=1.0),
+                       lambda p: p["extraction"]["nodes"][0].update(source_chunk_id="foreign"),
+                       lambda p: p.update(identity={}),
+                       lambda p: p.update(source_sha256="0"*64),
+                       lambda p: p.update(unexpected=True)):
+            payload = json.loads(self.candidate().payload_json)
+            update(payload)
+            raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            candidate = GraphPublicationCandidate(raw, hashlib.sha256(raw.encode()).hexdigest())
+            with self.subTest(payload=raw[:30]), self.assertRaises(ValueError):
+                restore_graph_publication(candidate, self.chunks, **self.identity)

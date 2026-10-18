@@ -22,7 +22,9 @@ from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
 from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
-from app.services.graph_publication_candidate import GraphPublicationCandidate, prepare_graph_publication
+from app.services.graph_publication_candidate import (
+    GraphPublicationCandidate, prepare_graph_publication, restore_graph_publication,
+)
 from app.services.parser_service import DocumentChunk
 from app.services.upload_service import UploadService
 from app.schemas.extraction import GraphExtractionResponse
@@ -372,6 +374,32 @@ class GraphContinuationService:
         returned value is not durable authority, a receipt or permission to
         publish after releasing this transaction. No remote writes occur here.
         """
+        sources = await self._publication_sources(session, claim)
+        if sources is None:
+            return None
+        record, chunks = sources
+        return prepare_graph_publication(extraction, chunks, upload_id=record.upload_id,
+            course_id=record.course_uuid, document_task_id=record.task_id,
+            document_name=record.original_filename)
+
+    async def restore_publication(
+        self, session: AsyncSession, claim: GraphJobClaim, candidate: GraphPublicationCandidate,
+    ) -> GraphExtractionResponse | None:
+        """Validate replay under current locks, without releasing or completing them.
+
+        No saved identity or caller-supplied chunks establish authority. Caller
+        owns commit/rollback, including on validation errors; no remote I/O occurs.
+        This is not a durable receipt or cross-store reconciliation operation.
+        """
+        sources = await self._publication_sources(session, claim)
+        if sources is None:
+            return None
+        record, chunks = sources
+        return restore_graph_publication(candidate, chunks, upload_id=record.upload_id,
+            course_id=record.course_uuid, document_task_id=record.task_id,
+            document_name=record.original_filename)
+
+    async def _publication_sources(self, session: AsyncSession, claim: GraphJobClaim):
         locked = await self._locked_claim(session, claim)
         if locked is None:
             return None
@@ -379,9 +407,7 @@ class GraphContinuationService:
         chunks = snapshot_chunks(job.snapshot_json, record)
         if snapshot_digest(job.snapshot_json) != job.snapshot_sha256 or extraction_contract(chunks) != job.contract_sha256:
             raise ValueError("Graph snapshot/configuration changed.")
-        return prepare_graph_publication(extraction, chunks, upload_id=record.upload_id,
-            course_id=record.course_uuid, document_task_id=record.task_id,
-            document_name=record.original_filename)
+        return record, chunks
 
     async def load_input(
         self, session: AsyncSession, claim: GraphJobClaim,

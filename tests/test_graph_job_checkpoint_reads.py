@@ -67,6 +67,47 @@ class QualifiedCheckpointReads(unittest.TestCase):
 
 
 class ReadTransactionBoundary(unittest.IsolatedAsyncioTestCase):
+    async def test_replay_lost_claim_never_restores_candidate(self):
+        service = GraphContinuationService()
+        with patch.object(service, "_locked_claim", AsyncMock(return_value=None)), \
+             patch("app.services.graph_continuation_service.restore_graph_publication") as restore:
+            self.assertIsNone(await service.restore_publication(SimpleNamespace(), SimpleNamespace(), "untrusted"))
+        restore.assert_not_called()
+
+    async def test_replay_uses_persisted_sources_and_current_identity_without_finishing_transaction(self):
+        service = GraphContinuationService()
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+        record = SimpleNamespace(upload_id="current", course_uuid="course", task_id="task", original_filename="source.pdf")
+        job = SimpleNamespace(snapshot_json={}, snapshot_sha256="digest", contract_sha256="contract")
+        with patch.object(service, "_locked_claim", AsyncMock(return_value=(record, job, None))), \
+             patch("app.services.graph_continuation_service.snapshot_chunks", return_value=("persisted",)), \
+             patch("app.services.graph_continuation_service.snapshot_digest", return_value="digest"), \
+             patch("app.services.graph_continuation_service.extraction_contract", return_value="contract"), \
+             patch("app.services.graph_continuation_service.restore_graph_publication", return_value="graph") as restore:
+            self.assertEqual(await service.restore_publication(session, SimpleNamespace(chunks=("foreign",)), "candidate"), "graph")
+        self.assertEqual(restore.call_args.args, ("candidate", ("persisted",)))
+        self.assertEqual(restore.call_args.kwargs, dict(upload_id="current", course_id="course",
+            document_task_id="task", document_name="source.pdf"))
+        session.commit.assert_not_awaited()
+        session.rollback.assert_not_awaited()
+
+    async def test_replay_changed_snapshot_or_contract_never_restores_candidate(self):
+        for digest, contract in (("stale", "contract"), ("digest", "stale")):
+            service = GraphContinuationService()
+            session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+            job = SimpleNamespace(snapshot_json={}, snapshot_sha256=digest, contract_sha256=contract)
+            with self.subTest(digest=digest, contract=contract), \
+                 patch.object(service, "_locked_claim", AsyncMock(return_value=(SimpleNamespace(), job, None))), \
+                 patch("app.services.graph_continuation_service.snapshot_chunks", return_value=()), \
+                 patch("app.services.graph_continuation_service.snapshot_digest", return_value="digest"), \
+                 patch("app.services.graph_continuation_service.extraction_contract", return_value="contract"), \
+                 patch("app.services.graph_continuation_service.restore_graph_publication") as restore:
+                with self.assertRaisesRegex(ValueError, "changed"):
+                    await service.restore_publication(session, SimpleNamespace(), "candidate")
+            restore.assert_not_called()
+            session.commit.assert_not_awaited()
+            session.rollback.assert_not_awaited()
+
     async def test_publication_lost_claim_never_builds_candidate(self):
         service = GraphContinuationService()
         session = SimpleNamespace()

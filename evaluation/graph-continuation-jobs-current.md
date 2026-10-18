@@ -2,7 +2,7 @@
 
 Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
 
-27 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+28 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
 
 - additive_schema_restart_and_due_lease_indexes: passed
 - database_rejects_incomplete_running_lease_and_excess_attempts: passed
@@ -14,6 +14,7 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - persisted_empty_recovery_and_sections_resume_without_provider_calls: passed
 - graph_only_stage_renews_real_lease_and_resumes_saved_batches: passed
 - publication_preflight_keeps_document_fence_and_rejects_stale_claim: passed
+- publication_replay_uses_current_sources_keeps_fence_and_rejects_stale_claim: passed
 - changed_section_concepts_invalidate_recovery_save: passed
 - changed_section_concepts_invalidate_recovery_read: passed
 - graph_only_stage_durably_defers_known_quota_without_hot_retry: passed

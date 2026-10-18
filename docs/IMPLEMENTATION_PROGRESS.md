@@ -1,6 +1,6 @@
 # ConceptGraph implementation and verification ledger
 
-Updated: 2026-10-17 (India). This is the current roadmap; older numbered scaling phases in the handbook describe earlier work.
+Updated: 2026-10-18 (India). This is the current roadmap; older numbered scaling phases in the handbook describe earlier work.
 
 ## Operating boundaries
 
@@ -20,7 +20,7 @@ Updated: 2026-10-17 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: inactive extraction stage shipped; safeguards/accounting local | Internal input/extraction/deferral checkpoint `0d7124a` is deployed but undispatched. Snapshot safeguards, fenced publication preflight and Groq/Gemini-reported token telemetry remain local. Latest checks: 487 backend tests and 27 prior isolated PostgreSQL job/stage checks, zero hosted calls. Neo4j projection remains a separate primitive, not cross-store completion. Next: fenced publication/crash reconciliation and bounded dispatch. Hosted inference admission, full split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: safeguards shipped; fenced replay release prepared | Safeguards and Groq/Gemini usage telemetry deployed at `f144b42`; CI and exact public API readiness passed. Automatic continuation remains disabled. Saved-candidate validation plus fenced replay pass all 495 backend tests and 28 isolated PostgreSQL checks, with nine frontend tests/build passing. Actual release verification is recorded separately. Next: durable publication intent/receipt, fenced cross-store completion/crash reconciliation and bounded dispatch. Hosted inference admission, full split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,10 @@ Updated: 2026-10-17 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+18 October fenced replay checkpoint: `GraphContinuationService.restore_publication` now reloads the current document/job claim, persisted snapshot and extraction contract before restoring a candidate. Preparation and restoration share the same internal source validation; neither commits/releases successful locks nor performs network I/O. Three new mocked boundary tests and all 495 backend tests pass (2.947 seconds, run from `/private/tmp` without project `.env`). The isolated PostgreSQL runner passes 28 checks, including current-source replay with caller chunks ignored, a competing row-lock attempt blocked until rollback, and stale-token rejection. It removes its random schema; the disposable server was stopped and removed. Zero hosted calls or production mutations. The report hashes reflect this increment. No durable publication intent/receipt, remote graph write, job completion or automatic dispatch has been implemented; cross-store crash reconciliation remains the next gate. Record any actual release separately.
+
+18 October replay-validation checkpoint: added internal `restore_graph_publication` beside publication preflight. It verifies the exact saved JSON digest, revalidates graph structure, rebuilds the candidate from caller-supplied current source execution and requires exact canonical equality. Corruption, malformed payloads, changed evidence, foreign identity, coerced page types and unexpected envelope fields are rejected, even with a recomputed checksum. Four additional tests cover round-trip independence and rejection paths; all 14 candidate tests and 492 backend tests pass (full suite 3.393 seconds from `/private/tmp`, without project `.env`), compile and diff checks pass. No database schema, provider call, production mutation or dispatcher change. This helper is local/unreleased and has no durable storage or runtime caller. A checksum is not authentication, semantic truth or a live lease: the future publisher must load current authority under locks and implement durable intent/receipt plus ambiguous-commit/deletion reconciliation. The previous PostgreSQL report was not regenerated for this pure helper.
 
 15 October local checkpoint: added `GraphContinuationService.load_input`, which returns persisted snapshot chunks and validated checkpoints together under the existing claim fence, then releases read locks before extraction. This prevents the future processor from pairing trusted checkpoints with stale caller-supplied chunks. The existing checkpoint-only reader remains compatible. Nine focused tests pass; full offline suite: 446 tests pass. This helper is not dispatched, published or deployed; automatic continuation remains disabled and cross-store completion is still unfinished.
 
@@ -131,6 +135,8 @@ More workers cannot create additional free provider capacity. Current entry poin
 App heartbeat `conceptgraph-phases-3-8`: every four hours, returning to this chat. It resumes the current unfinished checkpoint, does not guarantee one phase per run, and reports meaningful results or actionable blockers. Disable after verified Phase 8 completion. Local execution requires the computer and desktop app to remain running.
 
 ## Release checkpoint
+
+- Replay-validation local checkpoint: nine frontend tests and `npm run build` (TypeScript plus Vite, 8.10 seconds for Vite) pass alongside 492 offline backend tests, compile and diff checks. Four scoped files remain local and uncommitted; no release or new production revision is claimed for this helper. Current verified deployed baseline remains `f144b42`; full cross-store publication acceptance is still open.
 
 - Safeguards CI follow-up: release `b3b2f7b` reached public API readiness with no degraded services, but GitHub run `39123447272` failed one mocked Groq test because it relied on a locally configured key. The fixture now supplies an explicit dummy key; production keys and runtime behavior are unchanged. The complete 488-test suite was rerun from `/private/tmp` without loading the project `.env`. Frontend CI passed. Authenticated Render logs remain unavailable until sign-in, and automatic continuation is still disabled.
 
