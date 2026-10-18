@@ -132,6 +132,8 @@ App heartbeat `conceptgraph-phases-3-8`: every four hours, returning to this cha
 
 ## Release checkpoint
 
+- Safeguards CI follow-up: release `b3b2f7b` reached public API readiness with no degraded services, but GitHub run `39123447272` failed one mocked Groq test because it relied on a locally configured key. The fixture now supplies an explicit dummy key; production keys and runtime behavior are unchanged. The complete 488-test suite was rerun from `/private/tmp` without loading the project `.env`. Frontend CI passed. Authenticated Render logs remain unavailable until sign-in, and automatic continuation is still disabled.
+
 - 18 October safeguards release verification: all 488 offline backend tests pass (12.269 seconds), including concurrent-thread reported-usage isolation; nine frontend tests and TypeScript/Vite production build pass. A PostgreSQL runner interrupted long enough for its 180-second claim to expire failed its recovery-checkpoint assertion; a fresh uninterrupted run passes all 27 checks with zero hosted calls and removes its randomized schema. Production lease enforcement was not weakened. Snapshot budgets, terminal-body pruning, publication preflight and reported Groq/Gemini usage remain additive/internal; automatic graph continuation stays disabled. Render authentication has expired, so authenticated deployment-log verification needs sign-in; do not infer deployment success from these local checks.
 
 - Release preparation: 362 backend tests, nine frontend tests, TypeScript/Vite build and compile checks passed. Phase 1 report hashes match current runtime code; Phase 2 evaluator hashes match the saved offline report.

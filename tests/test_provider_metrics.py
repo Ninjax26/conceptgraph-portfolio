@@ -39,12 +39,13 @@ class ProviderMetricsTests(unittest.TestCase):
 
     def test_groq_truncated_graph_still_captures_consumed_usage(self):
         from app.services.ingestion_service import IngestionService
+        from app.services.ingestion_service import settings
         client = Mock()
         client.chat.completions.create.return_value = SimpleNamespace(
             usage=SimpleNamespace(prompt_tokens=12, completion_tokens=7, total_tokens=19),
             choices=[SimpleNamespace(finish_reason="length", message=SimpleNamespace(content="{}"))])
         metrics = ProviderMetrics()
-        with patch("app.services.ingestion_service.Groq", return_value=client), self.assertRaises(GraphStructureError):
+        with patch.object(settings, "groq_api_key", "offline-fixture-key"), patch("app.services.ingestion_service.Groq", return_value=client), self.assertRaises(GraphStructureError):
             metrics.observe("groq", "graph_extraction", lambda: IngestionService(
                 graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())._extract_with_groq(
                     "evidence", allow_repair=False), input_characters=4)
