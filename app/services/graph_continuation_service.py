@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import GraphStructureError
 from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
-from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint
+from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.graph_publication_candidate import (
@@ -408,6 +408,103 @@ class GraphContinuationService:
         if snapshot_digest(job.snapshot_json) != job.snapshot_sha256 or extraction_contract(chunks) != job.contract_sha256:
             raise ValueError("Graph snapshot/configuration changed.")
         return record, chunks
+
+    async def save_publication_draft(
+        self, session: AsyncSession, claim: GraphJobClaim, candidate: GraphPublicationCandidate,
+    ) -> bool:
+        """Stage one immutable draft under the claim; caller owns commit/rollback.
+
+        This is not a dispatch/commit intent or receipt. It is safe to discard
+        with the job because no external write is initiated by this operation.
+        """
+        if await self.restore_publication(session, claim, candidate) is None:
+            return False
+        if len(candidate.payload_json.encode("utf-8")) > MAX_SNAPSHOT_BYTES:
+            raise ValueError("Graph publication draft exceeds its storage bound.")
+        # Same-transaction replay must see a prior staged insert even with the
+        # application's autoflush=False session configuration.
+        await session.flush()
+        saved = (await session.execute(select(GraphPublicationDraft).where(
+            GraphPublicationDraft.job_id == claim.job_id).with_for_update()
+            .execution_options(populate_existing=True))).scalar_one_or_none()
+        if saved is not None:
+            if (saved.payload_json, saved.payload_sha256) != (candidate.payload_json, candidate.sha256):
+                raise ValueError("Graph job already has a different publication draft.")
+            return True
+        if not await self._draft_capacity(session, candidate):
+            return False
+        session.add(GraphPublicationDraft(job_id=claim.job_id,
+            payload_json=candidate.payload_json, payload_sha256=candidate.sha256))
+        return True
+
+    @staticmethod
+    async def _draft_capacity(session: AsyncSession, candidate: GraphPublicationCandidate) -> bool:
+        """Serialize new admissions; count every retained draft, not only active jobs."""
+        max_jobs, max_bytes = settings.graph_draft_max_jobs, settings.graph_draft_max_bytes
+        if not max_jobs and not max_bytes:
+            return True
+        await session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+            {"key": "conceptgraph:graph-snapshot-admission"})
+        await session.flush()
+        usage = (await session.execute(select(func.count().label("jobs"),
+            func.coalesce(func.sum(func.octet_length(GraphPublicationDraft.payload_json)), 0).label("bytes")))).one()
+        return (not max_jobs or usage.jobs + 1 <= max_jobs) and (
+            not max_bytes or usage.bytes + len(candidate.payload_json.encode("utf-8")) <= max_bytes)
+
+    async def prune_terminal_drafts(self, session: AsyncSession, *, older_than_days: int, limit: int = 50) -> int:
+        """Remove old unpublished drafts only; caller owns transaction, no scheduler.
+
+        Preserve job tombstones/attempts, snapshots, READY results and checkpoints.
+        These cascading drafts must never serve as remote-write receipts.
+        """
+        if type(older_than_days) is not int or not 1 <= older_than_days <= 365:
+            raise ValueError("Invalid draft retention period.")
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("Invalid draft cleanup batch size.")
+        await session.flush()  # Repeated caller-owned cleanup must see pending deletes.
+        cutoff = (await session.execute(select(func.clock_timestamp()))).scalar_one() - timedelta(days=older_than_days)
+        uploads = (await session.execute(select(DocumentUpload.upload_id).join(
+            GraphContinuationJob, GraphContinuationJob.upload_id == DocumentUpload.upload_id).join(
+                GraphPublicationDraft, GraphPublicationDraft.job_id == GraphContinuationJob.id).where(
+                    GraphContinuationJob.status.in_(("stopped", "completed")), GraphContinuationJob.updated_at < cutoff)
+            .order_by(GraphContinuationJob.updated_at, DocumentUpload.upload_id).limit(limit)
+            .with_for_update(of=DocumentUpload, skip_locked=True))).scalars().all()
+        pruned = 0
+        for upload_id in uploads:
+            job = await self._job(session, upload_id)
+            if job is None or job.status not in {"stopped", "completed"} or job.updated_at >= cutoff:
+                continue
+            draft = (await session.execute(select(GraphPublicationDraft).where(
+                GraphPublicationDraft.job_id == job.id).with_for_update()
+                .execution_options(populate_existing=True))).scalar_one_or_none()
+            if draft is not None:
+                await session.delete(draft)
+                pruned += 1
+        return pruned
+
+    async def load_publication_draft(
+        self, session: AsyncSession, claim: GraphJobClaim,
+    ) -> GraphPublicationCandidate | None:
+        """Read/revalidate a saved draft under current locks; caller owns transaction.
+
+        None means missing draft or lost authority, never permission to publish.
+        Locks must not be released before a future publisher rechecks authority.
+        """
+        sources = await self._publication_sources(session, claim)
+        if sources is None:
+            return None
+        await session.flush()
+        saved = (await session.execute(select(GraphPublicationDraft).where(
+            GraphPublicationDraft.job_id == claim.job_id).with_for_update()
+            .execution_options(populate_existing=True))).scalar_one_or_none()
+        if saved is None:
+            return None
+        candidate = GraphPublicationCandidate(saved.payload_json, saved.payload_sha256)
+        record, chunks = sources
+        restore_graph_publication(candidate, chunks, upload_id=record.upload_id,
+            course_id=record.course_uuid, document_task_id=record.task_id,
+            document_name=record.original_filename)
+        return candidate
 
     async def load_input(
         self, session: AsyncSession, claim: GraphJobClaim,

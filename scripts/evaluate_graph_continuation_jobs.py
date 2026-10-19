@@ -22,12 +22,12 @@ from uuid import uuid4
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.core import database
 from app.core.config import Settings
-from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint
+from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft
 from app.schemas.extraction import ConceptNode, GraphExtractionResponse
 from app.services import graph_continuation_service as jobs
 from app.services import ingestion_service as ingestion
@@ -252,6 +252,101 @@ async def run(args):
                 assert not session.in_transaction()
             checks["publication_replay_uses_current_sources_keeps_fence_and_rejects_stale_claim"] = True
 
+            async with sessions() as session:
+                assert await service.save_publication_draft(session, claim, candidate)
+                assert await service.save_publication_draft(session, claim, candidate)
+                assert await service.load_publication_draft(session, claim) == candidate
+                await session.rollback()
+            async with sessions() as session:
+                assert await service.load_publication_draft(session, claim) is None
+                await session.rollback()
+                assert await service.save_publication_draft(session, claim, candidate)
+                await session.commit()
+            with patch.object(database, "postgres_engine", engine):
+                await database.initialize_database_schema()
+            async with sessions() as session:
+                assert await service.load_publication_draft(session, replace(claim, chunks=())) == candidate
+                assert await service.load_publication_draft(session, replace(claim, claim_token="stale")) is None
+            checks["draft_same_transaction_idempotency_rollback_and_restart_preservation"] = True
+
+            draft_bytes = len(candidate.payload_json.encode("utf-8"))
+            for max_bytes, expected in ((draft_bytes*2, True), (draft_bytes*2-1, False)):
+                with patch.object(jobs, "settings", jobs.settings.model_copy(update={
+                        "graph_draft_max_jobs":2, "graph_draft_max_bytes":max_bytes})):
+                    async with sessions() as session:
+                        assert await service._draft_capacity(session, candidate) is expected
+                        await session.rollback()
+            with patch.object(jobs, "settings", jobs.settings.model_copy(update={"graph_draft_max_jobs":1})):
+                async with sessions() as session:
+                    assert not await service._draft_capacity(session, candidate)
+                    assert await service.save_publication_draft(session, claim, candidate)
+                    await session.rollback()
+            checks["draft_logical_byte_and_count_limits_preserve_idempotent_saved_candidate"] = True
+
+            contenders = []
+            for index in range(2):
+                contender_id, contender_task, _, contender_result = await prepared()
+                await make_due(sessions, contender_id)
+                async with sessions() as session:
+                    contender_claim = await service.claim_next(session, lease_owner=f"draft-contender-{index}", lease_seconds=180)
+                    assert contender_claim.upload_id == contender_id
+                    contender_candidate = await service.prepare_publication(session, contender_claim,
+                        GraphExtractionResponse(empty_extraction=True))
+                    await session.rollback()
+                contenders.append((contender_claim, contender_candidate, contender_result))
+            start_admissions = asyncio.Event()
+            async def save_contender(item):
+                contender_claim, contender_candidate, _ = item
+                async with sessions() as session:
+                    await start_admissions.wait()
+                    accepted = await service.save_publication_draft(session, contender_claim, contender_candidate)
+                    await session.commit()
+                    return accepted
+            with patch.object(jobs, "settings", jobs.settings.model_copy(update={"graph_draft_max_jobs":2})):
+                tasks = [asyncio.create_task(save_contender(item)) for item in contenders]
+                start_admissions.set()
+                assert sum(await asyncio.gather(*tasks)) == 1
+            async with sessions() as session:
+                assert (await session.execute(select(func.count()).select_from(GraphPublicationDraft))).scalar_one() == 2
+                for contender_claim, _, contender_result in contenders:
+                    assert (await UploadService().get_upload(session, contender_claim.upload_id)).result_json == contender_result
+                # Remove only these authored disposable fixture documents;
+                # their draft/job/checkpoint rows cascade inside this schema.
+                await session.execute(delete(DocumentUpload).where(DocumentUpload.upload_id.in_(
+                    [item[0].upload_id for item in contenders])))
+                await session.commit()
+            checks["two_concurrent_sessions_admit_one_draft_at_last_slot_without_ready_mutation"] = True
+
+            async with sessions() as session:
+                changed = stage_result.model_copy(deep=True)
+                changed.nodes[0].description = "Different validated candidate"
+                alternative = await service.prepare_publication(session, claim, changed)
+                try:
+                    await service.save_publication_draft(session, claim, alternative)
+                except ValueError as exc:
+                    assert "different" in str(exc)
+                    await session.rollback()
+                else:
+                    raise AssertionError("Existing draft was replaced")
+                assert await service.load_publication_draft(session, claim) == candidate
+                await session.rollback()
+                try:
+                    await session.execute(text("UPDATE graph_publication_drafts SET payload_json='' WHERE job_id=:job"), {"job":claim.job_id})
+                    await session.commit()
+                except IntegrityError:
+                    await session.rollback()
+                else:
+                    raise AssertionError("Database accepted an empty draft")
+            checks["draft_conflict_and_database_storage_constraint_fail_closed"] = True
+
+            async with sessions() as session:
+                await session.execute(text("DELETE FROM graph_continuation_jobs WHERE id=:job"), {"job":claim.job_id})
+                assert (await session.execute(select(func.count()).select_from(GraphPublicationDraft))).scalar_one() == 0
+                assert (await UploadService().get_upload(session, upload_id)).result_json == original
+                await session.rollback()
+                assert await service.load_publication_draft(session, claim) == candidate
+            checks["job_deletion_cascades_unpublished_draft_without_changing_ready_result_and_rolls_back"] = True
+
             changed_graph = graph.model_copy(update={"nodes":[graph.nodes[0].model_copy(update={"name":"Domain Name System"}), graph.nodes[1]]})
             async with sessions() as session:
                 assert await service.save_section_checkpoint(session, claim, batch=batch, extraction=changed_graph)
@@ -472,6 +567,36 @@ async def run(args):
                 assert len(await UploadService().load_graph_checkpoints(session, upload_id)) == 3
                 assert (await UploadService().get_upload(session, upload_id)).result_json == original
             checks["terminal_snapshot_cleanup_rolls_back_and_preserves_exhausted_tombstone"] = True
+            async with sessions() as session:
+                # Snapshot maintenance refreshed updated_at; recent terminal
+                # jobs must not be pruned. Accelerate only the fixture clock.
+                assert await service.prune_terminal_drafts(session, older_than_days=7, limit=1) == 0
+                terminal = (await session.execute(select(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == upload_id))).scalar_one()
+                terminal.updated_at = datetime.now(timezone.utc) - timedelta(days=8)
+                await session.commit()
+                await session.execute(select(DocumentUpload).where(
+                    DocumentUpload.upload_id == upload_id).with_for_update())
+                async with sessions() as other:
+                    assert await service.prune_terminal_drafts(other, older_than_days=7, limit=1) == 0
+                    await other.rollback()
+                await session.rollback()
+                checks["terminal_draft_cleanup_skips_document_locked_by_another_session"] = True
+                assert await service.prune_terminal_drafts(session, older_than_days=7, limit=1) == 1
+                assert await service.prune_terminal_drafts(session, older_than_days=7, limit=1) == 0
+                await session.rollback()
+                assert (await session.execute(select(func.count()).select_from(GraphPublicationDraft))).scalar_one() == 1
+                await session.rollback()
+                assert await service.prune_terminal_drafts(session, older_than_days=7, limit=1) == 1
+                await session.commit()
+                assert (await session.execute(select(func.count()).select_from(GraphPublicationDraft))).scalar_one() == 0
+                terminal = (await session.execute(select(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == upload_id))).scalar_one()
+                assert terminal.status == "stopped" and terminal.attempt_count == retained_attempts
+                assert terminal.snapshot_sha256 == retained_digest and terminal.snapshot_json == {}
+                assert len(await UploadService().load_graph_checkpoints(session, upload_id)) == 3
+                assert (await UploadService().get_upload(session, upload_id)).result_json == original
+            checks["terminal_draft_cleanup_is_bounded_repeatable_rollback_safe_and_preserves_job_history"] = True
     finally:
         if engine is not None:
             await engine.dispose()
@@ -490,12 +615,13 @@ async def run(args):
             "app/services/graph_job_extraction.py", "tests/test_graph_job_extraction.py",
             "app/core/config.py", "tests/test_graph_snapshot_budget.py",
             "app/services/graph_publication_candidate.py", "tests/test_graph_publication_candidate.py",
-            "app/services/ingestion_service.py", "app/services/upload_service.py")},
+            "app/services/ingestion_service.py", "app/services/upload_service.py", "tests/test_graph_publication_draft.py")},
         "limitations": [
             "Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.",
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
+            "Saved drafts are not remote-write intents or receipts; cascade deletion does not solve late remote commits. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
             "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
             "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.",
         ],

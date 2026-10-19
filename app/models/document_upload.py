@@ -151,6 +151,21 @@ class GraphContinuationJob(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class GraphPublicationDraft(Base):
+    """Saved candidate only; never proof that a remote projection committed."""
+
+    __tablename__ = "graph_publication_drafts"
+    __table_args__ = (
+        CheckConstraint("length(payload_sha256) = 64", name="ck_graph_draft_digest"),
+        CheckConstraint("octet_length(payload_json) BETWEEN 1 AND 8388608", name="ck_graph_draft_bytes"),
+    )
+
+    job_id: Mapped[str] = mapped_column(String(64), ForeignKey("graph_continuation_jobs.id", ondelete="CASCADE"), primary_key=True)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ProviderBudget(Base):
     __tablename__ = "provider_budgets"
 
