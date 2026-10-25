@@ -10,6 +10,7 @@ from pydantic import SecretStr
 from app.services.evidence_facets import comparison_facets
 from app.services.rerank_service import RerankService
 from app.services.citation_service import prepare_evidence
+from app.services.provider_metrics import provider_metrics
 
 
 class EvidenceFacetTests(unittest.TestCase):
@@ -94,6 +95,74 @@ class EvidenceFacetTests(unittest.TestCase):
                     await service._rerank_with_cohere("Compare TLS with authorization.", [self.chunk("TLS and authorization context.")])
                     self.assertEqual(calls, ["Explain TLS", "TLS", "authorization"])
                     self.assertFalse(client.is_closed)
+        asyncio.run(check())
+
+    def test_each_cohere_request_is_reserved_before_the_hosted_call(self):
+        async def check():
+            events = []
+
+            async def reserve(provider, *, operation, estimated_tokens):
+                events.append(("reserved", provider, operation, estimated_tokens))
+
+            def response(request):
+                body = json.loads(request.content)
+                events.append(("sent", body["query"], len(body["query"]) + sum(map(len, body["documents"]))))
+                return httpx.Response(200, json={"results": [
+                    {"index": index, "relevance_score": .9}
+                    for index in range(len(body["documents"]))
+                ]})
+
+            async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as client:
+                with patch("app.core.config.settings.cohere_api_key", SecretStr("test")), \
+                     patch("app.services.rerank_service.reserve_provider_request", side_effect=reserve):
+                    await RerankService(client)._rerank_with_cohere(
+                        "Compare TLS with authorization.", [self.chunk("TLS and authorization context.")])
+
+            self.assertEqual([event[0] for event in events], ["reserved", "sent", "reserved", "sent"])
+            self.assertEqual([event[1:3] for event in events if event[0] == "reserved"],
+                             [("cohere", "rerank"), ("cohere", "rerank")])
+            reservations = [event[3] for event in events if event[0] == "reserved"]
+            inputs = [event[2] for event in events if event[0] == "sent"]
+            self.assertEqual(reservations, [(characters + 3) // 4 for characters in inputs])
+
+        asyncio.run(check())
+
+    def test_cohere_reported_search_units_are_captured_as_units_not_tokens(self):
+        async def check():
+            provider_metrics.clear()
+
+            def response(request):
+                return httpx.Response(200, json={
+                    "results": [{"index": 0, "relevance_score": .9}],
+                    "meta": {"billed_units": {"search_units": 1.5}},
+                })
+
+            async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as client:
+                with patch("app.core.config.settings.cohere_api_key", SecretStr("test")):
+                    ranked = await RerankService(client)._rerank_with_cohere(
+                        "Explain TLS", [self.chunk("TLS context.")])
+
+            self.assertEqual(len(ranked), 1)
+            totals = provider_metrics.snapshot()["totals"]
+            self.assertEqual(totals["reported_search_unit_attempts"], 1)
+            self.assertEqual(totals["reported_search_units"], 1.5)
+            self.assertEqual(totals["reported_usage_attempts"], 0)
+            self.assertEqual(totals["estimated_output_tokens"], 0)
+
+        asyncio.run(check())
+
+    def test_cohere_admission_denial_prevents_the_hosted_request(self):
+        async def check():
+            from app.core.exceptions import SharedProviderBudgetExceeded
+
+            async with httpx.AsyncClient(transport=httpx.MockTransport(
+                lambda request: self.fail("Hosted request must not be sent after admission denial"))) as client:
+                with patch("app.core.config.settings.cohere_api_key", SecretStr("test")), \
+                     patch("app.services.rerank_service.reserve_provider_request",
+                           AsyncMock(side_effect=SharedProviderBudgetExceeded("budget", retry_after_seconds=60))):
+                    with self.assertRaises(SharedProviderBudgetExceeded):
+                        await RerankService(client)._rerank_with_cohere("Explain TLS", [self.chunk("context")])
+
         asyncio.run(check())
 
     def test_second_hosted_facet_error_does_not_return_partial_results(self):

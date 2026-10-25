@@ -76,7 +76,7 @@ async def shared_provider_status():
                   "estimated_tokens_per_minute": settings.provider_interactive_token_reserve_per_minute,
                   "estimated_tokens_per_day": settings.provider_interactive_token_reserve_per_day,
               },
-              "usage": [], "note": "Attempt reservations shared by database/scope. UTC windows; failures and cancellations retain reservations. Tokens estimate characters/4 plus an operation output allowance, not vendor billing or a hard token quota. Zero token limits/reserves disable enforcement. Earlier requests and older processes do not supply token reservations. Hosted embedding/rerank accounting is not integrated yet."}
+              "usage": [], "note": "Attempt reservations shared by database/scope. UTC windows; failures and cancellations retain reservations. Tokens estimate characters/4 plus an operation output allowance, not vendor billing or a hard token quota. Zero token limits/reserves disable enforcement. Earlier requests and older processes do not supply token reservations. Cohere rerank attempts, Qdrant-hosted document upserts and query embeddings are reserved before their requests; Cohere-reported rerank search units are recorded separately from token counts. Qdrant-hosted embedding usage is not captured."}
     if not status["enabled"]:
         return status
     async with AsyncSessionLocal() as session:

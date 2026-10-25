@@ -3205,6 +3205,42 @@ class DocumentProcessingServiceTests(unittest.TestCase):
         self.assertEqual(completed_result["native_text_pages"], 1)
         self.assertEqual(completed_result["ocr_pages"], 0)
 
+    def test_qdrant_cloud_embedding_reserves_shared_budget_before_upload(self):
+        service, _, ingestion_service, chunk = self._service_fixture()
+        events = []
+
+        async def reserve(provider, *, operation, estimated_tokens):
+            events.append(("reserved", provider, operation, estimated_tokens))
+
+        def upsert(chunks):
+            events.append(("upsert", len(chunks)))
+            return len(chunks)
+
+        ingestion_service.upsert_chunks_to_qdrant.side_effect = upsert
+        with (patch("app.services.document_processing_service.settings.embedding_provider", "qdrant_cloud"),
+              patch("app.services.document_processing_service.reserve_provider_request", side_effect=reserve),
+              patch("app.services.document_processing_service.storage_service.get_bytes", return_value=b"%PDF-test"),
+              patch("app.services.document_processing_service.storage_service.exists", return_value=True)):
+            result = asyncio.run(service.process_document("upload-1", "task-1", lease_owner="instance-1"))
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(events, [("reserved", "qdrant_cloud", "document_embedding", (len(chunk.text) + 3) // 4),
+                                  ("upsert", 1)])
+
+    def test_qdrant_cloud_budget_denial_skips_embedding_upload(self):
+        from app.core.exceptions import SharedProviderBudgetExceeded
+
+        service, _, ingestion_service, _ = self._service_fixture()
+        with (patch("app.services.document_processing_service.settings.embedding_provider", "qdrant_cloud"),
+              patch("app.services.document_processing_service.reserve_provider_request",
+                    AsyncMock(side_effect=SharedProviderBudgetExceeded("held for interactive traffic", retry_after_seconds=60))),
+              patch("app.services.document_processing_service.storage_service.get_bytes", return_value=b"%PDF-test"),
+              patch("app.services.document_processing_service.storage_service.exists", return_value=True)):
+            result = asyncio.run(service.process_document("upload-1", "task-1", lease_owner="instance-1"))
+
+        self.assertEqual(result["status"], "failed")
+        ingestion_service.upsert_chunks_to_qdrant.assert_not_called()
+
     def test_empty_provider_graph_keeps_vectorized_document_ready(self):
         service, upload_service, ingestion_service, _ = self._service_fixture()
         ingestion_service.extract_graph_from_chunks.return_value = GraphExtractionResponse()

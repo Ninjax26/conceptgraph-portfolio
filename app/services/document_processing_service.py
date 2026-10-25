@@ -20,7 +20,8 @@ from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.parser_service import ExtractedPage, ParserService
 from app.services.storage_service import storage_service
 from app.services.upload_service import UploadService
-from app.services.shared_provider_service import provider_call_counts
+from app.services.shared_provider_service import provider_call_counts, reserve_provider_request
+from app.services.provider_budget_policy import estimated_reservation
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -145,6 +146,14 @@ class DocumentProcessingService:
                 upload_id, task_id, lease_owner, ProcessingStage.EMBEDDING
             )
             stage_started = time.perf_counter()
+            if settings.embedding_provider == "qdrant_cloud":
+                await reserve_provider_request(
+                    "qdrant_cloud",
+                    operation="document_embedding",
+                    estimated_tokens=estimated_reservation(
+                        sum(len(chunk.text) for chunk in chunks), "document_embedding"
+                    ),
+                )
             vector_count = await run_blocking_safely(
                 self.ingestion_service.upsert_chunks_to_qdrant, chunks
             )

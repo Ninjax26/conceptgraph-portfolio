@@ -1,14 +1,48 @@
 import unittest
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
 from app.core.exceptions import GraphStructureError, LLMProviderRateLimitError
-from app.services.provider_metrics import ProviderMetrics, record_provider_usage
+from app.services.provider_metrics import ProviderMetrics, record_provider_search_units, record_provider_usage
 
 
 class ProviderMetricsTests(unittest.TestCase):
+    def test_async_observation_records_provider_reported_search_units(self):
+        metrics = ProviderMetrics()
+
+        async def check():
+            async def request():
+                record_provider_search_units(1.5)
+                return {"results": []}
+
+            result = await metrics.observe_async("cohere", "rerank", request, input_characters=20)
+            self.assertEqual(result, {"results": []})
+
+        asyncio.run(check())
+        totals = metrics.snapshot()["totals"]
+        self.assertEqual(totals["reported_search_unit_attempts"], 1)
+        self.assertEqual(totals["reported_search_units"], 1.5)
+        self.assertEqual(totals["reported_usage_attempts"], 0)
+
+    def test_async_observation_ignores_missing_and_invalid_search_units(self):
+        metrics = ProviderMetrics()
+
+        async def check():
+            async def request():
+                for value in (None, True, -1, float("nan"), float("inf"), "1"):
+                    record_provider_search_units(value)
+                return None
+
+            await metrics.observe_async("cohere", "rerank", request, input_characters=0)
+
+        asyncio.run(check())
+        event = metrics.snapshot()["recent_events"][0]
+        self.assertIsNone(event["reported_search_units"])
+        self.assertEqual(metrics.snapshot()["totals"]["reported_search_unit_attempts"], 0)
+
     def test_concurrent_threads_do_not_mix_reported_usage(self):
         metrics = ProviderMetrics()
         barrier = Barrier(2)

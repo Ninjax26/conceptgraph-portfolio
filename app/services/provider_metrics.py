@@ -4,7 +4,7 @@ import math
 import threading
 import time
 from collections import defaultdict, deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from contextvars import ContextVar
 from datetime import UTC, datetime
@@ -23,6 +23,7 @@ from app.core.exceptions import (
 
 T = TypeVar("T")
 _reported_usage: ContextVar[list[tuple[int, int, int]] | None] = ContextVar("reported_provider_usage", default=None)
+_reported_search_units: ContextVar[list[float] | None] = ContextVar("reported_provider_search_units", default=None)
 
 
 def record_provider_usage(input_tokens, output_tokens, total_tokens) -> None:
@@ -31,6 +32,19 @@ def record_provider_usage(input_tokens, output_tokens, total_tokens) -> None:
     values = (input_tokens, output_tokens, total_tokens)
     if collector is not None and all(type(value) is int and value >= 0 for value in values):
         collector.append(values)
+
+
+def record_provider_search_units(search_units) -> None:
+    """Capture reported rerank units separately from token counts and cost."""
+    collector = _reported_search_units.get()
+    if collector is None or type(search_units) not in (int, float):
+        return
+    try:
+        value = float(search_units)
+    except (OverflowError, ValueError):
+        return
+    if math.isfinite(value) and value >= 0:
+        collector.append(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +62,7 @@ class ProviderCallMetric:
     reported_input_tokens: int | None = None
     reported_output_tokens: int | None = None
     reported_total_tokens: int | None = None
+    reported_search_units: float | None = None
 
 
 class ProviderMetrics:
@@ -77,6 +92,58 @@ class ProviderMetrics:
                 failover=failover, repair=repair, usage=usage)
         finally:
             _reported_usage.reset(token)
+
+    async def observe_async(
+        self,
+        provider: str,
+        operation: str,
+        func: Callable[[], Awaitable[T]],
+        *,
+        input_characters: int,
+        failover: bool = False,
+        repair: bool = False,
+        output_characters: int | None = None,
+    ) -> T:
+        """Measure one asynchronous provider request and collect its reported metadata."""
+        usage: list[tuple[int, int, int]] = []
+        search_units: list[float] = []
+        usage_token = _reported_usage.set(usage)
+        units_token = _reported_search_units.set(search_units)
+        started = time.perf_counter()
+        try:
+            result = await func()
+        except Exception as exc:
+            self._record(
+                provider=provider,
+                operation=operation,
+                outcome=self._classify_exception(exc),
+                latency_ms=self._elapsed_ms(started),
+                failover=failover,
+                input_characters=input_characters,
+                output_characters=0,
+                failure_reason=exc.reason.value if isinstance(exc, GraphStructureError) else None,
+                repair=repair,
+                usage=usage,
+                search_units=search_units,
+            )
+            raise
+        else:
+            self._record(
+                provider=provider,
+                operation=operation,
+                outcome="success",
+                latency_ms=self._elapsed_ms(started),
+                failover=failover,
+                input_characters=input_characters,
+                output_characters=(self._output_size(result) if output_characters is None else output_characters),
+                repair=repair,
+                usage=usage,
+                search_units=search_units,
+            )
+            return result
+        finally:
+            _reported_search_units.reset(units_token)
+            _reported_usage.reset(usage_token)
 
     def _observe(self, provider, operation, func, *, input_characters, failover, repair, usage):
         started = time.perf_counter()
@@ -142,6 +209,8 @@ class ProviderMetrics:
                 "reported_input_tokens": sum(event.reported_input_tokens or 0 for event in events),
                 "reported_output_tokens": sum(event.reported_output_tokens or 0 for event in events),
                 "reported_total_tokens": sum(event.reported_total_tokens or 0 for event in events),
+                "reported_search_unit_attempts": sum(event.reported_search_units is not None for event in events),
+                "reported_search_units": sum(event.reported_search_units or 0 for event in events),
                 "average_latency_ms": self._average_latency(events),
                 "p95_latency_ms": self._percentile(latencies, 0.95),
             },
@@ -157,7 +226,8 @@ class ProviderMetrics:
                 "responses whose adapters capture usage (Groq/Gemini); missing usage is unknown, "
                 "not zero. No cost or complete provider-quota accounting is implied. Provider billing "
                 "dashboards remain authoritative. Gemini reported output counts response candidates; "
-                "its reported total can additionally include thinking/tool-use tokens. "
+                "its reported total can additionally include thinking/tool-use tokens. Cohere "
+                "rerank search units are reported separately and are not token counts or cost. "
                 "Metrics reset whenever the API process restarts."
             ),
         }
@@ -181,6 +251,7 @@ class ProviderMetrics:
         failure_reason: str | None = None,
         repair: bool = False,
         usage: list[tuple[int, int, int]] | None = None,
+        search_units: list[float] | None = None,
     ) -> None:
         event = ProviderCallMetric(
             provider=provider,
@@ -196,6 +267,7 @@ class ProviderMetrics:
             reported_input_tokens=sum(row[0] for row in usage) if usage else None,
             reported_output_tokens=sum(row[1] for row in usage) if usage else None,
             reported_total_tokens=sum(row[2] for row in usage) if usage else None,
+            reported_search_units=sum(search_units) if search_units else None,
         )
         with self._lock:
             self._events.append(event)
@@ -280,6 +352,8 @@ class ProviderMetrics:
                 "reported_input_tokens": sum(event.reported_input_tokens or 0 for event in group),
                 "reported_output_tokens": sum(event.reported_output_tokens or 0 for event in group),
                 "reported_total_tokens": sum(event.reported_total_tokens or 0 for event in group),
+                "reported_search_unit_attempts": sum(event.reported_search_units is not None for event in group),
+                "reported_search_units": sum(event.reported_search_units or 0 for event in group),
                 "average_latency_ms": cls._average_latency(group),
             }
             for name, group in sorted(grouped.items())

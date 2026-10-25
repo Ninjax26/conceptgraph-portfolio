@@ -8,6 +8,9 @@ import httpx
 from app.core.config import settings
 from app.services.retrieval_candidates import rerank_passages
 from app.services.evidence_facets import comparison_facets
+from app.services.provider_budget_policy import estimated_reservation
+from app.services.provider_metrics import provider_metrics, record_provider_search_units
+from app.services.shared_provider_service import reserve_provider_request
 
 
 class RerankService:
@@ -45,26 +48,48 @@ class RerankService:
             raise RuntimeError("COHERE_API_KEY is required when RERANK_PROVIDER=cohere.")
         owns_client = self._client is None
         windows = self._windows(query, chunks)
+        await reserve_provider_request(
+            "cohere",
+            operation="rerank",
+            estimated_tokens=estimated_reservation(
+                len(query) + sum(len(passage) for _, passage in windows), "rerank"
+            ),
+        )
         client = self._client or httpx.AsyncClient(
             timeout=settings.provider_timeout_seconds
         )
         try:
-            response = await client.post(
-                "https://api.cohere.com/v2/rerank",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "X-Client-Name": "conceptgraph-portfolio",
-                },
-                json={
-                    "model": settings.rerank_model_name,
-                    "query": query,
-                    "documents": [passage for _, passage in windows],
-                    "top_n": len(windows),
-                },
+            async def send_rerank_request():
+                response = await client.post(
+                    "https://api.cohere.com/v2/rerank",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "X-Client-Name": "conceptgraph-portfolio",
+                    },
+                    json={
+                        "model": settings.rerank_model_name,
+                        "query": query,
+                        "documents": [passage for _, passage in windows],
+                        "top_n": len(windows),
+                    },
+                )
+                response.raise_for_status()
+                payload = response.json()
+                meta = payload.get("meta")
+                billed_units = meta.get("billed_units") if isinstance(meta, dict) else None
+                if isinstance(billed_units, dict):
+                    record_provider_search_units(billed_units.get("search_units"))
+                return payload
+
+            payload = await provider_metrics.observe_async(
+                "cohere",
+                "rerank",
+                send_rerank_request,
+                input_characters=len(query) + sum(len(passage) for _, passage in windows),
+                output_characters=0,
             )
-            response.raise_for_status()
-            results = response.json().get("results", [])
+            results = payload.get("results", [])
         finally:
             if owns_client:
                 await client.aclose()

@@ -19,6 +19,8 @@ from app.core.database import neo4j_driver, qdrant_client
 from app.services.course_service import ReadyCourseContext
 from app.services.gemini_service import gemini_service
 from app.services.retrieval_candidates import fuse_candidates, identifier_terms
+from app.services.provider_budget_policy import estimated_reservation
+from app.services.shared_provider_service import reserve_provider_request
 from app.schemas.extraction import relationship_key
 
 logger = logging.getLogger(__name__)
@@ -168,6 +170,17 @@ class RetrievalService:
         graph_ms = round((time.perf_counter() - graph_started) * 1000, 2)
         retrieval_metadata: dict[str, Any] = {"candidate_limit": top_k}
         vector_started = time.perf_counter()
+        if settings.embedding_provider == "qdrant_cloud" and context.document_ids:
+            expanded_query = self._build_expanded_query(
+                question,
+                graph_result.one_hop_prerequisite_names,
+                graph_result.two_hop_prerequisite_names,
+            )
+            await reserve_provider_request(
+                "qdrant_cloud",
+                operation="query_embedding",
+                estimated_tokens=estimated_reservation(len(expanded_query), "query_embedding"),
+            )
         chunks = await asyncio.to_thread(
             self.search_qdrant,
             question,

@@ -53,6 +53,44 @@ class RetrievalModesTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(RuntimeError, "vector offline"):
             await service.retrieve("Question", SimpleNamespace(document_ids=["allowed"], graph_status="GRAPH_READY"))
 
+    async def test_qdrant_cloud_query_embedding_is_reserved_before_vector_search(self):
+        from app.services.provider_budget_policy import estimated_reservation
+
+        service = RetrievalService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
+        service.search_qdrant = Mock(return_value=[])
+        context = SimpleNamespace(document_ids=["allowed"], graph_status="GRAPH_READY")
+        events = []
+
+        async def reserve(provider, *, operation, estimated_tokens):
+            events.append(("reserved", provider, operation, estimated_tokens))
+
+        def search(*args, **kwargs):
+            events.append(("search", args[0]))
+            return []
+
+        service.search_qdrant.side_effect = search
+        with patch("app.core.config.settings.embedding_provider", "qdrant_cloud"), \
+             patch("app.services.rag_service.reserve_provider_request", side_effect=reserve):
+            await service.retrieve("Question", context, retrieval_mode="vector_only")
+
+        expanded_query = service._build_expanded_query("Question", [], [])
+        self.assertEqual(events, [("reserved", "qdrant_cloud", "query_embedding",
+                                   estimated_reservation(len(expanded_query), "query_embedding")),
+                                  ("search", "Question")])
+
+    async def test_qdrant_cloud_query_budget_denial_skips_vector_search(self):
+        from app.core.exceptions import SharedProviderBudgetExceeded
+
+        service = RetrievalService(graph_driver=SimpleNamespace(), vector_client=SimpleNamespace())
+        service.search_qdrant = Mock()
+        with patch("app.core.config.settings.embedding_provider", "qdrant_cloud"), \
+             patch("app.services.rag_service.reserve_provider_request",
+                   AsyncMock(side_effect=SharedProviderBudgetExceeded("budget", retry_after_seconds=60))):
+            with self.assertRaises(SharedProviderBudgetExceeded):
+                await service.retrieve("Question", SimpleNamespace(document_ids=["allowed"], graph_status="GRAPH_READY"),
+                                       retrieval_mode="vector_only")
+        service.search_qdrant.assert_not_called()
+
     async def test_missing_projection_is_distinguished_from_a_valid_empty_extraction(self):
         for recorded_nodes, projected_nodes in ((15, 0), (0, 0), (15, 15)):
             with self.subTest(recorded_nodes=recorded_nodes, projected_nodes=projected_nodes):
