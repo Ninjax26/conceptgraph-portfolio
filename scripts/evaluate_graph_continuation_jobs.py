@@ -27,7 +27,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.core import database
 from app.core.config import Settings
-from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent
+from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
 from app.schemas.extraction import ConceptNode, GraphExtractionResponse
 from app.services import graph_continuation_service as jobs
 from app.services import ingestion_service as ingestion
@@ -35,6 +35,7 @@ from app.services.course_service import CourseService
 from app.services.upload_service import UploadService
 from app.services.parser_service import DocumentChunk
 from app.services.graph_job_extraction import GraphJobDeferred, GraphJobExtraction
+from app.services.ingestion_service import GraphProjectionMarker
 from scripts.evaluate_provider_admission import engine_for
 from scripts.evaluate_graph_retry import fixture
 
@@ -336,11 +337,32 @@ async def run(args):
                 assert saved.id == intent_id and saved.document_task_id == task
             checks["intent_stages_only_from_validated_draft_and_survives_restart"] = True
 
+            observed = GraphProjectionMarker(intent_id, claim.job_id, upload_id,
+                course.id, task, candidate.sha256)
+            reader = SimpleNamespace(read_graph_publication_marker=AsyncMock(return_value=observed))
+            async with sessions() as session:
+                receipt = await service.observe_publication_receipt(session, claim, reader)
+                assert receipt is not None and receipt.intent_id == intent_id
+                assert (await service.observe_publication_receipt(session, claim, reader)).intent_id == intent_id
+                await session.commit()
+                assert (await UploadService().get_upload(session, upload_id)).result_json == original
+            with patch.object(database, "postgres_engine", engine):
+                await database.initialize_database_schema()
+            async with sessions() as session:
+                persisted = (await session.execute(select(GraphPublicationReceipt).where(
+                    GraphPublicationReceipt.intent_id == intent_id))).scalar_one()
+                assert persisted.payload_sha256 == candidate.sha256
+            checks["receipt_requires_exact_observed_marker_and_survives_restart"] = True
+
             orphan_id, orphan_task, _, _ = await prepared()
             async with sessions() as session:
                 orphan_job = (await session.execute(select(GraphContinuationJob).where(
                     GraphContinuationJob.upload_id == orphan_id))).scalar_one()
-                session.add(GraphPublicationIntent(id=str(uuid4()), job_id=orphan_job.id,
+                orphan_intent = str(uuid4())
+                session.add(GraphPublicationIntent(id=orphan_intent, job_id=orphan_job.id,
+                    upload_id=orphan_id, document_task_id=orphan_task,
+                    course_id=course.id, payload_sha256="a" * 64))
+                session.add(GraphPublicationReceipt(intent_id=orphan_intent, job_id=orphan_job.id,
                     upload_id=orphan_id, document_task_id=orphan_task,
                     course_id=course.id, payload_sha256="a" * 64))
                 await session.commit()
@@ -349,10 +371,12 @@ async def run(args):
             async with sessions() as session:
                 assert (await session.execute(select(func.count()).select_from(GraphPublicationIntent).where(
                     GraphPublicationIntent.upload_id == orphan_id))).scalar_one() == 1
+                assert (await session.execute(select(func.count()).select_from(GraphPublicationReceipt).where(
+                    GraphPublicationReceipt.upload_id == orphan_id))).scalar_one() == 1
                 assert (await session.execute(select(func.count()).select_from(GraphContinuationJob).where(
                     GraphContinuationJob.upload_id == orphan_id))).scalar_one() == 0
                 assert await UploadService().get_upload(session, orphan_id) is None
-            checks["intent_survives_document_and_job_cascade_for_future_reconciliation"] = True
+            checks["intent_and_receipt_survive_document_and_job_cascade_for_reconciliation"] = True
 
             async with sessions() as session:
                 changed = stage_result.model_copy(deep=True)
@@ -653,13 +677,13 @@ async def run(args):
             "app/core/config.py", "tests/test_graph_snapshot_budget.py",
             "app/services/graph_publication_candidate.py", "tests/test_graph_publication_candidate.py",
             "app/services/ingestion_service.py", "app/services/upload_service.py", "tests/test_graph_publication_draft.py",
-            "tests/test_graph_publication_intent.py")},
+            "tests/test_graph_publication_intent.py", "tests/test_graph_publication_receipt.py")},
         "limitations": [
             "Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.",
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-            "An immutable intent now survives document/job deletion, but no remote write, receipt, projection-marker lookup or reconciler consumes it. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
+            "An immutable intent and observed-marker receipt survive document/job deletion, but the reader is mocked and no publisher, completion or reconciler consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
             "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
             "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.",
         ],

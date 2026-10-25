@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import GraphStructureError
 from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
-from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent
+from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.graph_publication_candidate import (
@@ -537,6 +537,55 @@ class GraphContinuationService:
             course_id=record.course_uuid, payload_sha256=candidate.sha256)
         session.add(intent)
         return intent
+
+    async def observe_publication_receipt(
+        self, session: AsyncSession, claim: GraphJobClaim, ingestion_service: IngestionService,
+    ) -> GraphPublicationReceipt | None:
+        """Record an exact remote marker under the current source/job fence.
+
+        This is a disconnected observation, not graph-job completion. The caller
+        owns the PostgreSQL commit/rollback boundary and must release locks on
+        all paths. A future publisher still needs crash/deletion reconciliation.
+        """
+        candidate = await self.load_publication_draft(session, claim)
+        if candidate is None:
+            return None
+        locked = await self._locked_claim(session, claim)
+        if locked is None:
+            return None
+        record, job, _ = locked
+        intent = (await session.execute(select(GraphPublicationIntent).where(
+            GraphPublicationIntent.job_id == job.id).with_for_update()
+            .execution_options(populate_existing=True))).scalar_one_or_none()
+        if intent is None:
+            return None
+        identity = (intent.id, job.id, record.upload_id, record.course_uuid,
+                    record.task_id, candidate.sha256)
+        if (intent.job_id, intent.upload_id, intent.course_id,
+                intent.document_task_id, intent.payload_sha256) != identity[1:]:
+            raise ValueError("Graph publication intent no longer matches the source.")
+        marker = await ingestion_service.read_graph_publication_marker(intent.id)
+        if marker is None:
+            return None
+        if (marker.id, marker.job_id, marker.upload_id, marker.course_id,
+                marker.document_task_id, marker.payload_sha256) != identity:
+            raise ValueError("Remote graph marker conflicts with the publication intent.")
+        if await self._locked_claim(session, claim) is None:
+            return None  # The lease may have expired during remote I/O.
+        await session.flush()
+        receipt = (await session.execute(select(GraphPublicationReceipt).where(
+            GraphPublicationReceipt.intent_id == intent.id).with_for_update()
+            .execution_options(populate_existing=True))).scalar_one_or_none()
+        if receipt is not None:
+            if (receipt.intent_id, receipt.job_id, receipt.upload_id, receipt.course_id,
+                    receipt.document_task_id, receipt.payload_sha256) != identity:
+                raise ValueError("Graph publication receipt conflicts with the observed marker.")
+            return receipt
+        receipt = GraphPublicationReceipt(intent_id=intent.id, job_id=job.id,
+            upload_id=record.upload_id, course_id=record.course_uuid,
+            document_task_id=record.task_id, payload_sha256=candidate.sha256)
+        session.add(receipt)
+        return receipt
 
     async def load_input(
         self, session: AsyncSession, claim: GraphJobClaim,

@@ -33,12 +33,21 @@ alone is never permission to publish after the fence is released.
 The disconnected Neo4j replacement primitive can now write a `GraphPublication`
 marker in the same managed transaction and read it by intent ID. This marker
 is remote commit evidence only when the caller supplied an exact staged intent;
-no runtime caller does that yet. The publisher still needs a separate PostgreSQL
-receipt/finalization state and a
+no runtime caller does that yet. A separate `GraphPublicationReceipt` row can
+now be staged after the current fenced job reads an exact matching marker. The
+receipt survives document/job deletion, is immutable by intent ID, and is not
+created when the marker is absent or conflicting. Its caller owns commit or
+rollback. The publisher still needs PostgreSQL job finalization and a
 reconciler for ambiguous commits, killed processes, superseded tasks and document
 deletion. A late write after deletion must be found and removed. The entire
 fenced publication/completion unit must drain on cancellation. These steps and
 bounded dispatch remain unimplemented; automatic continuation stays disabled.
+
+The receipt's isolated PostgreSQL test uses a mocked marker reader. The separate
+isolated Neo4j test exercises the real marker write/read. They are **not** a
+combined PostgreSQL–Neo4j transaction, hard-kill or deletion-reconciliation
+test. A receipt means an exact marker was observed, not that the source remains
+eligible or that the graph job is complete.
 
 ## Verification
 

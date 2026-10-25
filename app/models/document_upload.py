@@ -187,6 +187,22 @@ class GraphPublicationIntent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class GraphPublicationReceipt(Base):
+    """Observed remote marker identity; survives source deletion for reconciliation."""
+
+    __tablename__ = "graph_publication_receipts"
+    __table_args__ = (CheckConstraint("length(payload_sha256) = 64", name="ck_graph_receipt_digest"),)
+
+    # No cascading foreign keys: the marker can outlive its upload and job.
+    intent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    job_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    upload_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    course_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    document_task_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ProviderBudget(Base):
     __tablename__ = "provider_budgets"
 

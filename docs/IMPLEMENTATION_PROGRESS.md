@@ -20,7 +20,7 @@ Updated: 2026-10-25 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission and disconnected publication intent deployed; remote marker verified locally | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`. A disconnected Neo4j marker/read primitive is locally verified; its release outcome is recorded below. The worker does not call the intent or marker operation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Next: PostgreSQL receipt, cross-store completion/crash/deletion reconciliation and bounded dispatch. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent and remote marker deployed but disconnected; receipt local | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`. A disconnected observed-marker receipt is locally verified. The worker calls none of these publication operations. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Next: cross-store completion/crash/deletion reconciliation and bounded dispatch. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,25 @@ Updated: 2026-10-25 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+26 October local receipt checkpoint: added an additive
+`graph_publication_receipts` table and internal method that observes an exact
+Neo4j marker under the current document/job/source fence, checks the claim
+again after remote I/O, and stages one immutable receipt without committing.
+Rows have no cascading source foreign key, so they survive deletion for future
+reconciliation. Five new offline tests bring the backend suite to 528 passing;
+the isolated PostgreSQL runner passes 38 checks, including receipt replay,
+schema reinitialization and deletion survival. Its marker reader is mocked;
+the prior real Neo4j marker check remains separate. Nine frontend tests,
+TypeScript/Vite build, compile and diff checks pass. The first PostgreSQL
+harness attempt hung because `pg_ctl` inherited captured output pipes; its
+exact disposable cluster was stopped and removed. A corrected run passed with
+zero hosted calls and zero production mutations. There is still no publisher,
+job completion, cross-store crash/deletion reconciler or activation. Record
+release verification separately after pushing; this checkpoint alone does not
+complete Phase 3.
+
+25 October remote-marker release `db97255b14d6b89bbd44059f18a140cc1ef0e35e`: eight scoped files were pushed only to `origin/main`. [GitHub CI run 40217107770](https://github.com/Ninjax26/conceptgraph-portfolio/actions/runs/40217107770) passed. The public API `/api/v1/ready` returned HTTP 200 with this exact revision, combined processing role, queue depth zero and ingestion available. It still reported `degraded_services=[neo4j]` and `graph_available=false`, as the previous revision did; the cause remains unconfirmed. The public `/sample` page rendered its saved answer, three source-page links and a three-concept/two-relationship illustration. That prepared preview does not verify live Neo4j, and no frontend code changed. No hosted provider or production test-data call was made. The marker/intent have no runtime caller and automatic continuation remains disabled. This release-verification note remains local until the next substantive release to avoid a docs-only redeployment.
 
 25 October local remote-marker checkpoint: an optional `GraphPublication` node is
 written in the same Neo4j managed transaction as a replacement projection, with
