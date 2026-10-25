@@ -40,6 +40,27 @@ Neo4j and PostgreSQL do not share a distributed transaction. Commit ambiguity,
 process death between commits, reconciliation and repeatable completion still
 need implementation and tests. No graph-only completion or dispatcher was added.
 
+## Optional remote commit marker — 25 October 2026
+
+The same managed Neo4j transaction now optionally writes a `GraphPublication`
+marker after replacing the upload projection. Its fields are the intent, job,
+upload, course, original READY task and validated candidate digest. Identity
+mismatch is rejected before opening a session; a conflicting existing marker
+rolls back the replacement. A separate reader looks up the marker by exact
+intent ID. No API, worker or coordinator calls either operation. Existing graph
+writes omit the marker and keep their previous query sequence. The marker is not
+a PostgreSQL receipt, an authorization token or a complete cross-store recovery
+protocol. The future caller must tie it to a committed intent and current fence,
+then reconcile commits, deletions and hard kills before dispatch is enabled.
+
+The current offline suite has 523 passing backend tests, including five new
+marker boundary checks, plus nine frontend tests, TypeScript/Vite build and
+compile/diff checks. The isolated real Neo4j runner passes nine checks,
+including atomic marker commit, exact read, replay and conflicting-identity
+rollback; it removes its disposable container and network. No hosted provider
+call or production test-data mutation was made. See the refreshed
+`evaluation/graph-projection-current.md` for the test limits and source hashes.
+
 No parsing, OCR, embedding, vector deletion, schema/environment change, provider
 call or production test-data mutation is performed by this increment.
 

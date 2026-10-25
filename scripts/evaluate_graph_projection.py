@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 from neo4j import AsyncGraphDatabase
 from neo4j.exceptions import ServiceUnavailable
 from app.schemas.extraction import ConceptNode, ConceptRelationship, GraphExtractionResponse
-from app.services.ingestion_service import IngestionService
+from app.services.ingestion_service import GraphProjectionMarker, IngestionService
 
 
 def docker(*args):
@@ -63,8 +63,9 @@ async def verify(driver):
     self_identity = dict(upload_id="target", document_name="fixture.pdf",
                          course_name="Fixture course", execution_token="ready-task")
 
-    async def replace(extraction=None):
-        await service.replace_graph_extraction(extraction if extraction is not None else graph(), "course", **self_identity)
+    async def replace(extraction=None, *, marker=None):
+        await service.replace_graph_extraction(extraction if extraction is not None else graph(), "course",
+            **self_identity, marker=marker)
 
     async def seed():
         await rows(driver, "MATCH (n) DETACH DELETE n")  # Only this owned disposable server.
@@ -94,6 +95,28 @@ async def verify(driver):
     await replace(graph(count=13))
     assert await state(driver) == after
     checks["replay_preserves_graph_content_without_duplicate_edges"] = True
+
+    await seed()
+    marker = GraphProjectionMarker("intent", "job", "target", "course", "ready-task", "a" * 64)
+    await replace(graph(count=3), marker=marker)
+    assert await service.read_graph_publication_marker("intent") == marker
+    assert await service.read_graph_publication_marker("absent") is None
+    committed = await state(driver)
+    await replace(graph(count=3), marker=marker)
+    assert await state(driver) == committed
+    checks["marker_commits_atomically_and_replay_reads_exact_identity"] = True
+
+    await seed()
+    await rows(driver, "CREATE (:GraphPublication {id:'intent', job_id:'another-job'})")
+    before_conflict = await state(driver)
+    try:
+        await replace(graph(count=3), marker=marker)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Conflicting remote marker identity was accepted")
+    assert await state(driver) == before_conflict
+    checks["marker_identity_conflict_rolls_back_projection"] = True
 
     for failure in ("callback", "cypher"):
         await seed()

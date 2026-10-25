@@ -74,6 +74,21 @@ class GraphSectionBatch:
     kind: str = "section"
 
 
+@dataclass(frozen=True, slots=True)
+class GraphProjectionMarker:
+    """Identity of one intended projection, persisted with its Neo4j write."""
+
+    id: str
+    job_id: str
+    upload_id: str
+    course_id: str
+    document_task_id: str
+    payload_sha256: str
+
+    def as_parameters(self) -> dict[str, str]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
 class IngestionService:
     MAX_CONCEPTS_PER_BATCH = 8
     MAX_RELATIONSHIPS_PER_BATCH = 10
@@ -641,6 +656,7 @@ class IngestionService:
         self, extraction: GraphExtractionResponse, course_id: str, *,
         upload_id: str, document_name: str, course_name: str,
         execution_token: str,
+        marker: GraphProjectionMarker | None = None,
     ) -> None:
         """Replace one upload projection atomically; caller owns its PG fence.
 
@@ -664,6 +680,13 @@ class IngestionService:
         if any(node.upload_id != upload_id or node.document_name != document_name
                or not node.source_chunk_id or node.page_number is None for node in checked.nodes):
             raise ValueError("Graph replacement requires bound source provenance.")
+        if marker is not None and (
+            not all(isinstance(value, str) and value.strip() for value in marker.as_parameters().values())
+            or (marker.upload_id, marker.course_id, marker.document_task_id)
+               != (upload_id, course_id, execution_token)
+            or re.fullmatch(r"[0-9a-f]{64}", marker.payload_sha256) is None
+        ):
+            raise ValueError("Graph publication marker does not match the replacement identity.")
 
         async def replace(tx):
             result = await tx.run(
@@ -688,6 +711,25 @@ class IngestionService:
                 """, course_id=course_id,
             )
             await result.consume()
+            if marker is not None:
+                result = await tx.run(
+                    """
+                    MERGE (marker:GraphPublication {id: $id})
+                    ON CREATE SET marker.job_id = $job_id,
+                                  marker.upload_id = $upload_id,
+                                  marker.course_id = $course_id,
+                                  marker.document_task_id = $document_task_id,
+                                  marker.payload_sha256 = $payload_sha256
+                    WITH marker
+                    WHERE marker.job_id = $job_id AND marker.upload_id = $upload_id
+                      AND marker.course_id = $course_id
+                      AND marker.document_task_id = $document_task_id
+                      AND marker.payload_sha256 = $payload_sha256
+                    RETURN marker.id AS id
+                    """, **marker.as_parameters(),
+                )
+                if await result.single() is None:
+                    raise ValueError("Graph publication marker conflicts with an existing write.")
 
         async def publish():
             async with self.graph_driver.session() as session:
@@ -696,6 +738,21 @@ class IngestionService:
                 await session.execute_write(replace)
 
         await run_async_safely(publish())
+
+    async def read_graph_publication_marker(self, intent_id: str) -> GraphProjectionMarker | None:
+        """Read remote commit evidence; caller must reconcile it with PostgreSQL."""
+        if not isinstance(intent_id, str) or not intent_id.strip():
+            raise ValueError("Graph publication intent ID is required.")
+        async with self.graph_driver.session() as session:
+            result = await session.run(
+                """MATCH (marker:GraphPublication {id: $id})
+                RETURN marker.id AS id, marker.job_id AS job_id,
+                       marker.upload_id AS upload_id, marker.course_id AS course_id,
+                       marker.document_task_id AS document_task_id,
+                       marker.payload_sha256 AS payload_sha256""", id=intent_id,
+            )
+            row = await result.single()
+        return GraphProjectionMarker(**dict(row)) if row is not None else None
 
     async def ingest_chunks(self, chunks: Sequence[DocumentChunk]) -> dict[str, int]:
         self._validate_llm_configured()

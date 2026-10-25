@@ -30,8 +30,11 @@ document → job fence, verify the exact intent/draft/source identity and hold t
 authority through the Neo4j write and PostgreSQL completion. A committed intent
 alone is never permission to publish after the fence is released.
 
-The Neo4j projection still needs a durable operation marker and a reader for
-that marker. The publisher needs a separate receipt/finalization state and a
+The disconnected Neo4j replacement primitive can now write a `GraphPublication`
+marker in the same managed transaction and read it by intent ID. This marker
+is remote commit evidence only when the caller supplied an exact staged intent;
+no runtime caller does that yet. The publisher still needs a separate PostgreSQL
+receipt/finalization state and a
 reconciler for ambiguous commits, killed processes, superseded tasks and document
 deletion. A late write after deletion must be found and removed. The entire
 fenced publication/completion unit must drain on cancellation. These steps and
