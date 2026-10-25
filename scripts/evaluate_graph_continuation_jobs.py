@@ -27,7 +27,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.core import database
 from app.core.config import Settings
-from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft
+from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent
 from app.schemas.extraction import ConceptNode, GraphExtractionResponse
 from app.services import graph_continuation_service as jobs
 from app.services import ingestion_service as ingestion
@@ -316,6 +316,43 @@ async def run(args):
                     [item[0].upload_id for item in contenders])))
                 await session.commit()
             checks["two_concurrent_sessions_admit_one_draft_at_last_slot_without_ready_mutation"] = True
+
+            async with sessions() as session:
+                intent = await service.stage_publication_intent(session, claim)
+                assert intent is not None and intent.payload_sha256 == candidate.sha256
+                intent_id = intent.id
+                assert (await service.stage_publication_intent(session, claim)).id == intent_id
+                await session.commit()
+                assert (await UploadService().get_upload(session, upload_id)).result_json == original
+            async with sessions() as session:
+                repeated = await service.stage_publication_intent(session, claim)
+                assert repeated is not None and repeated.id == intent_id
+                await session.rollback()
+            with patch.object(database, "postgres_engine", engine):
+                await database.initialize_database_schema()
+            async with sessions() as session:
+                saved = (await session.execute(select(GraphPublicationIntent).where(
+                    GraphPublicationIntent.job_id == claim.job_id))).scalar_one()
+                assert saved.id == intent_id and saved.document_task_id == task
+            checks["intent_stages_only_from_validated_draft_and_survives_restart"] = True
+
+            orphan_id, orphan_task, _, _ = await prepared()
+            async with sessions() as session:
+                orphan_job = (await session.execute(select(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == orphan_id))).scalar_one()
+                session.add(GraphPublicationIntent(id=str(uuid4()), job_id=orphan_job.id,
+                    upload_id=orphan_id, document_task_id=orphan_task,
+                    course_id=course.id, payload_sha256="a" * 64))
+                await session.commit()
+                await session.execute(delete(DocumentUpload).where(DocumentUpload.upload_id == orphan_id))
+                await session.commit()
+            async with sessions() as session:
+                assert (await session.execute(select(func.count()).select_from(GraphPublicationIntent).where(
+                    GraphPublicationIntent.upload_id == orphan_id))).scalar_one() == 1
+                assert (await session.execute(select(func.count()).select_from(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == orphan_id))).scalar_one() == 0
+                assert await UploadService().get_upload(session, orphan_id) is None
+            checks["intent_survives_document_and_job_cascade_for_future_reconciliation"] = True
 
             async with sessions() as session:
                 changed = stage_result.model_copy(deep=True)
@@ -615,13 +652,14 @@ async def run(args):
             "app/services/graph_job_extraction.py", "tests/test_graph_job_extraction.py",
             "app/core/config.py", "tests/test_graph_snapshot_budget.py",
             "app/services/graph_publication_candidate.py", "tests/test_graph_publication_candidate.py",
-            "app/services/ingestion_service.py", "app/services/upload_service.py", "tests/test_graph_publication_draft.py")},
+            "app/services/ingestion_service.py", "app/services/upload_service.py", "tests/test_graph_publication_draft.py",
+            "tests/test_graph_publication_intent.py")},
         "limitations": [
             "Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.",
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-            "Saved drafts are not remote-write intents or receipts; cascade deletion does not solve late remote commits. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
+            "An immutable intent now survives document/job deletion, but no remote write, receipt, projection-marker lookup or reconciler consumes it. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
             "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
             "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.",
         ],

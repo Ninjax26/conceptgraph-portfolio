@@ -2,7 +2,7 @@
 
 Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
 
-35 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+37 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
 
 - additive_schema_restart_and_due_lease_indexes: passed
 - database_rejects_incomplete_running_lease_and_excess_attempts: passed
@@ -18,6 +18,8 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - draft_same_transaction_idempotency_rollback_and_restart_preservation: passed
 - draft_logical_byte_and_count_limits_preserve_idempotent_saved_candidate: passed
 - two_concurrent_sessions_admit_one_draft_at_last_slot_without_ready_mutation: passed
+- intent_stages_only_from_validated_draft_and_survives_restart: passed
+- intent_survives_document_and_job_cascade_for_future_reconciliation: passed
 - draft_conflict_and_database_storage_constraint_fail_closed: passed
 - job_deletion_cascades_unpublished_draft_without_changing_ready_result_and_rolls_back: passed
 - changed_section_concepts_invalidate_recovery_save: passed
@@ -46,6 +48,6 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.
 - Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.
 - Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.
-- Saved drafts are not remote-write intents or receipts; cascade deletion does not solve late remote commits. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
+- An immutable intent now survives document/job deletion, but no remote write, receipt, projection-marker lookup or reconciler consumes it. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
 - Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.
 - Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.

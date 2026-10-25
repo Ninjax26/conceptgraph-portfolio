@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import GraphStructureError
 from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
-from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft
+from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.graph_publication_candidate import (
@@ -505,6 +505,38 @@ class GraphContinuationService:
             course_id=record.course_uuid, document_task_id=record.task_id,
             document_name=record.original_filename)
         return candidate
+
+    async def stage_publication_intent(
+        self, session: AsyncSession, claim: GraphJobClaim,
+    ) -> GraphPublicationIntent | None:
+        """Record an immutable remote-write possibility; caller commits before I/O.
+
+        This disconnected primitive neither authorizes a later write nor records
+        its outcome. A future publisher must refence the document/job after
+        committing this row, and reconcile ambiguous writes and deletions.
+        """
+        candidate = await self.load_publication_draft(session, claim)
+        if candidate is None:
+            return None
+        locked = await self._locked_claim(session, claim)
+        if locked is None:
+            return None
+        record, job, _ = locked
+        identity = (job.id, record.upload_id, record.task_id, record.course_uuid, candidate.sha256)
+        await session.flush()  # See a staged intent with autoflush disabled.
+        saved = (await session.execute(select(GraphPublicationIntent).where(
+            GraphPublicationIntent.job_id == job.id).with_for_update()
+            .execution_options(populate_existing=True))).scalar_one_or_none()
+        if saved is not None:
+            if (saved.job_id, saved.upload_id, saved.document_task_id,
+                    saved.course_id, saved.payload_sha256) != identity:
+                raise ValueError("Graph job already has a different publication intent.")
+            return saved
+        intent = GraphPublicationIntent(id=str(uuid4()), job_id=job.id,
+            upload_id=record.upload_id, document_task_id=record.task_id,
+            course_id=record.course_uuid, payload_sha256=candidate.sha256)
+        session.add(intent)
+        return intent
 
     async def load_input(
         self, session: AsyncSession, claim: GraphJobClaim,

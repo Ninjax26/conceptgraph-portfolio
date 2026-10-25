@@ -166,6 +166,27 @@ class GraphPublicationDraft(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class GraphPublicationIntent(Base):
+    """Durable breadcrumb for a future remote write; survives source deletion."""
+
+    __tablename__ = "graph_publication_intents"
+    __table_args__ = (
+        UniqueConstraint("job_id"),
+        CheckConstraint("length(payload_sha256) = 64", name="ck_graph_intent_digest"),
+        Index("ix_graph_publication_intent_upload", "upload_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # Deliberately no cascading foreign keys: an in-flight remote commit may
+    # outlive deletion of its document or graph job and still need cleanup.
+    job_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    upload_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    document_task_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ProviderBudget(Base):
     __tablename__ = "provider_budgets"
 
