@@ -131,6 +131,28 @@ async def verify(driver):
     assert (await rows(driver, "MATCH (n:GraphPublication) RETURN count(n) AS count"))[0]["count"] == 2
     checks["upload_cleanup_removes_only_matching_remote_marker_and_is_idempotent"] = True
 
+    await seed()
+    await replace(graph(count=3), marker=marker)
+    assert await service.cleanup_graph_publication(marker) is True
+    assert await service.cleanup_graph_publication(marker) is False
+    assert await service.read_graph_publication_marker("intent") is None
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'target'}) RETURN count(n) AS count"))[0]["count"] == 0
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'neighbor'}) RETURN count(n) AS count"))[0]["count"] == 2
+    checks["exact_obsolete_publication_cleanup_is_idempotent_and_preserves_neighbors"] = True
+
+    await seed()
+    await replace(graph(count=3), marker=marker)
+    newer = GraphProjectionMarker("new-intent", "new-job", "target", "course", "new-ready-task", "b" * 64)
+    await service.replace_graph_extraction(graph(count=4), "course", upload_id="target",
+        document_name="fixture.pdf", course_name="Fixture course",
+        execution_token="new-ready-task", marker=newer)
+    assert await service.cleanup_graph_publication(marker) is True
+    assert await service.read_graph_publication_marker("intent") is None
+    assert await service.read_graph_publication_marker("new-intent") == newer
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'target'}) RETURN count(n) AS count, collect(DISTINCT n.execution_token) AS tokens")) == [
+        {"count": 4, "tokens": ["new-ready-task"]}]
+    checks["obsolete_marker_cleanup_preserves_newer_execution_projection"] = True
+
     for failure in ("callback", "cypher"):
         await seed()
         before = await state(driver)

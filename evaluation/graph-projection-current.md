@@ -1,10 +1,10 @@
 # Graph projection — isolated Neo4j verification
 
-Generated: 2026-10-26T08:24:59.158441+00:00.
+Generated: 2026-10-26T12:45:25.777320+00:00.
 
 Command: `.venv/bin/python scripts/evaluate_graph_projection.py`. Requires running Docker and an already-installed official `neo4j:5-community` image; no image pull.
 
-10/10 checks passed against Neo4j 5.26.26. Hosted provider calls: **0**. Production mutations: **0**. The separate-network, loopback-bound test container had no host volume, disabled usage reporting, and was removed with its data and network.
+12/12 checks passed against Neo4j 5.26.26. Hosted provider calls: **0**. Production mutations: **0**. The separate-network, loopback-bound test container had no host volume, disabled usage reporting, and was removed with its data and network.
 
 | Check | Result |
 | --- | --- |
@@ -13,6 +13,8 @@ Command: `.venv/bin/python scripts/evaluate_graph_projection.py`. Requires runni
 | `marker_commits_atomically_and_replay_reads_exact_identity` | Pass |
 | `marker_identity_conflict_rolls_back_projection` | Pass |
 | `upload_cleanup_removes_only_matching_remote_marker_and_is_idempotent` | Pass |
+| `exact_obsolete_publication_cleanup_is_idempotent_and_preserves_neighbors` | Pass |
+| `obsolete_marker_cleanup_preserves_newer_execution_projection` | Pass |
 | `real_transaction_rollback_after_delete_and_callback_failure` | Pass |
 | `real_transaction_rollback_after_delete_and_cypher_failure` | Pass |
 | `actual_driver_retries_entire_callback_after_injected_retryable_failure` | Pass |

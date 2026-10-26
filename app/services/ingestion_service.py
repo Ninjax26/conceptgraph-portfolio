@@ -754,6 +754,63 @@ class IngestionService:
             row = await result.single()
         return GraphProjectionMarker(**dict(row)) if row is not None else None
 
+    async def cleanup_graph_publication(self, marker: GraphProjectionMarker) -> bool:
+        """Remove an obsolete exact publication and its original-task projection.
+
+        Internal reconciliation primitive only. The caller must first prove in
+        PostgreSQL that this publication is obsolete; it is not wired to any
+        API, worker or scheduler. One Neo4j transaction removes only this
+        marker and concepts bearing its original READY task token.
+        """
+        from app.core.blocking import run_async_safely
+
+        if (not isinstance(marker, GraphProjectionMarker)
+            or not all(isinstance(value, str) and value.strip() for value in marker.as_parameters().values())
+            or re.fullmatch(r"[0-9a-f]{64}", marker.payload_sha256) is None):
+            raise ValueError("Graph publication cleanup requires an exact marker identity.")
+
+        async def remove(tx):
+            result = await tx.run(
+                """MATCH (marker:GraphPublication {id: $id})
+                RETURN marker.id AS id, marker.job_id AS job_id,
+                       marker.upload_id AS upload_id, marker.course_id AS course_id,
+                       marker.document_task_id AS document_task_id,
+                       marker.payload_sha256 AS payload_sha256""", id=marker.id,
+            )
+            row = await result.single()
+            if row is None:
+                return False
+            if GraphProjectionMarker(**dict(row)) != marker:
+                raise ValueError("Remote graph marker conflicts with the cleanup identity.")
+            result = await tx.run(
+                """MATCH (marker:GraphPublication {id: $id, job_id: $job_id,
+                    upload_id: $upload_id, course_id: $course_id,
+                    document_task_id: $document_task_id, payload_sha256: $payload_sha256})
+                DETACH DELETE marker
+                RETURN count(*) AS deleted""", **marker.as_parameters(),
+            )
+            if (await result.single())["deleted"] != 1:
+                raise ValueError("Remote graph marker changed during cleanup.")
+            result = await tx.run(
+                """MATCH (course:Course {id: $course_id})-[:CONTAINS]->
+                       (concept:Concept {upload_id: $upload_id, execution_token: $document_task_id})
+                DETACH DELETE concept""", **marker.as_parameters(),
+            )
+            await result.consume()
+            result = await tx.run(
+                """MATCH (course:Course {id: $course_id})
+                WHERE NOT (course)-[:CONTAINS]->(:Concept)
+                DETACH DELETE course""", course_id=marker.course_id,
+            )
+            await result.consume()
+            return True
+
+        async def cleanup():
+            async with self.graph_driver.session() as session:
+                return await session.execute_write(remove)
+
+        return await run_async_safely(cleanup())
+
     async def ingest_chunks(self, chunks: Sequence[DocumentChunk]) -> dict[str, int]:
         self._validate_llm_configured()
         course_id = self._course_id_from_chunks(chunks)

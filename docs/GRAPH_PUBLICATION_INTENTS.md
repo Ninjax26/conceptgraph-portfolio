@@ -42,8 +42,14 @@ reconciler for ambiguous commits, killed processes, superseded tasks and documen
 deletion. Normal graph cleanup now deletes markers for the same upload and
 course along with its concepts; a late write after that cleanup must still be
 found and removed. The entire fenced publication/completion unit must drain on
-cancellation. These steps and
-bounded dispatch remain unimplemented; automatic continuation stays disabled.
+cancellation. These steps and bounded dispatch remain unimplemented; automatic
+continuation stays disabled.
+
+An internal `cleanup_graph_publication` primitive can remove one exact remote
+marker and only concepts carrying that marker's original READY task token in
+one Neo4j transaction. It is idempotent and preserves a newer task's graph.
+It has no runtime caller. A reconciler must establish in PostgreSQL that the
+intent is obsolete before using it; the marker alone is not cleanup authority.
 
 The receipt's isolated PostgreSQL test uses a mocked marker reader. The separate
 isolated Neo4j test exercises the real marker write/read. They are **not** a

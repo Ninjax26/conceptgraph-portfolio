@@ -49,13 +49,15 @@ class ManagedSession:
             if self.fail_on == len(self.calls):
                 raise RuntimeError("injected write failure")
             staged.append((query, copy.deepcopy(parameters)))
-            return SimpleNamespace(consume=AsyncMock(), single=AsyncMock(return_value=self.marker_row))
+            row = {"deleted": 1} if "RETURN count(*) AS deleted" in query else self.marker_row
+            return SimpleNamespace(consume=AsyncMock(), single=AsyncMock(return_value=row))
 
-        await callback(SimpleNamespace(run=run))
+        value = await callback(SimpleNamespace(run=run))
         self.started.set()
         if self.release is not None:
             await self.release.wait()
         self.committed = staged
+        return value
 
 
 class GraphProjectionTests(unittest.IsolatedAsyncioTestCase):
@@ -156,6 +158,44 @@ class GraphProjectionTests(unittest.IsolatedAsyncioTestCase):
         session.run = AsyncMock(return_value=SimpleNamespace(single=AsyncMock(return_value=marker.as_parameters())))
         self.assertEqual(await self.service(session).read_graph_publication_marker("intent"), marker)
         self.assertEqual(session.run.await_args.kwargs, {"id": "intent"})
+
+    async def test_obsolete_marker_cleanup_is_exact_and_uses_one_transaction(self):
+        marker = GraphProjectionMarker("intent", "job", "upload", "course", "original-ready-task", "a" * 64)
+        session = ManagedSession()
+        session.marker_row = marker.as_parameters()
+        self.assertTrue(await self.service(session).cleanup_graph_publication(marker))
+        self.assertEqual(session.transaction_count, 1)
+        self.assertEqual(len(session.calls), 4)
+        self.assertIn("GraphPublication", session.calls[0][0])
+        self.assertIn("DETACH DELETE marker", session.calls[1][0])
+        self.assertIn("execution_token: $document_task_id", session.calls[2][0])
+        self.assertIn("DETACH DELETE concept", session.calls[2][0])
+        self.assertEqual(session.calls[2][1], marker.as_parameters())
+        self.assertTrue(session.closed)
+
+    async def test_obsolete_marker_cleanup_rejects_absent_conflicting_or_failed_write(self):
+        marker = GraphProjectionMarker("intent", "job", "upload", "course", "original-ready-task", "a" * 64)
+        missing = ManagedSession(marker_present=False)
+        self.assertFalse(await self.service(missing).cleanup_graph_publication(marker))
+        self.assertEqual(len(missing.calls), 1)
+        conflicting = ManagedSession()
+        conflicting.marker_row = {**marker.as_parameters(), "job_id": "other"}
+        with self.assertRaises(ValueError):
+            await self.service(conflicting).cleanup_graph_publication(marker)
+        self.assertEqual(conflicting.committed, ["old projection"])
+        failed = ManagedSession(fail_on=2)
+        failed.marker_row = marker.as_parameters()
+        with self.assertRaises(RuntimeError):
+            await self.service(failed).cleanup_graph_publication(marker)
+        self.assertEqual(failed.committed, ["old projection"])
+
+    async def test_obsolete_marker_cleanup_rejects_invalid_identity_before_io(self):
+        session = ManagedSession()
+        service = self.service(session)
+        with self.assertRaises(ValueError):
+            await service.cleanup_graph_publication(
+                GraphProjectionMarker("intent", "job", "upload", "course", "task", "invalid"))
+        service.graph_driver.session.assert_not_called()
 
     async def test_empty_replacement_deletes_only_upload_then_cleans_empty_course(self):
         session = ManagedSession()
