@@ -1,14 +1,15 @@
 {
-  "generated_at_utc": "2026-10-25T17:32:50.125746+00:00",
+  "generated_at_utc": "2026-10-26T08:24:59.158441+00:00",
   "kind": "isolated real Neo4j transaction checks with synthetic graph/failure fixtures",
   "neo4j_version": "5.26.26",
   "image_id": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
-  "elapsed_seconds": 47.389,
+  "elapsed_seconds": 38.521,
   "checks": {
     "merged_graph_replacement_preserves_other_uploads_and_ready_scope": true,
     "replay_preserves_graph_content_without_duplicate_edges": true,
     "marker_commits_atomically_and_replay_reads_exact_identity": true,
     "marker_identity_conflict_rolls_back_projection": true,
+    "upload_cleanup_removes_only_matching_remote_marker_and_is_idempotent": true,
     "real_transaction_rollback_after_delete_and_callback_failure": true,
     "real_transaction_rollback_after_delete_and_cypher_failure": true,
     "actual_driver_retries_entire_callback_after_injected_retryable_failure": true,
@@ -21,8 +22,8 @@
   "disposable_container_and_network_removed": true,
   "code_sha256": {
     "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
-    "app/services/ingestion_service.py": "9a055d9fa3c39d61c6021c7d4698c7ddb7ff0c8436580f9fdbd2b9f5bd695782",
-    "scripts/evaluate_graph_projection.py": "4400089df4e5279cf0fd1ca3864c4611c7da6d125345a015b62f68a7ba9c35ff"
+    "app/services/ingestion_service.py": "c0cb172b5c93f9cd37587f9635444e59056dc624d85d60aa01b1e75725bd60d5",
+    "scripts/evaluate_graph_projection.py": "f1f22dffa31615bf02c7487d1d1d5a65263dc4aa88959f663556e5b663d0aa23"
   },
   "limits": [
     "No PostgreSQL/job fence, Qdrant/R2 or full ingestion worker exercised.",

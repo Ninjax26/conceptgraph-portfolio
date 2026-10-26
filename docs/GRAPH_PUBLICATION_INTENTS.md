@@ -39,8 +39,10 @@ receipt survives document/job deletion, is immutable by intent ID, and is not
 created when the marker is absent or conflicting. Its caller owns commit or
 rollback. The publisher still needs PostgreSQL job finalization and a
 reconciler for ambiguous commits, killed processes, superseded tasks and document
-deletion. A late write after deletion must be found and removed. The entire
-fenced publication/completion unit must drain on cancellation. These steps and
+deletion. Normal graph cleanup now deletes markers for the same upload and
+course along with its concepts; a late write after that cleanup must still be
+found and removed. The entire fenced publication/completion unit must drain on
+cancellation. These steps and
 bounded dispatch remain unimplemented; automatic continuation stays disabled.
 
 The receipt's isolated PostgreSQL test uses a mocked marker reader. The separate

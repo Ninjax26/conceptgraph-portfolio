@@ -805,6 +805,14 @@ class IngestionService:
             )
             await session.run(
                 """
+                MATCH (marker:GraphPublication {course_id: $course_id, upload_id: $upload_id})
+                DETACH DELETE marker
+                """,
+                course_id=course_id,
+                upload_id=upload_id,
+            )
+            await session.run(
+                """
                 MATCH (course:Course {id: $course_id})
                 WHERE NOT (course)-[:CONTAINS]->(:Concept)
                 DETACH DELETE course

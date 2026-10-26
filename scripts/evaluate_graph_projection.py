@@ -118,6 +118,19 @@ async def verify(driver):
     assert await state(driver) == before_conflict
     checks["marker_identity_conflict_rolls_back_projection"] = True
 
+    await seed()
+    await replace(graph(count=3), marker=marker)
+    await rows(driver, "CREATE (:GraphPublication {id:'neighbor-intent', upload_id:'neighbor', course_id:'course'})")
+    await rows(driver, "CREATE (:GraphPublication {id:'other-intent', upload_id:'other', course_id:'other-course'})")
+    await service.cleanup_graph("target", "course")
+    assert await service.read_graph_publication_marker("intent") is None
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'target'}) RETURN count(n) AS count"))[0]["count"] == 0
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'neighbor'}) RETURN count(n) AS count"))[0]["count"] == 2
+    assert set((await rows(driver, "MATCH (n:GraphPublication) RETURN collect(n.id) AS ids"))[0]["ids"]) == {"neighbor-intent", "other-intent"}
+    await service.cleanup_graph("target", "course")
+    assert (await rows(driver, "MATCH (n:GraphPublication) RETURN count(n) AS count"))[0]["count"] == 2
+    checks["upload_cleanup_removes_only_matching_remote_marker_and_is_idempotent"] = True
+
     for failure in ("callback", "cypher"):
         await seed()
         before = await state(driver)

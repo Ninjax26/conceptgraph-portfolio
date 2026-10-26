@@ -172,14 +172,18 @@ class ProcessingRulesTests(unittest.TestCase):
 
         asyncio.run(service.cleanup_upload("upload-1", "course-1"))
 
-        self.assertEqual(graph_session.run.await_count, 2)
+        self.assertEqual(graph_session.run.await_count, 3)
         delete_concepts = graph_session.run.await_args_list[0]
-        delete_course = graph_session.run.await_args_list[1]
+        delete_marker = graph_session.run.await_args_list[1]
+        delete_course = graph_session.run.await_args_list[2]
         self.assertIn("DETACH DELETE concept", delete_concepts.args[0])
         self.assertEqual(
             delete_concepts.kwargs,
             {"course_id": "course-1", "upload_id": "upload-1"},
         )
+        self.assertIn("GraphPublication", delete_marker.args[0])
+        self.assertIn("DETACH DELETE marker", delete_marker.args[0])
+        self.assertEqual(delete_marker.kwargs, {"course_id": "course-1", "upload_id": "upload-1"})
         self.assertIn("WHERE NOT (course)-[:CONTAINS]->(:Concept)", delete_course.args[0])
         self.assertEqual(delete_course.kwargs, {"course_id": "course-1"})
 
