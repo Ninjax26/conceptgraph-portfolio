@@ -379,6 +379,13 @@ async def run(args):
             checks["intent_and_receipt_survive_document_and_job_cascade_for_reconciliation"] = True
 
             async with sessions() as session:
+                discovered = await service.list_deleted_source_intents(session, limit=1)
+                assert [row.id for row in discovered] == [orphan_intent]
+                assert (await service.list_deleted_source_intents(session, limit=1))[0].id == orphan_intent
+                await session.rollback()
+            checks["deleted_source_intent_discovery_excludes_live_uploads_and_is_repeatable"] = True
+
+            async with sessions() as session:
                 changed = stage_result.model_copy(deep=True)
                 changed.nodes[0].description = "Different validated candidate"
                 alternative = await service.prepare_publication(session, claim, changed)

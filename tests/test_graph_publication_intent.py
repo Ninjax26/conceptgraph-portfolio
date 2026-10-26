@@ -26,6 +26,26 @@ class PublicationIntentTests(unittest.IsolatedAsyncioTestCase):
     async def test_intent_has_no_cascading_document_or_job_foreign_key(self):
         self.assertFalse(GraphPublicationIntent.__table__.foreign_keys)
 
+    async def test_deleted_source_discovery_is_bounded_and_read_only(self):
+        service = GraphContinuationService()
+        rows = [SimpleNamespace(id="old-a"), SimpleNamespace(id="old-b")]
+        result = Mock()
+        result.scalars.return_value.all.return_value = rows
+        session = SimpleNamespace(execute=AsyncMock(return_value=result),
+            commit=AsyncMock(), rollback=AsyncMock(), add=Mock())
+        self.assertEqual(await service.list_deleted_source_intents(session, limit=2), rows)
+        query = str(session.execute.call_args.args[0])
+        self.assertIn("graph_publication_intents", query)
+        self.assertIn("document_uploads", query)
+        self.assertIn("IS NULL", query)
+        self.assertIn("LIMIT", query)
+        session.add.assert_not_called()
+        session.commit.assert_not_awaited()
+        session.rollback.assert_not_awaited()
+        for bad in (0, 101, True, 1.5):
+            with self.assertRaises(ValueError):
+                await service.list_deleted_source_intents(session, limit=bad)
+
     async def test_lost_authority_or_missing_draft_creates_no_intent(self):
         service = GraphContinuationService()
         for saved, locked in ((None, self.locked()),

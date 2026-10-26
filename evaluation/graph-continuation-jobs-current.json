@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-25T21:37:55.825448+00:00",
+  "generated_at_utc": "2026-10-26T16:47:34.283319+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -21,6 +21,7 @@
     "intent_stages_only_from_validated_draft_and_survives_restart": true,
     "receipt_requires_exact_observed_marker_and_survives_restart": true,
     "intent_and_receipt_survive_document_and_job_cascade_for_reconciliation": true,
+    "deleted_source_intent_discovery_excludes_live_uploads_and_is_repeatable": true,
     "draft_conflict_and_database_storage_constraint_fail_closed": true,
     "job_deletion_cascades_unpublished_draft_without_changing_ready_result_and_rolls_back": true,
     "changed_section_concepts_invalidate_recovery_save": true,
@@ -43,15 +44,15 @@
     "terminal_draft_cleanup_skips_document_locked_by_another_session": true,
     "terminal_draft_cleanup_is_bounded_repeatable_rollback_safe_and_preserves_job_history": true
   },
-  "checks_passed": 38,
+  "checks_passed": 39,
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 8.9372,
+  "duration_seconds": 5.427,
   "code_sha256": {
     "app/models/document_upload.py": "73c186c1ca3b9d9ae284255c6852e18a0b4c53ad283b92fa980f908559976688",
-    "app/services/graph_continuation_service.py": "81356a51f048b4e5127027745f3ecadbef782b2b4a6de33bbf4fd2d138db1b60",
-    "scripts/evaluate_graph_continuation_jobs.py": "6f401edf08ca852f664774993749b04a92fecbd96e0b10f5f352e935f08e3050",
+    "app/services/graph_continuation_service.py": "037ae90cfdde25622d1baed54af117dccf443bd031871a2c2b08a3d02d083b87",
+    "scripts/evaluate_graph_continuation_jobs.py": "971f1107cb04023f476559d817bde6f8674080bcf98c3b012bbfe2a3537de29f",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
     "tests/test_graph_job_checkpoint_reads.py": "8bf7b2e70b30cf399f6f38abb83253e9a5bbd0d4e58b7dfdabb37688ddbb1b72",
     "app/services/graph_job_extraction.py": "732d0108699b6daa2fcf59d215095b654a1b4081ef11e010c65922376941d758",
@@ -60,10 +61,10 @@
     "tests/test_graph_snapshot_budget.py": "1a8a15fb6f25eb08604abf4bdac3c0c775adc6c1e838fe17d2c7a5f2dc7a7f9f",
     "app/services/graph_publication_candidate.py": "7641202bc00c47dc6f6d068f7facab19febdc5cdbfa1d8098432d1d76fa0eb5f",
     "tests/test_graph_publication_candidate.py": "3f13dd2aff67bb190f86f46c6e4f085761e15b2ff304be7094bcdb0e98403d39",
-    "app/services/ingestion_service.py": "9a055d9fa3c39d61c6021c7d4698c7ddb7ff0c8436580f9fdbd2b9f5bd695782",
+    "app/services/ingestion_service.py": "15374ee660185ff541315e01f061221351111f3733c0d43bad34b3a3bd3007a5",
     "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1",
     "tests/test_graph_publication_draft.py": "9c57f226ccbd0eb65f903b924c39f3f37f2a28c2b01d1a605bfb6753c7d2e737",
-    "tests/test_graph_publication_intent.py": "2401f29c132e2d20fb2b6543be4416aa2b617f270f2ab8b18f06b16545588b90",
+    "tests/test_graph_publication_intent.py": "13a9d02177cb17b39055c2aabd4a0e5fef11f076f16065e4ebf27f2e4c1c5058",
     "tests/test_graph_publication_receipt.py": "ba305cae86206a6d88533d81d7ae21cb578170ffb356d0a5d68add626edf37d9"
   },
   "limitations": [

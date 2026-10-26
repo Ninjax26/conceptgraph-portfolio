@@ -538,6 +538,24 @@ class GraphContinuationService:
         session.add(intent)
         return intent
 
+    @staticmethod
+    async def list_deleted_source_intents(
+        session: AsyncSession, *, limit: int = 50,
+    ) -> list[GraphPublicationIntent]:
+        """Find bounded intent tombstones after upload deletion, without mutating them.
+
+        This is discovery only: an absent PostgreSQL upload is not proof that a
+        remote write has finished. A future reconciler must inspect the exact
+        Neo4j marker and repeat after late writers have drained.
+        """
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("Invalid deleted-source discovery batch size.")
+        result = await session.execute(select(GraphPublicationIntent).outerjoin(
+            DocumentUpload, DocumentUpload.upload_id == GraphPublicationIntent.upload_id).where(
+            DocumentUpload.upload_id.is_(None)).order_by(
+            GraphPublicationIntent.created_at, GraphPublicationIntent.id).limit(limit))
+        return result.scalars().all()
+
     async def observe_publication_receipt(
         self, session: AsyncSession, claim: GraphJobClaim, ingestion_service: IngestionService,
     ) -> GraphPublicationReceipt | None:

@@ -20,7 +20,7 @@ Updated: 2026-10-26 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent, remote marker and receipt deployed but disconnected | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`. An exact obsolete-marker cleanup primitive is locally verified but disconnected. The worker calls none of these publication operations. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Next: cross-store completion/crash/late-write reconciliation and bounded dispatch. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent, remote marker and receipt deployed but disconnected | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`. Bounded deleted-source intent discovery is verified locally; the worker calls none of these publication operations. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Next: cross-store completion/crash/late-write reconciliation and bounded dispatch. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,30 @@ Updated: 2026-10-26 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+26 October local deleted-source discovery checkpoint: a bounded, read-only
+PostgreSQL query now lists retained publication intents whose upload row is
+gone. One mocked contract test passes; the isolated PostgreSQL runner passes
+39 checks, including this discovery after an actual fixture deletion while a
+live-upload intent remains excluded. It neither reads Neo4j nor cleans up
+anything, and a late writer can still appear afterward. The private local
+cluster and test schema were removed. No hosted provider or production data
+was used. Automatic continuation and reconciliation remain unfinished.
+
+26 October obsolete-publication cleanup release
+`6c3c699911da43a156393ddd818d63ef6363ac1d`: seven scoped files were
+pushed to `origin/main`. [GitHub CI run 40325225703](https://github.com/Ninjax26/conceptgraph-portfolio/actions/runs/40325225703)
+passed. The first public readiness call timed out during a cold start; the next
+returned the prior revision, then `/api/v1/ready` returned HTTP 200 with this
+exact revision, combined role, queue depth zero, no degraded services and
+`graph_available=true`. The public `/sample` page rendered a saved answer,
+three source-page links and a three-concept/two-relationship illustration.
+That prepared preview does not test live graph writes or cleanup. All 531
+backend tests, nine frontend tests, TypeScript/Vite build and 12 isolated
+Neo4j checks passed before pushing. No hosted model or production test-data
+call was made. The new cleanup method has no runtime caller; Phase 3 remains
+incomplete. This release-verification note stays local until the next
+substantive release.
 
 26 October local obsolete-publication cleanup checkpoint: added a disconnected
 Neo4j managed-transaction primitive to remove one exact marker and only concept

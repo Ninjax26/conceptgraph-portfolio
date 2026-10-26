@@ -51,6 +51,13 @@ one Neo4j transaction. It is idempotent and preserves a newer task's graph.
 It has no runtime caller. A reconciler must establish in PostgreSQL that the
 intent is obsolete before using it; the marker alone is not cleanup authority.
 
+`list_deleted_source_intents` now finds at most 100 retained intents whose
+upload row has been deleted, in stable creation/ID order. It only reads
+PostgreSQL and has no worker or scheduler caller. An absent upload identifies
+a cleanup candidate, not proof that an in-flight Neo4j write has ended. The
+future reconciler must inspect the exact marker and repeat after late writers
+have drained; this discovery must never directly authorize a remote delete.
+
 The receipt's isolated PostgreSQL test uses a mocked marker reader. The separate
 isolated Neo4j test exercises the real marker write/read. They are **not** a
 combined PostgreSQL–Neo4j transaction, hard-kill or deletion-reconciliation
