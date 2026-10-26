@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-26T16:47:34.283319+00:00",
+  "generated_at_utc": "2026-10-26T21:25:31.209331+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -48,11 +48,11 @@
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 5.427,
+  "duration_seconds": 6.3804,
   "code_sha256": {
     "app/models/document_upload.py": "73c186c1ca3b9d9ae284255c6852e18a0b4c53ad283b92fa980f908559976688",
     "app/services/graph_continuation_service.py": "037ae90cfdde25622d1baed54af117dccf443bd031871a2c2b08a3d02d083b87",
-    "scripts/evaluate_graph_continuation_jobs.py": "971f1107cb04023f476559d817bde6f8674080bcf98c3b012bbfe2a3537de29f",
+    "scripts/evaluate_graph_continuation_jobs.py": "18d01e3c963c34b07275bf79fd71e6b95561f6398f647ced9b2002e2ce3e1abb",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
     "tests/test_graph_job_checkpoint_reads.py": "8bf7b2e70b30cf399f6f38abb83253e9a5bbd0d4e58b7dfdabb37688ddbb1b72",
     "app/services/graph_job_extraction.py": "732d0108699b6daa2fcf59d215095b654a1b4081ef11e010c65922376941d758",
@@ -61,11 +61,11 @@
     "tests/test_graph_snapshot_budget.py": "1a8a15fb6f25eb08604abf4bdac3c0c775adc6c1e838fe17d2c7a5f2dc7a7f9f",
     "app/services/graph_publication_candidate.py": "7641202bc00c47dc6f6d068f7facab19febdc5cdbfa1d8098432d1d76fa0eb5f",
     "tests/test_graph_publication_candidate.py": "3f13dd2aff67bb190f86f46c6e4f085761e15b2ff304be7094bcdb0e98403d39",
-    "app/services/ingestion_service.py": "15374ee660185ff541315e01f061221351111f3733c0d43bad34b3a3bd3007a5",
+    "app/services/ingestion_service.py": "c173ae6cb10e6a2116bbf26b299f8c01eed7654b9381c352ca5c9e70d1390d8e",
     "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1",
     "tests/test_graph_publication_draft.py": "9c57f226ccbd0eb65f903b924c39f3f37f2a28c2b01d1a605bfb6753c7d2e737",
     "tests/test_graph_publication_intent.py": "13a9d02177cb17b39055c2aabd4a0e5fef11f076f16065e4ebf27f2e4c1c5058",
-    "tests/test_graph_publication_receipt.py": "ba305cae86206a6d88533d81d7ae21cb578170ffb356d0a5d68add626edf37d9"
+    "tests/test_graph_publication_receipt.py": "b8f778278a19c6f259e5a366c3dd2f2641335ab8f5d3a0d634825a0dbfb94249"
   },
   "limitations": [
     "Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.",

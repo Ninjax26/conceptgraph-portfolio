@@ -84,8 +84,10 @@ class GraphProjectionMarker:
     course_id: str
     document_task_id: str
     payload_sha256: str
+    # Monotonic DocumentUpload attempt, supplied by the PostgreSQL coordinator.
+    generation: int
 
-    def as_parameters(self) -> dict[str, str]:
+    def as_parameters(self) -> dict[str, str | int]:
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
 
@@ -681,7 +683,11 @@ class IngestionService:
                or not node.source_chunk_id or node.page_number is None for node in checked.nodes):
             raise ValueError("Graph replacement requires bound source provenance.")
         if marker is not None and (
-            not all(isinstance(value, str) and value.strip() for value in marker.as_parameters().values())
+            not all(isinstance(value, str) and value.strip() for value in (
+                marker.id, marker.job_id, marker.upload_id, marker.course_id,
+                marker.document_task_id, marker.payload_sha256,
+            ))
+            or type(marker.generation) is not int or marker.generation < 1
             or (marker.upload_id, marker.course_id, marker.document_task_id)
                != (upload_id, course_id, execution_token)
             or re.fullmatch(r"[0-9a-f]{64}", marker.payload_sha256) is None
@@ -689,6 +695,30 @@ class IngestionService:
             raise ValueError("Graph publication marker does not match the replacement identity.")
 
         async def replace(tx):
+            if marker is not None:
+                # The write lock acquired by SET serializes competing workers
+                # for this upload. A stale attempt cannot delete a newer graph.
+                result = await tx.run(
+                    """
+                    MERGE (fence:GraphProjectionFence {upload_id: $upload_id})
+                    ON CREATE SET fence.generation = 0, fence.deleted = false
+                    SET fence.lock_epoch = coalesce(fence.lock_epoch, 0) + 1
+                    WITH fence
+                    WHERE fence.deleted = false AND
+                      ($generation > fence.generation OR
+                       ($generation = fence.generation AND
+                        fence.document_task_id = $document_task_id AND
+                        fence.payload_sha256 = $payload_sha256))
+                    SET fence.generation = $generation,
+                        fence.document_task_id = $document_task_id,
+                        fence.payload_sha256 = $payload_sha256
+                    RETURN fence.upload_id AS upload_id
+                    """, upload_id=upload_id, generation=marker.generation,
+                    document_task_id=marker.document_task_id,
+                    payload_sha256=marker.payload_sha256,
+                )
+                if await result.single() is None:
+                    raise ValueError("Graph publication is older than the current upload generation.")
             result = await tx.run(
                 """
                 MATCH (concept:Concept {course_id: $course_id, upload_id: $upload_id})
@@ -719,12 +749,14 @@ class IngestionService:
                                   marker.upload_id = $upload_id,
                                   marker.course_id = $course_id,
                                   marker.document_task_id = $document_task_id,
-                                  marker.payload_sha256 = $payload_sha256
+                                  marker.payload_sha256 = $payload_sha256,
+                                  marker.generation = $generation
                     WITH marker
                     WHERE marker.job_id = $job_id AND marker.upload_id = $upload_id
                       AND marker.course_id = $course_id
                       AND marker.document_task_id = $document_task_id
                       AND marker.payload_sha256 = $payload_sha256
+                      AND marker.generation = $generation
                     RETURN marker.id AS id
                     """, **marker.as_parameters(),
                 )
@@ -733,6 +765,15 @@ class IngestionService:
 
         async def publish():
             async with self.graph_driver.session() as session:
+                if marker is not None:
+                    # MERGE alone cannot ensure one fence per upload under
+                    # concurrent creation. Keep the constraint as a write gate.
+                    result = await session.run(
+                        """CREATE CONSTRAINT graph_projection_fence_upload IF NOT EXISTS
+                        FOR (fence:GraphProjectionFence)
+                        REQUIRE fence.upload_id IS UNIQUE"""
+                    )
+                    await result.consume()
                 # Managed retries repeat the entire idempotent replacement;
                 # never retry deletion and insertion as separate transactions.
                 await session.execute_write(replace)
@@ -749,7 +790,8 @@ class IngestionService:
                 RETURN marker.id AS id, marker.job_id AS job_id,
                        marker.upload_id AS upload_id, marker.course_id AS course_id,
                        marker.document_task_id AS document_task_id,
-                       marker.payload_sha256 AS payload_sha256""", id=intent_id,
+                       marker.payload_sha256 AS payload_sha256,
+                       marker.generation AS generation""", id=intent_id,
             )
             row = await result.single()
         return GraphProjectionMarker(**dict(row)) if row is not None else None
@@ -765,7 +807,11 @@ class IngestionService:
         from app.core.blocking import run_async_safely
 
         if (not isinstance(marker, GraphProjectionMarker)
-            or not all(isinstance(value, str) and value.strip() for value in marker.as_parameters().values())
+            or not all(isinstance(value, str) and value.strip() for value in (
+                marker.id, marker.job_id, marker.upload_id, marker.course_id,
+                marker.document_task_id, marker.payload_sha256,
+            ))
+            or type(marker.generation) is not int or marker.generation < 1
             or re.fullmatch(r"[0-9a-f]{64}", marker.payload_sha256) is None):
             raise ValueError("Graph publication cleanup requires an exact marker identity.")
 
@@ -775,7 +821,8 @@ class IngestionService:
                 RETURN marker.id AS id, marker.job_id AS job_id,
                        marker.upload_id AS upload_id, marker.course_id AS course_id,
                        marker.document_task_id AS document_task_id,
-                       marker.payload_sha256 AS payload_sha256""", id=marker.id,
+                       marker.payload_sha256 AS payload_sha256,
+                       marker.generation AS generation""", id=marker.id,
             )
             row = await result.single()
             if row is None:

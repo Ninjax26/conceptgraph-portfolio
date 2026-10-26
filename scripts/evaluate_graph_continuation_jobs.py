@@ -338,7 +338,7 @@ async def run(args):
             checks["intent_stages_only_from_validated_draft_and_survives_restart"] = True
 
             observed = GraphProjectionMarker(intent_id, claim.job_id, upload_id,
-                course.id, task, candidate.sha256)
+                course.id, task, candidate.sha256, 1)
             reader = SimpleNamespace(read_graph_publication_marker=AsyncMock(return_value=observed))
             async with sessions() as session:
                 receipt = await service.observe_publication_receipt(session, claim, reader)

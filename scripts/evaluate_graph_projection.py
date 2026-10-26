@@ -49,10 +49,11 @@ async def rows(driver, query, **parameters):
 
 
 async def state(driver):
-    # Ignore only volatile course timestamps; include source/task/edge properties.
+    # Ignore volatile course timestamps and the fence's lock counter.
     nodes = await rows(driver, "MATCH (n) RETURN labels(n) AS labels, properties(n) AS p ORDER BY n.id")
     for row in nodes:
         row["p"].pop("updated_at", None)
+        row["p"].pop("lock_epoch", None)
     edges = await rows(driver, "MATCH (a)-[r]->(b) RETURN a.id AS a, b.id AS b, type(r) AS t, properties(r) AS p ORDER BY a.id, b.id, type(r)")
     return {"nodes": nodes, "edges": edges}
 
@@ -97,8 +98,12 @@ async def verify(driver):
     checks["replay_preserves_graph_content_without_duplicate_edges"] = True
 
     await seed()
-    marker = GraphProjectionMarker("intent", "job", "target", "course", "ready-task", "a" * 64)
+    marker = GraphProjectionMarker("intent", "job", "target", "course", "ready-task", "a" * 64, 1)
     await replace(graph(count=3), marker=marker)
+    assert await rows(driver, """SHOW CONSTRAINTS YIELD name, type
+        WHERE name = 'graph_projection_fence_upload'
+        RETURN name, type""") == [
+            {"name": "graph_projection_fence_upload", "type": "UNIQUENESS"}]
     assert await service.read_graph_publication_marker("intent") == marker
     assert await service.read_graph_publication_marker("absent") is None
     committed = await state(driver)
@@ -142,7 +147,7 @@ async def verify(driver):
 
     await seed()
     await replace(graph(count=3), marker=marker)
-    newer = GraphProjectionMarker("new-intent", "new-job", "target", "course", "new-ready-task", "b" * 64)
+    newer = GraphProjectionMarker("new-intent", "new-job", "target", "course", "new-ready-task", "b" * 64, 2)
     await service.replace_graph_extraction(graph(count=4), "course", upload_id="target",
         document_name="fixture.pdf", course_name="Fixture course",
         execution_token="new-ready-task", marker=newer)
@@ -152,6 +157,51 @@ async def verify(driver):
     assert (await rows(driver, "MATCH (n:Concept {upload_id:'target'}) RETURN count(n) AS count, collect(DISTINCT n.execution_token) AS tokens")) == [
         {"count": 4, "tokens": ["new-ready-task"]}]
     checks["obsolete_marker_cleanup_preserves_newer_execution_projection"] = True
+
+    # A newer source task must win even when an exact old marker replays late.
+    await seed()
+    await replace(graph(count=3), marker=marker)
+    await service.replace_graph_extraction(graph(count=4), "course", upload_id="target",
+        document_name="fixture.pdf", course_name="Fixture course",
+        execution_token="new-ready-task", marker=newer)
+    try:
+        await replace(graph(count=3), marker=marker)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("A stale publication replaced a newer task's graph")
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'target'}) "
+        "RETURN count(n) AS count, collect(DISTINCT n.execution_token) AS tokens")) == [
+            {"count": 4, "tokens": ["new-ready-task"]}]
+    checks["late_old_marker_replay_cannot_overwrite_newer_task_projection"] = True
+
+    await seed()
+    await replace(graph(count=3), marker=marker)
+    conflicting_task = GraphProjectionMarker("same-attempt-new-task", "other-job",
+        "target", "course", "other-ready-task", "c" * 64, 1)
+    before_conflict = await state(driver)
+    try:
+        await service.replace_graph_extraction(graph(count=4), "course",
+            upload_id="target", document_name="fixture.pdf",
+            course_name="Fixture course", execution_token="other-ready-task",
+            marker=conflicting_task)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("A different task reused an already-published generation")
+    assert await state(driver) == before_conflict
+    checks["same_generation_different_task_cannot_replace_projection"] = True
+
+    changed_payload = GraphProjectionMarker("same-attempt-new-payload", "other-job",
+        "target", "course", "ready-task", "d" * 64, 1)
+    try:
+        await replace(graph(count=4), marker=changed_payload)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("A different payload reused an already-published generation")
+    assert await state(driver) == before_conflict
+    checks["same_generation_different_payload_cannot_replace_projection"] = True
 
     for failure in ("callback", "cypher"):
         await seed()
@@ -295,6 +345,8 @@ async def main():
         "limits": ["No PostgreSQL/job fence, Qdrant/R2 or full ingestion worker exercised.",
             "Failures and graph outputs are authored; retry exception is injected, not a network outage.",
             "No hard-kill, ambiguous distributed commit, semantic accuracy or load-capacity claim.",
+            "The generation fence rejects a late old marked write after a newer attempt; it has no worker caller yet.",
+            "Deletion does not tombstone the fence: a late marked write after deletion could recreate the graph. Do not activate continuation until deletion and reconciliation are fenced.",
             "Automatic continuation remains disabled; this verifies its internal projection primitive only."]}
     directory = ROOT / "evaluation"
     (directory / "graph-projection-current.json").write_text(json.dumps(report, indent=2)+"\n")
@@ -305,7 +357,8 @@ async def main():
         "Command: `.venv/bin/python scripts/evaluate_graph_projection.py`. Requires running Docker and an already-installed official `neo4j:5-community` image; no image pull.\n\n"
         f"{len(checks)}/{len(checks)} checks passed against Neo4j {version}. Hosted provider calls: **0**. Production mutations: **0**. "
         "The separate-network, loopback-bound test container had no host volume, disabled usage reporting, and was removed with its data and network.\n\n"
-        f"| Check | Result |\n| --- | --- |\n{table}\n\n## Limits\n\n{limits}\n\n"
+        f"| Check | Result |\n| --- | --- |\n{table}\n\n"
+        f"## Limits\n\n{limits}\n\n"
         "Image and source SHA-256 hashes are recorded in the adjacent JSON. Elapsed time is a test-run observation, not throughput or capacity.\n")
     print(json.dumps({"passed": len(checks), "neo4j_version": version, "temporary_resources_removed": True}))
 

@@ -20,7 +20,7 @@ Updated: 2026-10-26 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent, remote marker and receipt deployed but disconnected | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`. Bounded deleted-source intent discovery is verified locally; the worker calls none of these publication operations. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Next: cross-store completion/crash/late-write reconciliation and bounded dispatch. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent, remote marker and receipt deployed but disconnected | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of these publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence now rejects that replay. Deletion tombstoning, source-generation propagation, cross-store completion/crash/late-write reconciliation and bounded dispatch remain before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,41 @@ Updated: 2026-10-26 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+27 October local late-write safety increment: the disconnected Neo4j
+publication primitive first accepted an exact old marker replay after a newer
+READY task had written its graph. A failing real-Neo4j regression captured
+that overwrite. The marked replacement now requires an explicit positive
+source generation and checks a unique, transaction-locked remote fence before
+deleting concepts. The same regression then passed: older attempts and
+different tasks or payloads at an equal generation cannot replace the newer graph. This
+does not activate the path: deletion lacks a durable tombstone, the
+PostgreSQL intent/receipt does not carry generation, and cross-store
+reconciliation/worker wiring remain. The disposable Neo4j 5.26.26 run passed
+15 checks; its container/network were removed and Docker Desktop was stopped.
+The isolated PostgreSQL continuation runner passed 39 checks with its private
+cluster removed. The backend suite passed 533 tests and 133 subtests;
+compileall and `git diff --check` passed. No hosted provider or production data
+was used. The first PostgreSQL command lacked its required socket argument;
+the sandbox then blocked shared memory, and two private-cluster setup attempts
+used the wrong socket path/role. The corrected isolated command passed.
+Record release/deployment separately.
+
+26 October deleted-source discovery release
+`4d9a57eb4cf1c8bc36d62741bbb9acf5d688e43b`: seven scoped files
+were pushed to `origin/main`. [GitHub CI run 40362701711](https://github.com/Ninjax26/conceptgraph-portfolio/actions/runs/40362701711)
+passed. The public API `/api/v1/ready` returned HTTP 200 at this exact
+revision, combined role, queue depth zero, no degraded services, with graph
+and ingestion available. The public `/sample` page rendered its saved answer,
+three source-page controls and a three-concept/two-relationship illustration.
+This prepared preview does not test live graph writes or reconciliation.
+All 532 backend tests, nine frontend tests, TypeScript/Vite build and 39
+isolated PostgreSQL checks passed before pushing. The first build attempt
+could not create Vite's temporary config file inside the sandbox; the same
+build passed with repository write permission. No hosted model or production
+test-data call was made. The new discovery method has no runtime caller;
+Phase 3 remains incomplete. This release-verification note stays local until
+the next substantive release.
 
 26 October local deleted-source discovery checkpoint: a bounded, read-only
 PostgreSQL query now lists retained publication intents whose upload row is

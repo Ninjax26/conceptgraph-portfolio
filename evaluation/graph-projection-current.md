@@ -1,10 +1,10 @@
 # Graph projection — isolated Neo4j verification
 
-Generated: 2026-10-26T12:45:25.777320+00:00.
+Generated: 2026-10-26T21:24:55.449224+00:00.
 
 Command: `.venv/bin/python scripts/evaluate_graph_projection.py`. Requires running Docker and an already-installed official `neo4j:5-community` image; no image pull.
 
-12/12 checks passed against Neo4j 5.26.26. Hosted provider calls: **0**. Production mutations: **0**. The separate-network, loopback-bound test container had no host volume, disabled usage reporting, and was removed with its data and network.
+15/15 checks passed against Neo4j 5.26.26. Hosted provider calls: **0**. Production mutations: **0**. The separate-network, loopback-bound test container had no host volume, disabled usage reporting, and was removed with its data and network.
 
 | Check | Result |
 | --- | --- |
@@ -15,6 +15,9 @@ Command: `.venv/bin/python scripts/evaluate_graph_projection.py`. Requires runni
 | `upload_cleanup_removes_only_matching_remote_marker_and_is_idempotent` | Pass |
 | `exact_obsolete_publication_cleanup_is_idempotent_and_preserves_neighbors` | Pass |
 | `obsolete_marker_cleanup_preserves_newer_execution_projection` | Pass |
+| `late_old_marker_replay_cannot_overwrite_newer_task_projection` | Pass |
+| `same_generation_different_task_cannot_replace_projection` | Pass |
+| `same_generation_different_payload_cannot_replace_projection` | Pass |
 | `real_transaction_rollback_after_delete_and_callback_failure` | Pass |
 | `real_transaction_rollback_after_delete_and_cypher_failure` | Pass |
 | `actual_driver_retries_entire_callback_after_injected_retryable_failure` | Pass |
@@ -26,6 +29,8 @@ Command: `.venv/bin/python scripts/evaluate_graph_projection.py`. Requires runni
 - No PostgreSQL/job fence, Qdrant/R2 or full ingestion worker exercised.
 - Failures and graph outputs are authored; retry exception is injected, not a network outage.
 - No hard-kill, ambiguous distributed commit, semantic accuracy or load-capacity claim.
+- The generation fence rejects a late old marked write after a newer attempt; it has no worker caller yet.
+- Deletion does not tombstone the fence: a late marked write after deletion could recreate the graph. Do not activate continuation until deletion and reconciliation are fenced.
 - Automatic continuation remains disabled; this verifies its internal projection primitive only.
 
 Image and source SHA-256 hashes are recorded in the adjacent JSON. Elapsed time is a test-run observation, not throughput or capacity.

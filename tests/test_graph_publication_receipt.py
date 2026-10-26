@@ -18,7 +18,7 @@ class PublicationReceiptTests(unittest.IsolatedAsyncioTestCase):
         self.job = SimpleNamespace(id="job")
         self.intent = SimpleNamespace(id="intent", job_id="job", upload_id="upload",
             course_id="course", document_task_id="task", payload_sha256="a" * 64)
-        self.marker = GraphProjectionMarker("intent", "job", "upload", "course", "task", "a" * 64)
+        self.marker = GraphProjectionMarker("intent", "job", "upload", "course", "task", "a" * 64, 1)
         self.candidate = GraphPublicationCandidate("{}", "a" * 64)
         self.reader = SimpleNamespace(read_graph_publication_marker=AsyncMock(return_value=self.marker))
 
@@ -50,7 +50,7 @@ class PublicationReceiptTests(unittest.IsolatedAsyncioTestCase):
         session.commit.assert_not_awaited()
 
     async def test_absent_or_conflicting_marker_never_stages_receipt(self):
-        for marker in (None, GraphProjectionMarker("intent", "other", "upload", "course", "task", "a" * 64)):
+        for marker in (None, GraphProjectionMarker("intent", "other", "upload", "course", "task", "a" * 64, 1)):
             with self.subTest(marker=marker):
                 self.reader.read_graph_publication_marker.reset_mock(return_value=True)
                 self.reader.read_graph_publication_marker.return_value = marker

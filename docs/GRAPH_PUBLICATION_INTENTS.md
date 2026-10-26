@@ -58,6 +58,25 @@ a cleanup candidate, not proof that an in-flight Neo4j write has ended. The
 future reconciler must inspect the exact marker and repeat after late writers
 have drained; this discovery must never directly authorize a remote delete.
 
+## Remote generation fence and remaining activation blockers
+
+The isolated Neo4j test first reproduced an old exact-marker replay replacing
+a newer task's graph. The disconnected marked replacement now requires an
+explicit positive source generation and serializes publication on a unique
+`GraphProjectionFence.upload_id` node in the same Neo4j transaction as concept
+replacement and marker creation. A lower generation, or a different task or
+payload at the same generation, is rejected before graph deletion. The marker also stores
+the generation; the isolated test checks replay rejection against real Neo4j.
+The intended source is the monotonically increasing PostgreSQL upload attempt,
+but no worker currently supplies or verifies it.
+
+**Do not activate graph-only continuation yet.** Normal document deletion does
+not tombstone the fence, so a late marked write after deletion could recreate
+concepts. The PostgreSQL intent/receipt does not yet persist or compare the
+generation. A coordinator must prove source authority, publish, finalize and
+reconcile killed or ambiguous writes across stores. Exact-marker cleanup alone
+cannot establish that no writer remains in flight.
+
 The receipt's isolated PostgreSQL test uses a mocked marker reader. The separate
 isolated Neo4j test exercises the real marker write/read. They are **not** a
 combined PostgreSQL–Neo4j transaction, hard-kill or deletion-reconciliation
