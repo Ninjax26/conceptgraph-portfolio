@@ -1,9 +1,11 @@
 """Durable graph-job admission/claim/checkpoint foundation.
 
 Not connected to the coordinator or any API route yet. Opt-in READY completion
-can stage snapshots atomically, but this module performs
-PostgreSQL operations only; it never generates or projects a graph. A future
+can stage snapshots atomically. This module does not generate or publish a
+graph. A future
 graph-only worker must publish under the document/job fence before activation.
+The disconnected deleted-source reconciliation primitive may also tombstone
+an already-deleted upload in Neo4j after a fresh PostgreSQL check.
 """
 
 from collections.abc import Sequence
@@ -14,7 +16,7 @@ import json
 from uuid import uuid4
 
 from sqlalchemy import and_, func, or_, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.core.exceptions import GraphStructureError
@@ -555,6 +557,35 @@ class GraphContinuationService:
             DocumentUpload.upload_id.is_(None)).order_by(
             GraphPublicationIntent.created_at, GraphPublicationIntent.id).limit(limit))
         return result.scalars().all()
+
+    @staticmethod
+    async def reconcile_deleted_source_publication(
+        sessions: async_sessionmaker[AsyncSession], intent_id: str,
+        ingestion_service: IngestionService,
+    ) -> bool:
+        """Tombstone one retained intent only after a fresh committed-source check.
+
+        Internal manual recovery primitive with no worker or scheduler caller.
+        A new PostgreSQL session cannot observe an uncommitted deletion from
+        the caller; FOR UPDATE waits for a concurrent delete to finish.
+        The Neo4j tombstone is idempotent if PostgreSQL commit becomes unclear.
+        """
+        if not isinstance(intent_id, str) or not intent_id.strip():
+            raise ValueError("Graph publication intent ID is required.")
+        async with sessions() as session:
+            async with session.begin():
+                intent = (await session.execute(select(GraphPublicationIntent).where(
+                    GraphPublicationIntent.id == intent_id))).scalar_one_or_none()
+                if intent is None:
+                    return False
+                source = (await session.execute(select(DocumentUpload.upload_id).where(
+                    DocumentUpload.upload_id == intent.upload_id).with_for_update()
+                )).scalar_one_or_none()
+                if source is not None:
+                    return False
+                await ingestion_service.tombstone_graph_publication(
+                    intent.upload_id, intent.course_id)
+                return True
 
     async def observe_publication_receipt(
         self, session: AsyncSession, claim: GraphJobClaim, ingestion_service: IngestionService,

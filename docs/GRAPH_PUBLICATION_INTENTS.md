@@ -55,8 +55,15 @@ intent is obsolete before using it; the marker alone is not cleanup authority.
 upload row has been deleted, in stable creation/ID order. It only reads
 PostgreSQL and has no worker or scheduler caller. An absent upload identifies
 a cleanup candidate, not proof that an in-flight Neo4j write has ended. The
-future reconciler must inspect the exact marker and repeat after late writers
-have drained; this discovery must never directly authorize a remote delete.
+future reconciler must repeat after late writers have drained; this discovery
+must never directly authorize a remote delete.
+
+A disconnected reconciliation helper now opens its own PostgreSQL session,
+checks an intent's upload under `FOR UPDATE`, and calls the Neo4j tombstone
+only if the upload is committed absent. It waits for an in-flight deletion and
+does nothing if that deletion rolls back. Remote failures propagate so the
+same intent can be retried. The isolated PostgreSQL runner tests these cases
+with a mocked remote call; no worker or scheduler invokes this helper.
 
 ## Remote generation fence and remaining activation blockers
 
@@ -71,15 +78,22 @@ The intended source is the monotonically increasing PostgreSQL upload attempt,
 but no worker currently supplies or verifies it.
 
 **Do not activate graph-only continuation yet.** Normal document deletion does
-not tombstone the fence, so a late marked write after deletion could recreate
-concepts. The PostgreSQL intent/receipt does not yet persist or compare the
-generation. A coordinator must prove source authority, publish, finalize and
-reconcile killed or ambiguous writes across stores. Exact-marker cleanup alone
-cannot establish that no writer remains in flight.
+not call the new tombstone primitive. After PostgreSQL proves committed upload
+deletion, that primitive can permanently mark the fence deleted and remove the
+upload's concepts and publication markers in one managed Neo4j transaction.
+Real Neo4j checks cover idempotence, course scope, prepublication deletion and
+a concurrent in-flight marked write; later marked writes are rejected. It is
+disconnected because the live deletion order can fail after graph cleanup, so
+writing a permanent tombstone there could block a still-READY upload. The
+PostgreSQL intent/receipt does not yet persist or compare the generation. A
+coordinator must prove source authority, publish, finalize and reconcile killed
+or ambiguous writes across stores. Exact-marker cleanup alone cannot establish
+that no writer remains in flight.
 
-The receipt's isolated PostgreSQL test uses a mocked marker reader. The separate
-isolated Neo4j test exercises the real marker write/read. They are **not** a
-combined PostgreSQL–Neo4j transaction, hard-kill or deletion-reconciliation
+The receipt's isolated PostgreSQL test uses a mocked marker reader and the
+deleted-source helper uses a mocked Neo4j tombstone. The separate isolated
+Neo4j test exercises real marker and tombstone writes. They are **not** a
+combined PostgreSQL–Neo4j transaction, hard-kill or full deletion-reconciliation
 test. A receipt means an exact marker was observed, not that the source remains
 eligible or that the graph job is complete.
 

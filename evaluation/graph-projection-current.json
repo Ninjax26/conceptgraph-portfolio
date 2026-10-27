@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-10-26T21:24:55.449224+00:00",
+  "generated_at_utc": "2026-10-27T07:50:28.237594+00:00",
   "kind": "isolated real Neo4j transaction checks with synthetic graph/failure fixtures",
   "neo4j_version": "5.26.26",
   "image_id": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
-  "elapsed_seconds": 51.465,
+  "elapsed_seconds": 23.865,
   "checks": {
     "merged_graph_replacement_preserves_other_uploads_and_ready_scope": true,
     "replay_preserves_graph_content_without_duplicate_edges": true,
@@ -15,6 +15,10 @@
     "late_old_marker_replay_cannot_overwrite_newer_task_projection": true,
     "same_generation_different_task_cannot_replace_projection": true,
     "same_generation_different_payload_cannot_replace_projection": true,
+    "tombstone_blocks_late_publication_and_preserves_neighbors": true,
+    "tombstone_before_first_marker_blocks_publication": true,
+    "tombstone_rejects_foreign_course_without_partial_cleanup": true,
+    "concurrent_tombstone_waits_for_inflight_publication_then_removes_it": true,
     "real_transaction_rollback_after_delete_and_callback_failure": true,
     "real_transaction_rollback_after_delete_and_cypher_failure": true,
     "actual_driver_retries_entire_callback_after_injected_retryable_failure": true,
@@ -27,15 +31,15 @@
   "disposable_container_and_network_removed": true,
   "code_sha256": {
     "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
-    "app/services/ingestion_service.py": "c173ae6cb10e6a2116bbf26b299f8c01eed7654b9381c352ca5c9e70d1390d8e",
-    "scripts/evaluate_graph_projection.py": "d232b7ccc87476d79927bccd11e259fc795542f2e408231b9578b6389adae247"
+    "app/services/ingestion_service.py": "15206107973c632cab5999644d8305ca434dd3b4b715ae16ca1d51317a62e9c3",
+    "scripts/evaluate_graph_projection.py": "e748c8253e297cb5906b6fcb9097dabc9ff0fc36d0287628a5b34385dca1d6ee"
   },
   "limits": [
     "No PostgreSQL/job fence, Qdrant/R2 or full ingestion worker exercised.",
     "Failures and graph outputs are authored; retry exception is injected, not a network outage.",
     "No hard-kill, ambiguous distributed commit, semantic accuracy or load-capacity claim.",
     "The generation fence rejects a late old marked write after a newer attempt; it has no worker caller yet.",
-    "Deletion does not tombstone the fence: a late marked write after deletion could recreate the graph. Do not activate continuation until deletion and reconciliation are fenced.",
+    "The live deletion route does not call the tombstone primitive; it is reserved for a reconciler that has proved committed source deletion. Do not activate continuation until source authority and cross-store recovery are connected.",
     "Automatic continuation remains disabled; this verifies its internal projection primitive only."
   ]
 }

@@ -153,6 +153,30 @@ class GraphProjectionTests(unittest.IsolatedAsyncioTestCase):
                     await self.replace(self.service(session), marker=marker)
                 self.assertFalse(session.calls)
 
+    async def test_deleted_source_tombstone_and_cleanup_share_one_transaction(self):
+        session = ManagedSession()
+        await self.service(session).tombstone_graph_publication("upload", "course")
+        self.assertEqual(session.transaction_count, 1)
+        self.assertIn("GraphProjectionFence", session.calls[0][0])
+        self.assertIn("fence.deleted = true", session.calls[0][0])
+        self.assertIn("DETACH DELETE concept", session.calls[1][0])
+        self.assertIn("DETACH DELETE marker", session.calls[2][0])
+        self.assertIn("DETACH DELETE course", session.calls[3][0])
+        self.assertEqual(session.committed, session.calls)
+
+    async def test_failed_tombstone_cleanup_rolls_back_fence(self):
+        session = ManagedSession(fail_on=3)
+        with self.assertRaises(RuntimeError):
+            await self.service(session).tombstone_graph_publication("upload", "course")
+        self.assertEqual(session.committed, ["old projection"])
+
+    async def test_tombstone_rejects_incomplete_identity_before_io(self):
+        session = ManagedSession()
+        service = self.service(session)
+        with self.assertRaises(ValueError):
+            await service.tombstone_graph_publication("", "course")
+        service.graph_driver.session.assert_not_called()
+
     async def test_marker_write_failure_does_not_commit_replacement(self):
         session = ManagedSession(fail_on=8)
         marker = GraphProjectionMarker("intent", "job", "upload", "course", "original-ready-task", "a" * 64, 1)

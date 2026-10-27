@@ -203,6 +203,78 @@ async def verify(driver):
     assert await state(driver) == before_conflict
     checks["same_generation_different_payload_cannot_replace_projection"] = True
 
+    # A reconciler may call this only after PostgreSQL proves the upload was
+    # deleted. The tombstone must stop both old and future marked writes.
+    await seed()
+    await replace(graph(count=3), marker=marker)
+    await service.tombstone_graph_publication("target", "course")
+    assert await rows(driver, "MATCH (n:GraphProjectionFence {upload_id:'target'}) "
+        "RETURN n.deleted AS deleted") == [{"deleted": True}]
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'target'}) "
+        "RETURN count(n) AS count"))[0]["count"] == 0
+    assert await service.read_graph_publication_marker("intent") is None
+    for candidate, token in ((marker, "ready-task"), (newer, "new-ready-task")):
+        try:
+            await service.replace_graph_extraction(graph(count=3), "course",
+                upload_id="target", document_name="fixture.pdf",
+                course_name="Fixture course", execution_token=token,
+                marker=candidate)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("A deleted upload accepted a marked publication")
+    await service.tombstone_graph_publication("target", "course")
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'neighbor'}) "
+        "RETURN count(n) AS count"))[0]["count"] == 2
+    checks["tombstone_blocks_late_publication_and_preserves_neighbors"] = True
+
+    await seed()
+    await service.tombstone_graph_publication("target", "course")
+    try:
+        await replace(graph(count=3), marker=marker)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("A first publication recreated a deleted upload")
+    checks["tombstone_before_first_marker_blocks_publication"] = True
+
+    await seed()
+    await replace(graph(count=3), marker=marker)
+    before_wrong_course = await state(driver)
+    try:
+        await service.tombstone_graph_publication("target", "other-course")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("A foreign course tombstoned the upload")
+    assert await state(driver) == before_wrong_course
+    checks["tombstone_rejects_foreign_course_without_partial_cleanup"] = True
+
+    await seed()
+    entered, release = asyncio.Event(), asyncio.Event()
+    original_write = service._write_graph_extraction
+
+    async def paused_write(tx, *args, **kwargs):
+        entered.set()  # The publication transaction already owns the fence.
+        await release.wait()
+        await original_write(tx, *args, **kwargs)
+
+    with patch.object(service, "_write_graph_extraction", paused_write):
+        writer = asyncio.create_task(replace(graph(count=3), marker=marker))
+        await asyncio.wait_for(entered.wait(), 10)
+        deletion = asyncio.create_task(service.tombstone_graph_publication("target", "course"))
+        try:
+            await asyncio.sleep(0.1)
+            assert not deletion.done()
+        finally:
+            release.set()
+        await asyncio.wait_for(writer, 10)
+        await asyncio.wait_for(deletion, 10)
+    assert (await rows(driver, "MATCH (n:Concept {upload_id:'target'}) "
+        "RETURN count(n) AS count"))[0]["count"] == 0
+    assert await service.read_graph_publication_marker("intent") is None
+    checks["concurrent_tombstone_waits_for_inflight_publication_then_removes_it"] = True
+
     for failure in ("callback", "cypher"):
         await seed()
         before = await state(driver)
@@ -346,7 +418,7 @@ async def main():
             "Failures and graph outputs are authored; retry exception is injected, not a network outage.",
             "No hard-kill, ambiguous distributed commit, semantic accuracy or load-capacity claim.",
             "The generation fence rejects a late old marked write after a newer attempt; it has no worker caller yet.",
-            "Deletion does not tombstone the fence: a late marked write after deletion could recreate the graph. Do not activate continuation until deletion and reconciliation are fenced.",
+            "The live deletion route does not call the tombstone primitive; it is reserved for a reconciler that has proved committed source deletion. Do not activate continuation until source authority and cross-store recovery are connected.",
             "Automatic continuation remains disabled; this verifies its internal projection primitive only."]}
     directory = ROOT / "evaluation"
     (directory / "graph-projection-current.json").write_text(json.dumps(report, indent=2)+"\n")

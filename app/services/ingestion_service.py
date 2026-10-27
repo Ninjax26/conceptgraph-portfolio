@@ -701,10 +701,11 @@ class IngestionService:
                 result = await tx.run(
                     """
                     MERGE (fence:GraphProjectionFence {upload_id: $upload_id})
-                    ON CREATE SET fence.generation = 0, fence.deleted = false
+                    ON CREATE SET fence.generation = 0, fence.deleted = false,
+                                  fence.course_id = $course_id
                     SET fence.lock_epoch = coalesce(fence.lock_epoch, 0) + 1
                     WITH fence
-                    WHERE fence.deleted = false AND
+                    WHERE fence.course_id = $course_id AND fence.deleted = false AND
                       ($generation > fence.generation OR
                        ($generation = fence.generation AND
                         fence.document_task_id = $document_task_id AND
@@ -713,7 +714,8 @@ class IngestionService:
                         fence.document_task_id = $document_task_id,
                         fence.payload_sha256 = $payload_sha256
                     RETURN fence.upload_id AS upload_id
-                    """, upload_id=upload_id, generation=marker.generation,
+                    """, upload_id=upload_id, course_id=course_id,
+                    generation=marker.generation,
                     document_task_id=marker.document_task_id,
                     payload_sha256=marker.payload_sha256,
                 )
@@ -768,17 +770,67 @@ class IngestionService:
                 if marker is not None:
                     # MERGE alone cannot ensure one fence per upload under
                     # concurrent creation. Keep the constraint as a write gate.
-                    result = await session.run(
-                        """CREATE CONSTRAINT graph_projection_fence_upload IF NOT EXISTS
-                        FOR (fence:GraphProjectionFence)
-                        REQUIRE fence.upload_id IS UNIQUE"""
-                    )
-                    await result.consume()
+                    await self._ensure_graph_projection_fence_constraint(session)
                 # Managed retries repeat the entire idempotent replacement;
                 # never retry deletion and insertion as separate transactions.
                 await session.execute_write(replace)
 
         await run_async_safely(publish())
+
+    @staticmethod
+    async def _ensure_graph_projection_fence_constraint(session) -> None:
+        result = await session.run(
+            """CREATE CONSTRAINT graph_projection_fence_upload IF NOT EXISTS
+            FOR (fence:GraphProjectionFence)
+            REQUIRE fence.upload_id IS UNIQUE"""
+        )
+        await result.consume()
+
+    async def tombstone_graph_publication(self, upload_id: str, course_id: str) -> None:
+        """Fence a proven-deleted upload, then remove its projection atomically.
+
+        Internal reconciliation primitive only. The caller must prove durable
+        PostgreSQL deletion; this method has no API, worker or scheduler caller.
+        The tombstone survives marker cleanup and rejects late marked writes.
+        """
+        from app.core.blocking import run_async_safely
+
+        if not all(isinstance(value, str) and value.strip() for value in (upload_id, course_id)):
+            raise ValueError("Graph publication tombstone requires upload and course identity.")
+
+        async def remove(tx):
+            result = await tx.run(
+                """MERGE (fence:GraphProjectionFence {upload_id: $upload_id})
+                ON CREATE SET fence.course_id = $course_id,
+                              fence.generation = 0
+                SET fence.lock_epoch = coalesce(fence.lock_epoch, 0) + 1
+                WITH fence
+                WHERE fence.course_id = $course_id
+                SET fence.deleted = true
+                RETURN fence.upload_id AS upload_id""",
+                upload_id=upload_id, course_id=course_id,
+            )
+            if await result.single() is None:
+                raise ValueError("Graph publication fence belongs to another course.")
+            for query in (
+                """MATCH (concept:Concept {course_id: $course_id,
+                   upload_id: $upload_id})
+                   DETACH DELETE concept""",
+                """MATCH (marker:GraphPublication {course_id: $course_id,
+                   upload_id: $upload_id}) DETACH DELETE marker""",
+                """MATCH (course:Course {id: $course_id})
+                   WHERE NOT (course)-[:CONTAINS]->(:Concept)
+                   DETACH DELETE course""",
+            ):
+                result = await tx.run(query, course_id=course_id, upload_id=upload_id)
+                await result.consume()
+
+        async def tombstone():
+            async with self.graph_driver.session() as session:
+                await self._ensure_graph_projection_fence_constraint(session)
+                await session.execute_write(remove)
+
+        await run_async_safely(tombstone())
 
     async def read_graph_publication_marker(self, intent_id: str) -> GraphProjectionMarker | None:
         """Read remote commit evidence; caller must reconcile it with PostgreSQL."""

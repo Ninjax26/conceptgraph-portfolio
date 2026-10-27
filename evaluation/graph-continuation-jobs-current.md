@@ -2,7 +2,7 @@
 
 Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
 
-39 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+42 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
 
 - additive_schema_restart_and_due_lease_indexes: passed
 - database_rejects_incomplete_running_lease_and_excess_attempts: passed
@@ -22,6 +22,9 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - receipt_requires_exact_observed_marker_and_survives_restart: passed
 - intent_and_receipt_survive_document_and_job_cascade_for_reconciliation: passed
 - deleted_source_intent_discovery_excludes_live_uploads_and_is_repeatable: passed
+- deleted_source_reconciliation_requires_committed_absence: passed
+- deleted_source_reconciliation_retries_after_remote_failure: passed
+- uncommitted_deletion_cannot_authorize_remote_tombstone: passed
 - draft_conflict_and_database_storage_constraint_fail_closed: passed
 - job_deletion_cascades_unpublished_draft_without_changing_ready_result_and_rolls_back: passed
 - changed_section_concepts_invalidate_recovery_save: passed
@@ -50,6 +53,6 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.
 - Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.
 - Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.
-- An immutable intent and observed-marker receipt survive document/job deletion, but the reader is mocked and no publisher, completion or reconciler consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
+- An immutable intent and observed-marker receipt survive document/job deletion; the marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
 - Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.
 - Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.
