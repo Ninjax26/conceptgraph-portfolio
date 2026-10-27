@@ -20,7 +20,7 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent, remote marker and receipt deployed but disconnected | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of these publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence now rejects that replay. A disconnected tombstone and deleted-source helper exist. Source generation is now recorded in intents and compared in receipts locally, but no worker passes it to Neo4j. Live deletion integration, cross-store completion/crash/late-write reconciliation and bounded dispatch remain before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent, remote marker and receipt deployed but disconnected | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of these publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence now rejects that replay. A disconnected tombstone, deleted-source helper and durable cleanup receipt exist. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. Live deletion integration, combined cross-store completion/crash/late-write recovery and bounded dispatch remain before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,35 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+27 October local deleted-source recovery increment: a retained PostgreSQL
+cleanup receipt is written only after the disconnected Neo4j tombstone call
+succeeds. Repeated or concurrent reconciliation of the same intent returns
+without another remote call; a failed remote call leaves no receipt and can
+retry. Bounded discovery excludes cleaned intents so one old row cannot keep
+later deleted uploads out of a limited scan. The additive table has no
+cascading source or intent foreign key. The disposable PostgreSQL runner passed
+47 checks, including committed deletion, rollback, restart, repeat, later-row
+discovery and concurrent reconcilers; the remote tombstone was mocked. It
+removed its private schema/cluster and made zero hosted-provider calls. No
+worker or scheduler calls this helper. Combined PostgreSQL–Neo4j crash
+recovery, live deletion integration and graph-job completion remain before
+automatic continuation can be enabled. The backend suite passed 539 tests and
+135 subtests; nine frontend tests, TypeScript/Vite build, compileall and diff
+checks passed. Record release verification separately.
+
+27 October source-generation release `bb9f44b50e79ed4ae78f7ed247a208dc11b14eaf`:
+ten scoped files were pushed to `origin/main`. [GitHub CI run 40470405867](https://github.com/Ninjax26/conceptgraph-portfolio/actions/runs/40470405867)
+passed. The free Render API `/api/v1/ready` returned HTTP 200 at this exact
+revision, combined processing role, zero queued jobs, no degraded services,
+and graph/ingestion available. The frontend `/sample` route returned HTTP 200;
+its public API returned one prepared document with `GRAPH_READY`. These checks
+do not exercise the disconnected publication path. Final local verification:
+43 isolated PostgreSQL checks, 539 backend tests, 135 subtests, nine frontend
+tests, TypeScript/Vite build, compileall and staged diff checks passed.
+No hosted provider call or production test-data mutation was made. Automatic
+continuation remains disabled. This release-verification note is local until
+the next substantive release.
 
 27 October local source-generation increment: the upload's positive attempt
 count is stored with a new publication intent. Receipt observation requires

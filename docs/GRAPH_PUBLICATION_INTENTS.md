@@ -67,9 +67,15 @@ must never directly authorize a remote delete.
 A disconnected reconciliation helper now opens its own PostgreSQL session,
 checks an intent's upload under `FOR UPDATE`, and calls the Neo4j tombstone
 only if the upload is committed absent. It waits for an in-flight deletion and
-does nothing if that deletion rolls back. Remote failures propagate so the
-same intent can be retried. The isolated PostgreSQL runner tests these cases
-with a mocked remote call; no worker or scheduler invokes this helper.
+does nothing if that deletion rolls back. It serializes reconcilers for the
+intent with a transaction advisory lock, then persists a retained cleanup
+receipt only after the remote tombstone succeeds. Remote or PostgreSQL commit
+failures can be retried because the Neo4j tombstone is idempotent. Discovery
+skips cleaned intents, so a bounded scan can reach later deleted uploads.
+The isolated PostgreSQL runner tests rollback, restart, repeat, pagination and
+concurrency with a mocked remote call; no worker or scheduler invokes this
+helper. The cleanup receipt has no cascading foreign key and contains no PDF
+text or graph payload.
 
 ## Remote generation fence and remaining activation blockers
 

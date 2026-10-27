@@ -205,6 +205,18 @@ class GraphPublicationReceipt(Base):
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class GraphPublicationCleanupReceipt(Base):
+    """Retained proof that a deleted source's remote tombstone completed."""
+
+    __tablename__ = "graph_publication_cleanup_receipts"
+
+    # No source/intent foreign key: both may be absent during recovery.
+    intent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    upload_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    course_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    cleaned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ProviderBudget(Base):
     __tablename__ = "provider_budgets"
 

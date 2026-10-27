@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import settings
 from app.core.exceptions import GraphStructureError
 from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
-from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
+from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationCleanupReceipt, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.graph_publication_candidate import (
@@ -558,8 +558,11 @@ class GraphContinuationService:
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("Invalid deleted-source discovery batch size.")
         result = await session.execute(select(GraphPublicationIntent).outerjoin(
-            DocumentUpload, DocumentUpload.upload_id == GraphPublicationIntent.upload_id).where(
-            DocumentUpload.upload_id.is_(None)).order_by(
+            DocumentUpload, DocumentUpload.upload_id == GraphPublicationIntent.upload_id).outerjoin(
+            GraphPublicationCleanupReceipt,
+            GraphPublicationCleanupReceipt.intent_id == GraphPublicationIntent.id).where(
+            DocumentUpload.upload_id.is_(None),
+            GraphPublicationCleanupReceipt.intent_id.is_(None)).order_by(
             GraphPublicationIntent.created_at, GraphPublicationIntent.id).limit(limit))
         return result.scalars().all()
 
@@ -588,8 +591,20 @@ class GraphContinuationService:
                 )).scalar_one_or_none()
                 if source is not None:
                     return False
+                # Only one reconciler may call the remote tombstone for this
+                # intent. The transaction lock lasts through receipt commit.
+                await session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                    {"key": f"conceptgraph:graph-publication-cleanup:{intent.id}"})
+                receipt = (await session.execute(select(GraphPublicationCleanupReceipt).where(
+                    GraphPublicationCleanupReceipt.intent_id == intent.id))).scalar_one_or_none()
+                if receipt is not None:
+                    if (receipt.upload_id, receipt.course_id) != (intent.upload_id, intent.course_id):
+                        raise ValueError("Graph publication cleanup receipt conflicts with intent.")
+                    return False
                 await ingestion_service.tombstone_graph_publication(
                     intent.upload_id, intent.course_id)
+                session.add(GraphPublicationCleanupReceipt(intent_id=intent.id,
+                    upload_id=intent.upload_id, course_id=intent.course_id))
                 return True
 
     async def observe_publication_receipt(

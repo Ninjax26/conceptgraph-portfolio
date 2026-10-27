@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.models.document_upload import GraphPublicationIntent
+from app.models.document_upload import GraphPublicationCleanupReceipt, GraphPublicationIntent
 from app.services.graph_continuation_service import GraphContinuationService
 from app.services.graph_publication_candidate import GraphPublicationCandidate
 
@@ -26,6 +26,7 @@ class PublicationIntentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_intent_has_no_cascading_document_or_job_foreign_key(self):
         self.assertFalse(GraphPublicationIntent.__table__.foreign_keys)
+        self.assertFalse(GraphPublicationCleanupReceipt.__table__.foreign_keys)
 
     async def test_deleted_source_discovery_is_bounded_and_read_only(self):
         service = GraphContinuationService()
@@ -38,6 +39,7 @@ class PublicationIntentTests(unittest.IsolatedAsyncioTestCase):
         query = str(session.execute.call_args.args[0])
         self.assertIn("graph_publication_intents", query)
         self.assertIn("document_uploads", query)
+        self.assertIn("graph_publication_cleanup_receipts", query)
         self.assertIn("IS NULL", query)
         self.assertIn("LIMIT", query)
         session.add.assert_not_called()

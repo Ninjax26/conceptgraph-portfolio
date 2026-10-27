@@ -27,7 +27,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.core import database
 from app.core.config import Settings
-from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
+from app.models.document_upload import Course, DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationCleanupReceipt, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
 from app.schemas.extraction import ConceptNode, GraphExtractionResponse
 from app.services import graph_continuation_service as jobs
 from app.services import ingestion_service as ingestion
@@ -387,17 +387,6 @@ async def run(args):
                 await session.rollback()
             checks["deleted_source_intent_discovery_excludes_live_uploads_and_is_repeatable"] = True
 
-            remote_cleanup = SimpleNamespace(tombstone_graph_publication=AsyncMock())
-            assert await service.reconcile_deleted_source_publication(
-                sessions, orphan_intent, remote_cleanup) is True
-            remote_cleanup.tombstone_graph_publication.assert_awaited_once_with(
-                orphan_id, course.id)
-            remote_cleanup.tombstone_graph_publication.reset_mock()
-            assert await service.reconcile_deleted_source_publication(
-                sessions, intent_id, remote_cleanup) is False
-            remote_cleanup.tombstone_graph_publication.assert_not_awaited()
-            checks["deleted_source_reconciliation_requires_committed_absence"] = True
-
             failed_remote = SimpleNamespace(tombstone_graph_publication=AsyncMock(
                 side_effect=RuntimeError("synthetic remote failure")))
             try:
@@ -407,9 +396,77 @@ async def run(args):
                 pass
             else:
                 raise AssertionError("Remote tombstone failure was swallowed")
+            async with sessions() as session:
+                assert (await session.execute(select(func.count()).select_from(
+                    GraphPublicationCleanupReceipt))).scalar_one() == 0
+            checks["failed_remote_tombstone_leaves_no_cleanup_receipt"] = True
+            remote_cleanup = SimpleNamespace(tombstone_graph_publication=AsyncMock())
             assert await service.reconcile_deleted_source_publication(
                 sessions, orphan_intent, remote_cleanup) is True
+            remote_cleanup.tombstone_graph_publication.assert_awaited_once_with(
+                orphan_id, course.id)
+            assert await service.reconcile_deleted_source_publication(
+                sessions, orphan_intent, remote_cleanup) is False
+            remote_cleanup.tombstone_graph_publication.assert_awaited_once()
             checks["deleted_source_reconciliation_retries_after_remote_failure"] = True
+
+            async with sessions() as session:
+                receipt = (await session.execute(select(GraphPublicationCleanupReceipt).where(
+                    GraphPublicationCleanupReceipt.intent_id == orphan_intent))).scalar_one()
+                assert (receipt.upload_id, receipt.course_id) == (orphan_id, course.id)
+            with patch.object(database, "postgres_engine", engine):
+                await database.initialize_database_schema()
+            async with sessions() as session:
+                assert (await session.execute(select(func.count()).select_from(
+                    GraphPublicationCleanupReceipt).where(
+                    GraphPublicationCleanupReceipt.intent_id == orphan_intent))).scalar_one() == 1
+            checks["cleanup_receipt_survives_restart_and_prevents_duplicate_remote_calls"] = True
+
+            next_id, next_task, _, _ = await prepared()
+            next_intent = str(uuid4())
+            async with sessions() as session:
+                next_job = (await session.execute(select(GraphContinuationJob).where(
+                    GraphContinuationJob.upload_id == next_id))).scalar_one()
+                session.add(GraphPublicationIntent(id=next_intent, job_id=next_job.id,
+                    upload_id=next_id, document_task_id=next_task,
+                    course_id=course.id, payload_sha256="b" * 64))
+                await session.commit()
+                await session.execute(delete(DocumentUpload).where(
+                    DocumentUpload.upload_id == next_id))
+                await session.commit()
+            async with sessions() as session:
+                assert [row.id for row in await service.list_deleted_source_intents(
+                    session, limit=1)] == [next_intent]
+                await session.rollback()
+            checks["cleaned_deleted_source_does_not_starve_later_discovery"] = True
+
+            entered, release = asyncio.Event(), asyncio.Event()
+            async def slow_tombstone(*_):
+                entered.set()
+                await release.wait()
+            concurrent_remote = SimpleNamespace(tombstone_graph_publication=AsyncMock(
+                side_effect=slow_tombstone))
+            first = asyncio.create_task(service.reconcile_deleted_source_publication(
+                sessions, next_intent, concurrent_remote))
+            await asyncio.wait_for(entered.wait(), 5)
+            second = asyncio.create_task(service.reconcile_deleted_source_publication(
+                sessions, next_intent, concurrent_remote))
+            try:
+                await asyncio.sleep(0.1)
+                assert not first.done() and not second.done()
+                concurrent_remote.tombstone_graph_publication.assert_awaited_once()
+            finally:
+                release.set()
+            assert await asyncio.wait_for(first, 5) is True
+            assert await asyncio.wait_for(second, 5) is False
+            concurrent_remote.tombstone_graph_publication.assert_awaited_once()
+            checks["concurrent_reconcilers_tombstone_once_and_record_one_receipt"] = True
+
+            remote_cleanup.tombstone_graph_publication.reset_mock()
+            assert await service.reconcile_deleted_source_publication(
+                sessions, intent_id, remote_cleanup) is False
+            remote_cleanup.tombstone_graph_publication.assert_not_awaited()
+            checks["deleted_source_reconciliation_requires_committed_absence"] = True
 
             async with sessions() as deleting:
                 await deleting.execute(delete(DocumentUpload).where(
@@ -420,8 +477,7 @@ async def run(args):
                 assert not pending.done()  # FOR UPDATE waits for deletion outcome.
                 await deleting.rollback()
                 assert await pending is False
-            remote_cleanup.tombstone_graph_publication.assert_awaited_once_with(
-                orphan_id, course.id)
+            remote_cleanup.tombstone_graph_publication.assert_not_awaited()
             checks["uncommitted_deletion_cannot_authorize_remote_tombstone"] = True
 
             async with sessions() as session:
@@ -748,7 +804,7 @@ async def run(args):
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-            "An immutable intent and observed-marker receipt survive document/job deletion; their source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
+            "An immutable intent, observed-marker receipt and deleted-source cleanup receipt survive document/job deletion; source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
             "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
             "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.",
         ],
