@@ -97,6 +97,8 @@ async def initialize_database_schema() -> None:
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_lease_expires_at ON document_uploads (lease_expires_at)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_created_upload ON document_uploads (created_at DESC, upload_id DESC)",
             "ALTER TABLE processing_attempts ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ",
+            "ALTER TABLE graph_publication_intents ADD COLUMN IF NOT EXISTS source_generation INTEGER",
+            "ALTER TABLE graph_publication_receipts ADD COLUMN IF NOT EXISTS source_generation INTEGER",
         ]
         for statement in migrations:
             await conn.execute(text(statement))

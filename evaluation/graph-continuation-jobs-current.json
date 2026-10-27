@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-27T07:49:59.545684+00:00",
+  "generated_at_utc": "2026-10-27T07:58:06.499144+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -45,17 +45,18 @@
     "concurrent_snapshot_admission_cannot_exceed_retained_job_cap": true,
     "terminal_snapshot_cleanup_rolls_back_and_preserves_exhausted_tombstone": true,
     "terminal_draft_cleanup_skips_document_locked_by_another_session": true,
-    "terminal_draft_cleanup_is_bounded_repeatable_rollback_safe_and_preserves_job_history": true
+    "terminal_draft_cleanup_is_bounded_repeatable_rollback_safe_and_preserves_job_history": true,
+    "source_generation_migration_is_additive_repeatable_and_preserves_legacy_rows": true
   },
-  "checks_passed": 42,
+  "checks_passed": 43,
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 4.3321,
+  "duration_seconds": 6.3661,
   "code_sha256": {
-    "app/models/document_upload.py": "73c186c1ca3b9d9ae284255c6852e18a0b4c53ad283b92fa980f908559976688",
-    "app/services/graph_continuation_service.py": "1e42b5da6e59ae9ec54ae43885e27ede169458d2a7b6511c38b56e8d3e9da919",
-    "scripts/evaluate_graph_continuation_jobs.py": "a685cd026c72c934244d86007ef38ec01749a17636ade0777923be50a7eeea9d",
+    "app/models/document_upload.py": "4e4d5d5c9b9fff50270cfebbec46a1adf6c4191e8cbc290f94430049943d39e8",
+    "app/services/graph_continuation_service.py": "a1166c32ae6116d6a1fbb8d1f63dbdb060ea997ca11df97c6272fdcaf343d908",
+    "scripts/evaluate_graph_continuation_jobs.py": "097fbd834b07ca757ae6c09beb32ee887c4db4f32a2289583d5cbd7562866892",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
     "tests/test_graph_job_checkpoint_reads.py": "8bf7b2e70b30cf399f6f38abb83253e9a5bbd0d4e58b7dfdabb37688ddbb1b72",
     "app/services/graph_job_extraction.py": "732d0108699b6daa2fcf59d215095b654a1b4081ef11e010c65922376941d758",
@@ -67,15 +68,15 @@
     "app/services/ingestion_service.py": "15206107973c632cab5999644d8305ca434dd3b4b715ae16ca1d51317a62e9c3",
     "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1",
     "tests/test_graph_publication_draft.py": "9c57f226ccbd0eb65f903b924c39f3f37f2a28c2b01d1a605bfb6753c7d2e737",
-    "tests/test_graph_publication_intent.py": "13a9d02177cb17b39055c2aabd4a0e5fef11f076f16065e4ebf27f2e4c1c5058",
-    "tests/test_graph_publication_receipt.py": "b8f778278a19c6f259e5a366c3dd2f2641335ab8f5d3a0d634825a0dbfb94249"
+    "tests/test_graph_publication_intent.py": "725c96930de09d0ffd7ed9568500914b8c156f0e5d2d25427f3aab1f05d1c158",
+    "tests/test_graph_publication_receipt.py": "750afe6e20a4297da8c88628a3ff996ba82a409b42a2bd39291c744ebc80403f"
   },
   "limitations": [
     "Claim processes and a SIGKILL extraction-stage process use mocked AI, not full API/ingestion-worker operation.",
     "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
     "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
     "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-    "An immutable intent and observed-marker receipt survive document/job deletion; the marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
+    "An immutable intent and observed-marker receipt survive document/job deletion; their source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
     "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
     "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric."
   ]

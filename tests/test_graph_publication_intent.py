@@ -20,7 +20,8 @@ class PublicationIntentTests(unittest.IsolatedAsyncioTestCase):
         return SimpleNamespace(job_id="job", upload_id="upload", document_task_id="task")
 
     def locked(self):
-        record = SimpleNamespace(upload_id="upload", task_id="task", course_uuid="course")
+        record = SimpleNamespace(upload_id="upload", task_id="task", course_uuid="course",
+            attempt_count=2)
         return record, SimpleNamespace(id="job"), object()
 
     async def test_intent_has_no_cascading_document_or_job_foreign_key(self):
@@ -65,7 +66,8 @@ class PublicationIntentTests(unittest.IsolatedAsyncioTestCase):
             intent = await service.stage_publication_intent(session, self.claim())
         self.assertIs(intent, session.add.call_args.args[0])
         self.assertEqual((intent.job_id, intent.upload_id, intent.document_task_id,
-            intent.course_id, intent.payload_sha256), ("job", "upload", "task", "course", "a" * 64))
+            intent.course_id, intent.payload_sha256, intent.source_generation),
+            ("job", "upload", "task", "course", "a" * 64, 2))
         session.commit.assert_not_awaited()
         session.rollback.assert_not_awaited()
 
@@ -73,7 +75,7 @@ class PublicationIntentTests(unittest.IsolatedAsyncioTestCase):
         service = GraphContinuationService()
         candidate = GraphPublicationCandidate("{}", "a" * 64)
         existing = SimpleNamespace(job_id="job", upload_id="upload", document_task_id="task",
-            course_id="course", payload_sha256="a" * 64)
+            course_id="course", payload_sha256="a" * 64, source_generation=2)
         session = self.session(existing)
         with patch.object(service, "load_publication_draft", AsyncMock(return_value=candidate)), \
              patch.object(service, "_locked_claim", AsyncMock(return_value=self.locked())):
@@ -86,6 +88,18 @@ class PublicationIntentTests(unittest.IsolatedAsyncioTestCase):
                 await service.stage_publication_intent(session, self.claim())
         session.add.assert_not_called()
         session.commit.assert_not_awaited()
+
+    async def test_old_intent_without_generation_fails_closed(self):
+        service = GraphContinuationService()
+        existing = SimpleNamespace(job_id="job", upload_id="upload", document_task_id="task",
+            course_id="course", payload_sha256="a" * 64, source_generation=None)
+        session = self.session(existing)
+        with patch.object(service, "load_publication_draft", AsyncMock(
+                return_value=GraphPublicationCandidate("{}", "a" * 64))), \
+             patch.object(service, "_locked_claim", AsyncMock(return_value=self.locked())):
+            with self.assertRaisesRegex(ValueError, "different"):
+                await service.stage_publication_intent(session, self.claim())
+        session.add.assert_not_called()
 
 
 if __name__ == "__main__":

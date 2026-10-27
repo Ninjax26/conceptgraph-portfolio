@@ -184,6 +184,7 @@ class GraphPublicationIntent(Base):
     document_task_id: Mapped[str] = mapped_column(String(64), nullable=False)
     course_id: Mapped[str] = mapped_column(String(64), nullable=False)
     payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_generation: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -200,6 +201,7 @@ class GraphPublicationReceipt(Base):
     course_id: Mapped[str] = mapped_column(String(64), nullable=False)
     document_task_id: Mapped[str] = mapped_column(String(64), nullable=False)
     payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_generation: Mapped[int | None] = mapped_column(Integer, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

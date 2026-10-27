@@ -2,7 +2,7 @@
 
 Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
 
-42 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+43 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
 
 - additive_schema_restart_and_due_lease_indexes: passed
 - database_rejects_incomplete_running_lease_and_excess_attempts: passed
@@ -46,6 +46,7 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - terminal_snapshot_cleanup_rolls_back_and_preserves_exhausted_tombstone: passed
 - terminal_draft_cleanup_skips_document_locked_by_another_session: passed
 - terminal_draft_cleanup_is_bounded_repeatable_rollback_safe_and_preserves_job_history: passed
+- source_generation_migration_is_additive_repeatable_and_preserves_legacy_rows: passed
 
 ## Limits
 
@@ -53,6 +54,6 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.
 - Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.
 - Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.
-- An immutable intent and observed-marker receipt survive document/job deletion; the marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
+- An immutable intent and observed-marker receipt survive document/job deletion; their source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
 - Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.
 - Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.

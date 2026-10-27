@@ -335,6 +335,7 @@ async def run(args):
                 saved = (await session.execute(select(GraphPublicationIntent).where(
                     GraphPublicationIntent.job_id == claim.job_id))).scalar_one()
                 assert saved.id == intent_id and saved.document_task_id == task
+                assert saved.source_generation == 1
             checks["intent_stages_only_from_validated_draft_and_survives_restart"] = True
 
             observed = GraphProjectionMarker(intent_id, claim.job_id, upload_id,
@@ -352,6 +353,7 @@ async def run(args):
                 persisted = (await session.execute(select(GraphPublicationReceipt).where(
                     GraphPublicationReceipt.intent_id == intent_id))).scalar_one()
                 assert persisted.payload_sha256 == candidate.sha256
+                assert persisted.source_generation == 1
             checks["receipt_requires_exact_observed_marker_and_survives_restart"] = True
 
             orphan_id, orphan_task, _, _ = await prepared()
@@ -702,6 +704,25 @@ async def run(args):
                 assert len(await UploadService().load_graph_checkpoints(session, upload_id)) == 3
                 assert (await UploadService().get_upload(session, upload_id)).result_json == original
             checks["terminal_draft_cleanup_is_bounded_repeatable_rollback_safe_and_preserves_job_history"] = True
+            # Recreate the previous schema shape with retained rows, then run
+            # startup migration twice. Legacy identities stay available for
+            # cleanup but have unknown generation and cannot authorize replay.
+            async with engine.begin() as connection:
+                await connection.execute(text(
+                    "ALTER TABLE graph_publication_intents DROP COLUMN source_generation"))
+                await connection.execute(text(
+                    "ALTER TABLE graph_publication_receipts DROP COLUMN source_generation"))
+            with patch.object(database, "postgres_engine", engine):
+                await database.initialize_database_schema()
+                await database.initialize_database_schema()
+            async with sessions() as session:
+                legacy_intent = (await session.execute(select(GraphPublicationIntent).where(
+                    GraphPublicationIntent.id == intent_id))).scalar_one()
+                legacy_receipt = (await session.execute(select(GraphPublicationReceipt).where(
+                    GraphPublicationReceipt.intent_id == intent_id))).scalar_one()
+                assert legacy_intent.source_generation is None
+                assert legacy_receipt.source_generation is None
+            checks["source_generation_migration_is_additive_repeatable_and_preserves_legacy_rows"] = True
     finally:
         if engine is not None:
             await engine.dispose()
@@ -727,7 +748,7 @@ async def run(args):
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-            "An immutable intent and observed-marker receipt survive document/job deletion; the marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
+            "An immutable intent and observed-marker receipt survive document/job deletion; their source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
             "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
             "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.",
         ],

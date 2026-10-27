@@ -524,19 +524,24 @@ class GraphContinuationService:
         if locked is None:
             return None
         record, job, _ = locked
-        identity = (job.id, record.upload_id, record.task_id, record.course_uuid, candidate.sha256)
+        generation = record.attempt_count
+        if type(generation) is not int or generation <= 0:
+            raise ValueError("Graph publication requires a positive source generation.")
+        identity = (job.id, record.upload_id, record.task_id, record.course_uuid,
+                    candidate.sha256, generation)
         await session.flush()  # See a staged intent with autoflush disabled.
         saved = (await session.execute(select(GraphPublicationIntent).where(
             GraphPublicationIntent.job_id == job.id).with_for_update()
             .execution_options(populate_existing=True))).scalar_one_or_none()
         if saved is not None:
             if (saved.job_id, saved.upload_id, saved.document_task_id,
-                    saved.course_id, saved.payload_sha256) != identity:
+                    saved.course_id, saved.payload_sha256, saved.source_generation) != identity:
                 raise ValueError("Graph job already has a different publication intent.")
             return saved
         intent = GraphPublicationIntent(id=str(uuid4()), job_id=job.id,
             upload_id=record.upload_id, document_task_id=record.task_id,
-            course_id=record.course_uuid, payload_sha256=candidate.sha256)
+            course_id=record.course_uuid, payload_sha256=candidate.sha256,
+            source_generation=generation)
         session.add(intent)
         return intent
 
@@ -608,18 +613,24 @@ class GraphContinuationService:
             .execution_options(populate_existing=True))).scalar_one_or_none()
         if intent is None:
             return None
+        generation = record.attempt_count
+        if type(generation) is not int or generation <= 0:
+            raise ValueError("Graph publication requires a positive source generation.")
         identity = (intent.id, job.id, record.upload_id, record.course_uuid,
-                    record.task_id, candidate.sha256)
+                    record.task_id, candidate.sha256, generation)
         if (intent.job_id, intent.upload_id, intent.course_id,
-                intent.document_task_id, intent.payload_sha256) != identity[1:]:
+                intent.document_task_id, intent.payload_sha256,
+                intent.source_generation) != identity[1:]:
             raise ValueError("Graph publication intent no longer matches the source.")
         marker = await ingestion_service.read_graph_publication_marker(intent.id)
         if marker is None:
             return None
         if (marker.id, marker.job_id, marker.upload_id, marker.course_id,
-                marker.document_task_id, marker.payload_sha256) != identity:
+                marker.document_task_id, marker.payload_sha256,
+                marker.generation) != identity:
             raise ValueError("Remote graph marker conflicts with the publication intent.")
-        if await self._locked_claim(session, claim) is None:
+        refenced = await self._locked_claim(session, claim)
+        if refenced is None or refenced[0].attempt_count != generation:
             return None  # The lease may have expired during remote I/O.
         await session.flush()
         receipt = (await session.execute(select(GraphPublicationReceipt).where(
@@ -627,12 +638,14 @@ class GraphContinuationService:
             .execution_options(populate_existing=True))).scalar_one_or_none()
         if receipt is not None:
             if (receipt.intent_id, receipt.job_id, receipt.upload_id, receipt.course_id,
-                    receipt.document_task_id, receipt.payload_sha256) != identity:
+                    receipt.document_task_id, receipt.payload_sha256,
+                    receipt.source_generation) != identity:
                 raise ValueError("Graph publication receipt conflicts with the observed marker.")
             return receipt
         receipt = GraphPublicationReceipt(intent_id=intent.id, job_id=job.id,
             upload_id=record.upload_id, course_id=record.course_uuid,
-            document_task_id=record.task_id, payload_sha256=candidate.sha256)
+            document_task_id=record.task_id, payload_sha256=candidate.sha256,
+            source_generation=generation)
         session.add(receipt)
         return receipt
 

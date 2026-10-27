@@ -14,10 +14,12 @@ class PublicationReceiptTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.service = GraphContinuationService()
         self.claim = SimpleNamespace(job_id="job", upload_id="upload", document_task_id="task")
-        self.record = SimpleNamespace(upload_id="upload", course_uuid="course", task_id="task")
+        self.record = SimpleNamespace(upload_id="upload", course_uuid="course", task_id="task",
+            attempt_count=1)
         self.job = SimpleNamespace(id="job")
         self.intent = SimpleNamespace(id="intent", job_id="job", upload_id="upload",
-            course_id="course", document_task_id="task", payload_sha256="a" * 64)
+            course_id="course", document_task_id="task", payload_sha256="a" * 64,
+            source_generation=1)
         self.marker = GraphProjectionMarker("intent", "job", "upload", "course", "task", "a" * 64, 1)
         self.candidate = GraphPublicationCandidate("{}", "a" * 64)
         self.reader = SimpleNamespace(read_graph_publication_marker=AsyncMock(return_value=self.marker))
@@ -44,8 +46,9 @@ class PublicationReceiptTests(unittest.IsolatedAsyncioTestCase):
         receipt = await self.observe(session)
         self.assertIs(receipt, session.add.call_args.args[0])
         self.assertEqual((receipt.intent_id, receipt.job_id, receipt.upload_id,
-            receipt.course_id, receipt.document_task_id, receipt.payload_sha256),
-            ("intent", "job", "upload", "course", "task", "a" * 64))
+            receipt.course_id, receipt.document_task_id, receipt.payload_sha256,
+            receipt.source_generation),
+            ("intent", "job", "upload", "course", "task", "a" * 64, 1))
         self.reader.read_graph_publication_marker.assert_awaited_once_with("intent")
         session.commit.assert_not_awaited()
 
@@ -69,15 +72,40 @@ class PublicationReceiptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await self.observe(session, locks=[locked, None]))
         session.add.assert_not_called()
 
+    async def test_changed_generation_after_remote_read_does_not_stage(self):
+        session = self.session()
+        changed = SimpleNamespace(upload_id="upload", course_uuid="course",
+            task_id="task", attempt_count=2)
+        self.assertIsNone(await self.observe(session, locks=[
+            (self.record, self.job, object()), (changed, self.job, object())]))
+        session.add.assert_not_called()
+
     async def test_exact_receipt_replays_but_conflict_fails_closed(self):
         existing = GraphPublicationReceipt(intent_id="intent", job_id="job", upload_id="upload",
-            course_id="course", document_task_id="task", payload_sha256="a" * 64)
+            course_id="course", document_task_id="task", payload_sha256="a" * 64,
+            source_generation=1)
         session = self.session(existing_receipt=existing)
         self.assertIs(await self.observe(session), existing)
         session.add.assert_not_called()
         existing.payload_sha256 = "b" * 64
         with self.assertRaisesRegex(ValueError, "receipt conflicts"):
             await self.observe(self.session(existing_receipt=existing))
+
+    async def test_generation_mismatch_or_legacy_intent_never_stages_receipt(self):
+        for generation in (None, 2):
+            with self.subTest(generation=generation):
+                self.intent.source_generation = generation
+                session = self.session()
+                with self.assertRaisesRegex(ValueError, "intent no longer matches"):
+                    await self.observe(session)
+                session.add.assert_not_called()
+        self.intent.source_generation = 1
+        self.marker = GraphProjectionMarker("intent", "job", "upload", "course", "task", "a" * 64, 2)
+        self.reader.read_graph_publication_marker.return_value = self.marker
+        session = self.session()
+        with self.assertRaisesRegex(ValueError, "Remote graph marker"):
+            await self.observe(session)
+        session.add.assert_not_called()
 
 
 if __name__ == "__main__":

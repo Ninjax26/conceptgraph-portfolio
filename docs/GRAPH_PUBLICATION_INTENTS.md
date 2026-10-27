@@ -14,14 +14,18 @@ a graph job.
   document and job locks.
 - One immutable intent is allowed per job. Repeating the same call is idempotent;
   a different document identity or candidate digest is rejected. The row stores
-  an ID, job ID, upload ID, original READY task ID, course ID and candidate digest,
-  but no source text or graph payload.
+  an ID, job ID, upload ID, original READY task ID, course ID, candidate digest
+  and the positive upload attempt count as its source generation, but no source
+  text or graph payload.
 - The table has no document or job foreign key. A remote commit may outlive
   deletion of those rows, so its intent must remain available for future
   reconciliation. This is deliberate retention, not proof that a write happened.
 - Startup creates the additive table and indexes without changing existing
-  document/job columns or rows. Older application code can ignore the table;
-  rollback does not require dropping it.
+  document/job columns or rows. The later generation columns are nullable for
+  old rows; they remain available for deletion reconciliation but fail closed
+  if replayed as a publication. Startup can add the columns repeatedly without
+  changing legacy rows. Older application code can ignore them; rollback does
+  not require dropping them.
 
 ## Publication protocol still required
 
@@ -36,8 +40,10 @@ is remote commit evidence only when the caller supplied an exact staged intent;
 no runtime caller does that yet. A separate `GraphPublicationReceipt` row can
 now be staged after the current fenced job reads an exact matching marker. The
 receipt survives document/job deletion, is immutable by intent ID, and is not
-created when the marker is absent or conflicting. Its caller owns commit or
-rollback. The publisher still needs PostgreSQL job finalization and a
+created when the marker is absent or conflicting. The observer now compares
+the marker's generation with the stored intent and current upload generation,
+then stores it in the receipt. Its caller owns commit or rollback. The
+publisher still needs PostgreSQL job finalization and a
 reconciler for ambiguous commits, killed processes, superseded tasks and document
 deletion. Normal graph cleanup now deletes markers for the same upload and
 course along with its concepts; a late write after that cleanup must still be
@@ -74,8 +80,9 @@ explicit positive source generation and serializes publication on a unique
 replacement and marker creation. A lower generation, or a different task or
 payload at the same generation, is rejected before graph deletion. The marker also stores
 the generation; the isolated test checks replay rejection against real Neo4j.
-The intended source is the monotonically increasing PostgreSQL upload attempt,
-but no worker currently supplies or verifies it.
+The source is the monotonically increasing PostgreSQL upload attempt, now
+recorded in staged intents and observed receipts. No worker currently passes
+it into the marked Neo4j writer.
 
 **Do not activate graph-only continuation yet.** Normal document deletion does
 not call the new tombstone primitive. After PostgreSQL proves committed upload
@@ -85,8 +92,8 @@ Real Neo4j checks cover idempotence, course scope, prepublication deletion and
 a concurrent in-flight marked write; later marked writes are rejected. It is
 disconnected because the live deletion order can fail after graph cleanup, so
 writing a permanent tombstone there could block a still-READY upload. The
-PostgreSQL intent/receipt does not yet persist or compare the generation. A
-coordinator must prove source authority, publish, finalize and reconcile killed
+PostgreSQL intent/receipt now persist and compare it, but a coordinator must
+still prove source authority, publish, finalize and reconcile killed
 or ambiguous writes across stores. Exact-marker cleanup alone cannot establish
 that no writer remains in flight.
 
