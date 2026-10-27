@@ -1,5 +1,13 @@
 # Graph publication intents — internal, not activated
 
+Normal source removal now has a durable pre-cleanup flag and restart sweep;
+see [deletion recovery](DELETION_RECOVERY.md). Pending removal fences graph
+claims while retaining source metadata/checkpoints until remote cleanup has
+finished. Its authenticated ASGI route has been tested across disposable
+PostgreSQL, Qdrant, Neo4j and MinIO; hosted R2 and the full graph-job
+publication/completion protocol remain unverified. Automatic graph-only
+continuation stays disabled.
+
 `GraphPublicationIntent` is a durable record that a particular validated graph
 candidate **might** be written to Neo4j. It is separate from the unpublished
 `GraphPublicationDraft`. The new `stage_publication_intent` method is not called

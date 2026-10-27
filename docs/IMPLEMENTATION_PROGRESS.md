@@ -20,7 +20,7 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: deleted-intent recovery runs in the combined service; graph publication remains disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. Full API/R2/Qdrant deletion integration, other crash boundaries, graph-job completion and bounded dispatch remain before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: durable removal and local four-store crash recovery verified; graph publication remains disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. The real ASGI deletion route now has an 18-check local PostgreSQL/Qdrant/Neo4j/MinIO recovery matrix. Hosted R2, other network ambiguities, graph-job publication/completion and bounded dispatch remain unverified before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,52 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+27 October local full-deletion recovery increment: reproduced a crash after
+Qdrant cleanup leaving a READY source eligible with no vectors. Removal now
+commits a flag in the existing upload result before remote cleanup, preserves
+its ingestion stage/checkpoints, and excludes pending removal from READY
+retrieval, course READY counts, retry, preview and duplicate upload admission.
+The existing PDF-admission lock serializes deletion with shared-object
+reference checks, uploads and retry. A bounded startup/periodic sweep resumes
+pending removals independently of demo expiry. No schema migration, hosted
+provider request or production test-data mutation was used.
+
+The real authenticated ASGI DELETE route passed 18 isolated checks against
+PostgreSQL, Qdrant, Neo4j and MinIO, with seven actual SIGKILL boundaries, four
+injected exception boundaries, fresh/concurrent recovery processes,
+shared-object deletes, checkpoint/marker cleanup and late marked writes.
+The initial runner attempt with an internal Docker network failed because
+Docker Desktop did not publish its ports; it removed the temporary resources,
+and a loopback-bound bridge run passed. The existing graph-job runner initially
+failed because its lock-rollback fixture used the now-durable deletion method.
+It now distinguishes a plain row lock from a committed removal request and
+adds a check that a pending deletion fences an existing graph claim; all 48
+PostgreSQL graph-job checks passed. The backend suite passed 545 tests and 135
+subtests. See [deletion contract](DELETION_RECOVERY.md) and
+[local recovery report](../evaluation/upload-deletion-current.md).
+
+MinIO verifies the S3 protocol, not hosted R2; existing in-flight queries are
+not cancelled, older releases ignore the JSON flag, and the bounded sweep can
+be delayed by repeated oldest-item failures. Drain pending removals before
+rolling back to an older release. Graph-job completion and automatic
+continuation remain disabled/pending. Nine frontend tests, the TypeScript/Vite
+production build, compileall and diff checks passed. Record release
+verification separately.
+
+27 October deleted-intent sweep release
+`693b82666004f3b0dd7c815e34b371bc5091e1e1`: seven scoped files
+were pushed to `origin/main`. [GitHub CI run 40488582142](https://github.com/Ninjax26/conceptgraph-portfolio/actions/runs/40488582142)
+passed. The free Render API `/api/v1/ready` returned HTTP 200 at this exact
+revision, combined processing role, and graph/ingestion available. The
+frontend `/sample` route returned HTTP 200; the public sample API returned
+one prepared document with `GRAPH_READY`. These public checks do not exercise
+the retention sweep or live deletion. Final local verification: three real
+PostgreSQL–Neo4j recovery checks, 541 backend tests, 135 subtests, nine
+frontend tests, TypeScript/Vite build, compileall and diff checks passed.
+No hosted provider calls or production test-data mutations were made.
+Automatic graph-only continuation remains disabled. This release-verification
+note is local until the next substantive release.
 
 27 October local cross-store recovery increment: the existing combined-service
 retention loop now runs a bounded deleted-intent sweep after its normal upload

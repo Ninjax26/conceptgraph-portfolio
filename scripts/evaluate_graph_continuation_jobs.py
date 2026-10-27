@@ -637,12 +637,21 @@ async def run(args):
             deletion_id, _, _, _ = await prepared()
             await make_due(sessions, deletion_id)
             async with sessions() as session:
-                assert await UploadService().lock_for_deletion(session, deletion_id) is not None
+                # A plain row-lock rollback is distinct from a committed user
+                # removal request, which must continue fencing this document.
+                await session.execute(select(DocumentUpload).where(
+                    DocumentUpload.upload_id == deletion_id).with_for_update())
                 outside = await one_claimant(args, schema)
                 assert not outside["claimed"]
                 await session.rollback()
                 deletion_claim = await service.claim_next(session, lease_owner="deletion-test", lease_seconds=180)
                 assert deletion_claim is not None and deletion_claim.upload_id == deletion_id
+                assert await UploadService().lock_for_deletion(session, deletion_id) is not None
+                await session.rollback()  # Remote failure cannot undo the removal request.
+                pending = await UploadService().get_upload(session, deletion_id)
+                assert pending.stage == "READY" and UploadService.is_deleting(pending)
+                assert not await service.heartbeat(session, deletion_claim, lease_seconds=180)
+                checks["committed_removal_fences_existing_graph_claim_after_rollback"] = True
                 assert await UploadService().lock_for_deletion(session, deletion_id) is not None
                 assert await UploadService().delete_document(session, deletion_id) is not None
                 assert not await service.heartbeat(session, deletion_claim, lease_seconds=180)
@@ -804,7 +813,7 @@ async def run(args):
             "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
             "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
             "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-            "An immutable intent, observed-marker receipt and deleted-source cleanup receipt survive document/job deletion; source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
+            "An immutable intent, observed-marker receipt and deleted-source cleanup receipt survive document/job deletion; source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher or completion dispatcher consumes them. Deleted-source cleanup is scheduled separately and its real-store checks are in the upload-deletion report. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
             "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
             "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.",
         ],

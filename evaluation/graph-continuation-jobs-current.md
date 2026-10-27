@@ -2,7 +2,7 @@
 
 Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-dir <private-test-socket>`.
 
-47 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
+48 checks passed. Hosted provider calls: 0. Production test-data mutations: 0.
 
 - additive_schema_restart_and_due_lease_indexes: passed
 - database_rejects_incomplete_running_lease_and_excess_attempts: passed
@@ -42,6 +42,7 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - changed_model_contract_requires_explicit_rebuild: passed
 - superseded_document_task_stops_old_job: passed
 - expired_retention_is_not_resurrected: passed
+- committed_removal_fences_existing_graph_claim_after_rollback: passed
 - deletion_lock_skipped_and_fk_cascade_fences_old_claim: passed
 - batch_budget_only_result_does_not_schedule_provider_retry: passed
 - old_document_sql_and_schema_restart_preserve_jobs: passed
@@ -58,6 +59,6 @@ Command: `.venv/bin/python scripts/evaluate_graph_continuation_jobs.py --socket-
 - Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.
 - Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.
 - Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.
-- An immutable intent, observed-marker receipt and deleted-source cleanup receipt survive document/job deletion; source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
+- An immutable intent, observed-marker receipt and deleted-source cleanup receipt survive document/job deletion; source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher or completion dispatcher consumes them. Deleted-source cleanup is scheduled separately and its real-store checks are in the upload-deletion report. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.
 - Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.
 - Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric.

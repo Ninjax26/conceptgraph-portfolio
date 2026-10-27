@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-27T08:17:47.036659+00:00",
+  "generated_at_utc": "2026-10-27T11:27:06.690386+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -42,6 +42,7 @@
     "changed_model_contract_requires_explicit_rebuild": true,
     "superseded_document_task_stops_old_job": true,
     "expired_retention_is_not_resurrected": true,
+    "committed_removal_fences_existing_graph_claim_after_rollback": true,
     "deletion_lock_skipped_and_fk_cascade_fences_old_claim": true,
     "batch_budget_only_result_does_not_schedule_provider_retry": true,
     "old_document_sql_and_schema_restart_preserve_jobs": true,
@@ -52,15 +53,15 @@
     "terminal_draft_cleanup_is_bounded_repeatable_rollback_safe_and_preserves_job_history": true,
     "source_generation_migration_is_additive_repeatable_and_preserves_legacy_rows": true
   },
-  "checks_passed": 47,
+  "checks_passed": 48,
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 6.1614,
+  "duration_seconds": 4.1514,
   "code_sha256": {
     "app/models/document_upload.py": "f2b387bca39f82dff61b49e4aa37a3f5fbcb17682308ca84407ecd7da0917fad",
     "app/services/graph_continuation_service.py": "9abdaadb0edbc32ebc3a09f0d46aa7181adfbc4e44d741ffbda37800954e58ec",
-    "scripts/evaluate_graph_continuation_jobs.py": "4809513a2bb837b0eae379758e717fd6aa3946e5fa36bedb71ec51966a57c982",
+    "scripts/evaluate_graph_continuation_jobs.py": "77a2817dc5e0ee79fcc02c151c9532c1eb3d25a5c3b7e7a2c3cfaf8f8c498baf",
     "tests/test_graph_continuation_snapshot.py": "8c4b7a240760c5a94f60198bef717598a46bf00b1c9041235ef19bf964cfb608",
     "tests/test_graph_job_checkpoint_reads.py": "8bf7b2e70b30cf399f6f38abb83253e9a5bbd0d4e58b7dfdabb37688ddbb1b72",
     "app/services/graph_job_extraction.py": "732d0108699b6daa2fcf59d215095b654a1b4081ef11e010c65922376941d758",
@@ -70,7 +71,7 @@
     "app/services/graph_publication_candidate.py": "7641202bc00c47dc6f6d068f7facab19febdc5cdbfa1d8098432d1d76fa0eb5f",
     "tests/test_graph_publication_candidate.py": "3f13dd2aff67bb190f86f46c6e4f085761e15b2ff304be7094bcdb0e98403d39",
     "app/services/ingestion_service.py": "15206107973c632cab5999644d8305ca434dd3b4b715ae16ca1d51317a62e9c3",
-    "app/services/upload_service.py": "1d6c410dca038f464de359158e185a16d29734eb63acef740cc3d17201ab84f1",
+    "app/services/upload_service.py": "fc7b50657c346cec890706600d16f6fd7811b2fc4026e5eb63c0f67475a20af5",
     "tests/test_graph_publication_draft.py": "9c57f226ccbd0eb65f903b924c39f3f37f2a28c2b01d1a605bfb6753c7d2e737",
     "tests/test_graph_publication_intent.py": "adfc4306bfcf19234a390d8481b5504e92b37841f7ef9da6f21d44eb8e58f171",
     "tests/test_graph_publication_receipt.py": "750afe6e20a4297da8c88628a3ff996ba82a409b42a2bd39291c744ebc80403f"
@@ -80,7 +81,7 @@
     "Killed-process recovery uses an explicit expired-lease fixture, not a natural lease-duration wait.",
     "Source/vector/graph counts and extracted graph output are authored fixtures; no Qdrant, Neo4j or R2 consistency claim.",
     "Scheduler/graph-only worker/recovery projection are not connected; no production automatic continuation is enabled.",
-    "An immutable intent, observed-marker receipt and deleted-source cleanup receipt survive document/job deletion; source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher, completion or reconciliation dispatcher consumes them. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
+    "An immutable intent, observed-marker receipt and deleted-source cleanup receipt survive document/job deletion; source-generation migration is nullable for legacy rows, which are rejected for publication replay. The marker reader and deleted-source reconciler's Neo4j tombstone are mocked. No runtime publisher or completion dispatcher consumes them. Deleted-source cleanup is scheduled separately and its real-store checks are in the upload-deletion report. Draft admission concurrency uses two sessions in one process, not full independent workers; limits/cleanup are default-disabled/unscheduled and logical, not physical storage measurements.",
     "Optional logical snapshot budgets and terminal-body cleanup are tested but default-disabled/unscheduled; JSON text bytes are not physical disk, WAL or memory measurements.",
     "Observed test duration is not an ingestion throughput, semantic-quality or production capacity metric."
   ]

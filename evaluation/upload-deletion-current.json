@@ -1,0 +1,112 @@
+{
+  "generated_at_utc": "2026-10-27T11:30:25.684284+00:00",
+  "passed": true,
+  "checks": {
+    "unauthenticated_delete_preserves_all_stores": true,
+    "authenticated_delete_removes_target_and_preserves_neighbor": true,
+    "uncommitted_deletion_preserves_ready_document_and_all_artifacts": true,
+    "hard_kill_intent_resumes_in_new_process_without_ready_leak": true,
+    "concurrent_recovery_processes_finish_one_removal": true,
+    "hard_kill_vectors_resumes_in_new_process_without_ready_leak": true,
+    "hard_kill_graph_resumes_in_new_process_without_ready_leak": true,
+    "hard_kill_storage_resumes_in_new_process_without_ready_leak": true,
+    "hard_kill_before_metadata_commit_resumes_in_new_process_without_ready_leak": true,
+    "committed_deletion_discovers_late_graph_write_and_blocks_replay": true,
+    "failure_vectors_preserves_durable_retry": true,
+    "failure_graph_preserves_durable_retry": true,
+    "failure_storage_preserves_durable_retry": true,
+    "failure_before_metadata_commit_preserves_durable_retry": true,
+    "shared_source_survives_until_last_reference_is_deleted": true,
+    "concurrent_shared_source_deletion_leaves_no_orphan": true,
+    "removed_checkpoints_and_markers_leave_only_protected_upload": true,
+    "unrelated_ready_upload_survives_all_crash_and_failure_scenarios": true
+  },
+  "crash_observations": {
+    "kill_before_intent_commit": {
+      "metadata": true,
+      "eligible": true,
+      "pending": false,
+      "vectors": 1,
+      "concepts": 2,
+      "source": true
+    },
+    "kill_intent": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 1,
+      "concepts": 2,
+      "source": true
+    },
+    "kill_vectors": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 2,
+      "source": true
+    },
+    "kill_graph": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 0,
+      "source": true
+    },
+    "kill_storage": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 0,
+      "source": false
+    },
+    "kill_before_metadata_commit": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 0,
+      "source": false
+    },
+    "kill_metadata": {
+      "metadata": false,
+      "eligible": false,
+      "pending": false,
+      "vectors": 0,
+      "concepts": 0,
+      "source": false
+    }
+  },
+  "elapsed_seconds": 44.092,
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "temporary_schema_containers_network_removed": true,
+  "container_images": {
+    "neo4j": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
+    "qdrant": "sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c",
+    "s3": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+  },
+  "postgres_version": "18.4 (Homebrew)",
+  "process_failure_mode": "SIGKILL at instrumented commit boundaries",
+  "source_sha256": {
+    "app/api/endpoints/ingest.py": "348b490b14c8b86f742d9ffc55a39086706922863903a4b9b94acacb50026bc4",
+    "app/services/upload_service.py": "fc7b50657c346cec890706600d16f6fd7811b2fc4026e5eb63c0f67475a20af5",
+    "app/services/course_service.py": "1801419984e9c0a757f774ad3c46be9d180a0dc862d9b577d61ee6c7a4b01dcf",
+    "app/services/demo_retention_service.py": "c95ec81baeae5c14aa298dec81afce8f1a34c1a0693adf96a712f1bb014f91c8",
+    "app/services/graph_continuation_service.py": "9abdaadb0edbc32ebc3a09f0d46aa7181adfbc4e44d741ffbda37800954e58ec",
+    "app/services/ingestion_service.py": "15206107973c632cab5999644d8305ca434dd3b4b715ae16ca1d51317a62e9c3",
+    "app/services/storage_service.py": "f90c423eccd36e76d672f24c59aeff80c95634423fd0e4f5801582dc2fb9a29a",
+    "scripts/evaluate_upload_deletion.py": "00f1587abf891103f5c041bd18feb67acf5a4db106593566c4c4dec41f5b7629"
+  },
+  "limits": [
+    "ASGI HTTP requests exercise the real authenticated DELETE route; this is not an external network/Render test.",
+    "PostgreSQL, Qdrant and Neo4j are real disposable stores; synthetic 3-dimensional vectors are inserted without embeddings.",
+    "MinIO exercises real local S3 PUT/HEAD/DELETE requests, not hosted Cloudflare R2.",
+    "Seven explicit process boundaries use SIGKILL; four additional boundaries raise exceptions. Other packet-loss/outage timings are untested.",
+    "Recovery runs in a fresh process through production sweep methods, not the timer or a deployed worker.",
+    "Automatic graph-only continuation remains disabled; this is not graph-job completion or an ingestion load benchmark.",
+    "Existing in-flight queries that already loaded READY context are not cancelled by a subsequent deletion request."
+  ]
+}

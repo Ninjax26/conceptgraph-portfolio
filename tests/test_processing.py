@@ -2631,6 +2631,7 @@ class DemoRetentionServiceTests(unittest.TestCase):
         config = Settings(_env_file=None, REQUIRE_UPLOAD_AUTH=True,
                           DEMO_ACCESS_TOKEN="a-strong-demo-secret-value-123456")
         service = DemoRetentionService(config=config)
+        service.resume_pending_deletions_once = AsyncMock(return_value=0)
         service.cleanup_once = AsyncMock(return_value=0)
         service.cleanup_deleted_graph_publications_once = AsyncMock(return_value=0)
 
@@ -2645,6 +2646,7 @@ class DemoRetentionServiceTests(unittest.TestCase):
                 await service.stop()
 
         asyncio.run(exercise())
+        service.resume_pending_deletions_once.assert_awaited_once()
         service.cleanup_once.assert_awaited_once()
         service.cleanup_deleted_graph_publications_once.assert_awaited_once()
 

@@ -93,6 +93,8 @@ async def upload_document(
     course = await course_service.get_or_create(db, course_id)
     duplicate = await upload_service.find_duplicate(db, course.id, content_hash)
     if duplicate is not None:
+        if upload_service.is_deleting(duplicate):
+            raise HTTPException(status_code=409, detail="This PDF is being removed. Wait for cleanup before uploading it again.")
         return _ingest_response(
             duplicate,
             message="This PDF already exists in the course. The existing document was returned.",
@@ -317,6 +319,9 @@ async def preview_upload(
     record = await upload_service.get_upload(db, upload_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Upload not found.")
+
+    if upload_service.is_deleting(record):
+        raise HTTPException(status_code=409, detail="Document removal is in progress.")
 
     try:
         content = await run_blocking_safely(storage_service.get_bytes, record.storage_key)

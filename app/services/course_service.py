@@ -2,11 +2,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import NAMESPACE_URL, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.processing import GraphStatus, ProcessingStage, assess_graph_status, normalize_course_name
 from app.models.document_upload import Course, DocumentUpload
+from app.services.upload_service import UploadService
 
 
 class CourseNotFoundError(LookupError):
@@ -74,7 +75,8 @@ class CourseService:
             canonical: dict[str, DocumentUpload] = {}
             for document in sorted(
                 records,
-                key=lambda item: (status_rank.get(item.status, 9), -item.updated_at.timestamp()),
+                key=lambda item: (UploadService.is_deleting(item), status_rank.get(item.status, 9),
+                                  -item.updated_at.timestamp()),
             ):
                 canonical.setdefault(document.content_hash or document.upload_id, document)
             logical_documents = list(canonical.values())
@@ -82,6 +84,7 @@ class CourseService:
                 document
                 for document in logical_documents
                 if document.stage == ProcessingStage.READY.value
+                and not UploadService.is_deleting(document)
             ]
             summaries.append(
                 CourseSummary(
@@ -170,6 +173,9 @@ class CourseService:
                 DocumentUpload.course_uuid == course.id,
                 DocumentUpload.stage == ProcessingStage.READY.value,
                 DocumentUpload.processed_chunk_count > 0,
+                func.coalesce(
+                    DocumentUpload.result_json["deletion_requested"].as_boolean(), False,
+                ).is_(False),
             )
             .order_by(DocumentUpload.created_at.desc())
         )

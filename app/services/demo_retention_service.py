@@ -39,7 +39,7 @@ class DemoRetentionService:
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
-        if not self.config.require_upload_auth or self._task is not None:
+        if self._task is not None:
             return
         self._stop.clear()
         self._task = asyncio.create_task(
@@ -113,6 +113,16 @@ class DemoRetentionService:
             logger.exception("Expired demo upload cleanup failed upload=%s", upload_id)
         return False
 
+    async def resume_pending_deletions_once(self) -> int:
+        """Resume explicit removals independently of demo expiry and sample rules."""
+        async with AsyncSessionLocal() as session:
+            upload_ids = await self.upload_service.list_pending_deletion_ids(session, limit=50)
+        removed = 0
+        for upload_id in upload_ids:
+            async with AsyncSessionLocal() as session:
+                removed += await self._delete_upload(session, upload_id)
+        return removed
+
     async def cleanup_deleted_graph_publications_once(self) -> int:
         """Reconcile a bounded set of retained intents after committed deletion.
 
@@ -134,6 +144,14 @@ class DemoRetentionService:
 
     async def _cleanup_loop(self) -> None:
         while not self._stop.is_set():
+            try:
+                resumed = await self.resume_pending_deletions_once()
+                if resumed:
+                    logger.info("Completed %s interrupted document removal(s)", resumed)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Pending document removal sweep failed")
             try:
                 deleted = await self.cleanup_once()
                 if deleted:

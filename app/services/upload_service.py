@@ -34,7 +34,14 @@ class UploadService:
     }
 
     @staticmethod
+    def is_deleting(record: DocumentUpload) -> bool:
+        result = getattr(record, "result_json", None)
+        return isinstance(result, dict) and result.get("deletion_requested") is True
+
+    @staticmethod
     def can_reprocess(record: DocumentUpload) -> bool:
+        if UploadService.is_deleting(record):
+            return False
         failed_retry = (
             record.stage == ProcessingStage.FAILED.value and record.retryable
         )
@@ -520,16 +527,53 @@ class UploadService:
         session: AsyncSession,
         upload_id: str,
     ) -> DocumentUpload | None:
-        result = await session.execute(
-            select(DocumentUpload)
-            .where(DocumentUpload.upload_id == upload_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-        record = result.scalar_one_or_none()
+        """Persist removal before remote I/O, then return with deletion locks held.
+
+        The existing upload row is the durable recovery record. Ingestion stages
+        and checkpoints remain intact until all remote cleanup succeeds. The
+        admission lock serializes shared-object deletion with uploads and retry.
+        """
+        from app.services.resource_budget_service import resource_budget_service
+
+        async def lock_record():
+            await resource_budget_service.lock(session)
+            result = await session.execute(
+                select(DocumentUpload)
+                .where(DocumentUpload.upload_id == upload_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            return result.scalar_one_or_none()
+
+        record = await lock_record()
         if record is None or record.stage not in self.DELETABLE_STAGES:
             return None
+        if not self.is_deleting(record):
+            record.result_json = {
+                **(record.result_json if isinstance(record.result_json, dict) else {}),
+                "deletion_requested": True,
+                "deletion_requested_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await session.commit()
+            # The committed flag blocks retry during this lock handoff. Recheck
+            # after another deletion or uploader may have acquired admission.
+            record = await lock_record()
+            if record is None or record.stage not in self.DELETABLE_STAGES:
+                return None
         return record
+
+    async def list_pending_deletion_ids(
+        self, session: AsyncSession, *, limit: int = 50,
+    ) -> list[str]:
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("Invalid pending-deletion batch size.")
+        result = await session.execute(
+            select(DocumentUpload.upload_id).where(
+                DocumentUpload.stage.in_(self.DELETABLE_STAGES),
+                DocumentUpload.result_json["deletion_requested"].as_boolean().is_(True),
+            ).order_by(DocumentUpload.created_at, DocumentUpload.upload_id).limit(limit)
+        )
+        return list(result.scalars().all())
 
     async def storage_key_is_shared(
         self,
