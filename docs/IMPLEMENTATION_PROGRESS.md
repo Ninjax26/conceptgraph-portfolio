@@ -29,6 +29,17 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 
 ## Phase 3 — Scale ingestion without overwhelming providers
 
+27 October verification correction: application/recovery changes were pushed
+as 4fadd1e and the Render API served that exact revision with healthy readiness
+and public sample data. The first CI run, 40518366943, failed because the new
+test module imported pytest, which is not installed by this repository's
+unittest-based CI. The four regressions were converted to standard-library
+unittest cases without adding a dependency or changing application code.
+The exact CI command, python -m unittest discover -s tests -v, then passed all
+545 tests locally. The four-store report's application/source hashes remain
+unchanged and verified. Record the corrected revision's CI/deployment result
+separately.
+
 27 October local full-deletion recovery increment: reproduced a crash after
 Qdrant cleanup leaving a READY source eligible with no vectors. Removal now
 commits a flag in the existing upload result before remote cleanup, preserves
