@@ -20,7 +20,7 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: fenced replay, bounded drafts, provider admission, publication intent, remote marker and receipt deployed but disconnected | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of these publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence now rejects that replay. A disconnected tombstone, deleted-source helper and durable cleanup receipt exist. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. Live deletion integration, combined cross-store completion/crash/late-write recovery and bounded dispatch remain before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: deleted-intent recovery runs in the combined service; graph publication remains disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. Full API/R2/Qdrant deletion integration, other crash boundaries, graph-job completion and bounded dispatch remain before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,40 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+27 October local cross-store recovery increment: the existing combined-service
+retention loop now runs a bounded deleted-intent sweep after its normal upload
+cleanup. It discovers at most 50 unreceipted intents, then rechecks each one
+in a fresh PostgreSQL transaction before asking Neo4j to tombstone it. A
+failed remote call is logged and leaves the durable receipt absent for retry;
+other discovered intents continue. Normal API and retention deletion order
+remain unchanged, so a permanent tombstone is never written before their
+PostgreSQL commit. A disposable PostgreSQL plus Neo4j test hard-killed a
+process immediately after the real Neo4j tombstone commit and before the
+PostgreSQL receipt, then used the retention sweep to finish once from another
+process. Three real-store checks passed; the schema, container and network
+were removed. The full backend suite passed 541 tests and 135 subtests; nine
+frontend tests, TypeScript/Vite build, compileall and diff checks passed. The
+runner made zero hosted-provider calls and no production test-data mutation.
+This is one crash boundary with synthetic source deletion: it
+does not run the live API, Qdrant or R2 deletion path. The sweep runs in the
+protected combined service, not the split API role; it is bounded to 50 per
+interval. Automatic graph-only continuation remains disabled. Record full
+suite and release verification separately.
+
+27 October deleted-source recovery release `2cf984c7dd6ab5b589b44ca76b2b98c30ceb09f5`:
+eight scoped files were pushed to `origin/main`. [GitHub CI run 40472570525](https://github.com/Ninjax26/conceptgraph-portfolio/actions/runs/40472570525)
+passed. The free Render API `/api/v1/ready` returned HTTP 200 at this exact
+revision, combined processing role, zero queued jobs, no degraded services,
+and graph/ingestion available. The frontend `/sample` route returned HTTP 200;
+the public sample API returned one prepared document with `GRAPH_READY`.
+These checks do not exercise the disconnected recovery path. The first API
+readiness request timed out during a cold start; the next succeeded. Final
+local verification: 47 isolated PostgreSQL checks, 539 backend tests, 135
+subtests, nine frontend tests, TypeScript/Vite build, compileall and staged
+diff checks passed. No hosted provider call or production test-data mutation
+was made. Automatic continuation remains disabled. This release-verification
+note is local until the next substantive release.
 
 27 October local deleted-source recovery increment: a retained PostgreSQL
 cleanup receipt is written only after the disconnected Neo4j tombstone call

@@ -1,0 +1,27 @@
+{
+  "generated_at_utc": "2026-10-27T10:26:30.412765+00:00",
+  "kind": "disposable real PostgreSQL plus Neo4j hard-kill recovery checks",
+  "checks": {
+    "remote_publication_marker_committed_before_source_deletion": true,
+    "hard_kill_after_neo4j_commit_leaves_durable_postgresql_retry": true,
+    "retention_sweep_finishes_receipt_idempotently_across_real_stores": true
+  },
+  "passed": true,
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "test_schema_container_network_removed": true,
+  "elapsed_seconds": 39.634,
+  "source_sha256": {
+    "app/services/graph_continuation_service.py": "9abdaadb0edbc32ebc3a09f0d46aa7181adfbc4e44d741ffbda37800954e58ec",
+    "app/services/demo_retention_service.py": "46758269bfaaeca1bfda4250a488edb99d6c40c81a6340c177b79aacaf44ac84",
+    "app/services/ingestion_service.py": "15206107973c632cab5999644d8305ca434dd3b4b715ae16ca1d51317a62e9c3",
+    "app/models/document_upload.py": "f2b387bca39f82dff61b49e4aa37a3f5fbcb17682308ca84407ecd7da0917fad",
+    "scripts/evaluate_graph_cross_store_recovery.py": "f9e12261a4ab3157e937bd49a4835ad3095fae7bfdba864bf0c0eed850c0cee6"
+  },
+  "limits": [
+    "Source deletion is simulated in isolated PostgreSQL; the live API/R2/Qdrant path is not exercised.",
+    "The hard kill occurs immediately after Neo4j tombstone commit, before PostgreSQL receipt commit; other crash boundaries remain untested.",
+    "The live combined API schedules deleted-intent cleanup, but this run does not exercise its full R2/Qdrant deletion path.",
+    "Automatic graph-only continuation remains disabled."
+  ]
+}

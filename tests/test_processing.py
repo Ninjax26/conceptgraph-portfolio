@@ -35,6 +35,7 @@ from app.services.cerebras_service import CerebrasService
 from app.services.course_service import CourseNotReadyError, CourseService
 from app.services.document_processing_service import DocumentProcessingService
 from app.services.demo_retention_service import DemoRetentionService
+from app.services.graph_continuation_service import GraphContinuationService
 from app.services.ingestion_service import IngestionService
 from app.services.parser_service import (
     DocumentChunk,
@@ -2626,6 +2627,59 @@ class UploadDeletionServiceTests(unittest.TestCase):
 
 
 class DemoRetentionServiceTests(unittest.TestCase):
+    def test_combined_retention_loop_runs_deleted_publication_sweep(self):
+        config = Settings(_env_file=None, REQUIRE_UPLOAD_AUTH=True,
+                          DEMO_ACCESS_TOKEN="a-strong-demo-secret-value-123456")
+        service = DemoRetentionService(config=config)
+        service.cleanup_once = AsyncMock(return_value=0)
+        service.cleanup_deleted_graph_publications_once = AsyncMock(return_value=0)
+
+        async def exercise():
+            await service.start()
+            try:
+                for _ in range(50):
+                    if service.cleanup_deleted_graph_publications_once.await_count:
+                        break
+                    await asyncio.sleep(0.01)
+            finally:
+                await service.stop()
+
+        asyncio.run(exercise())
+        service.cleanup_once.assert_awaited_once()
+        service.cleanup_deleted_graph_publications_once.assert_awaited_once()
+
+    def test_deleted_graph_publication_sweep_retries_failed_intents(self):
+        session = SimpleNamespace()
+
+        class SessionContext:
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        service = DemoRetentionService()
+        intents = [SimpleNamespace(id=value) for value in ("first", "failed", "last")]
+        with (
+            patch("app.services.demo_retention_service.AsyncSessionLocal",
+                  return_value=SessionContext()) as sessions,
+            patch.object(GraphContinuationService, "list_deleted_source_intents",
+                         new_callable=AsyncMock, return_value=intents) as discover,
+            patch.object(GraphContinuationService, "reconcile_deleted_source_publication",
+                         new_callable=AsyncMock,
+                         side_effect=[True, RuntimeError("remote unavailable"), False]) as reconcile,
+        ):
+            with self.assertLogs("app.services.demo_retention_service", level="ERROR"):
+                cleaned = asyncio.run(service.cleanup_deleted_graph_publications_once())
+
+        self.assertEqual(cleaned, 1)
+        discover.assert_awaited_once_with(session, limit=50)
+        self.assertEqual([call.args[1] for call in reconcile.await_args_list],
+                         ["first", "failed", "last"])
+        self.assertTrue(all(call.args[0] is sessions and
+                            call.args[2] is service.ingestion_service
+                            for call in reconcile.await_args_list))
+
     def test_retention_is_disabled_outside_the_protected_demo(self):
         config = Settings(_env_file=None, REQUIRE_UPLOAD_AUTH=False)
         service = DemoRetentionService(config=config)

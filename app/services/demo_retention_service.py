@@ -12,6 +12,7 @@ from app.core.blocking import run_blocking_safely
 from app.core.database import AsyncSessionLocal
 from app.services.course_service import CourseService
 from app.services.document_processing_service import document_processing_service
+from app.services.graph_continuation_service import GraphContinuationService
 from app.services.storage_service import ObjectStorageError, StorageService, storage_service
 from app.services.upload_service import UploadService
 
@@ -112,6 +113,25 @@ class DemoRetentionService:
             logger.exception("Expired demo upload cleanup failed upload=%s", upload_id)
         return False
 
+    async def cleanup_deleted_graph_publications_once(self) -> int:
+        """Reconcile a bounded set of retained intents after committed deletion.
+
+        Each intent is rechecked in a fresh transaction before its remote
+        tombstone. A failed item keeps its receipt absent for a later sweep.
+        """
+        async with AsyncSessionLocal() as session:
+            intents = await GraphContinuationService.list_deleted_source_intents(
+                session, limit=50)
+            intent_ids = [intent.id for intent in intents]
+        cleaned = 0
+        for intent_id in intent_ids:
+            try:
+                cleaned += await GraphContinuationService.reconcile_deleted_source_publication(
+                    AsyncSessionLocal, intent_id, self.ingestion_service)
+            except Exception:
+                logger.exception("Deleted graph publication cleanup failed intent=%s", intent_id)
+        return cleaned
+
     async def _cleanup_loop(self) -> None:
         while not self._stop.is_set():
             try:
@@ -122,6 +142,14 @@ class DemoRetentionService:
                 raise
             except Exception:
                 logger.exception("Demo upload retention sweep failed")
+            try:
+                cleaned = await self.cleanup_deleted_graph_publications_once()
+                if cleaned:
+                    logger.info("Reconciled %s deleted graph publication(s)", cleaned)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Deleted graph publication discovery failed")
             try:
                 await asyncio.wait_for(
                     self._stop.wait(),

@@ -64,7 +64,7 @@ a cleanup candidate, not proof that an in-flight Neo4j write has ended. The
 future reconciler must repeat after late writers have drained; this discovery
 must never directly authorize a remote delete.
 
-A disconnected reconciliation helper now opens its own PostgreSQL session,
+A reconciliation helper opens its own PostgreSQL session,
 checks an intent's upload under `FOR UPDATE`, and calls the Neo4j tombstone
 only if the upload is committed absent. It waits for an in-flight deletion and
 does nothing if that deletion rolls back. It serializes reconcilers for the
@@ -72,10 +72,16 @@ intent with a transaction advisory lock, then persists a retained cleanup
 receipt only after the remote tombstone succeeds. Remote or PostgreSQL commit
 failures can be retried because the Neo4j tombstone is idempotent. Discovery
 skips cleaned intents, so a bounded scan can reach later deleted uploads.
-The isolated PostgreSQL runner tests rollback, restart, repeat, pagination and
-concurrency with a mocked remote call; no worker or scheduler invokes this
-helper. The cleanup receipt has no cascading foreign key and contains no PDF
-text or graph payload.
+The protected combined-service retention loop now invokes a bounded scan of
+50 unreceipted deleted-source intents per interval and reconciles each in a
+fresh transaction. A failed item is logged and can retry on a later sweep;
+the live API deletion order is unchanged. The isolated PostgreSQL runner
+tests rollback, restart, repeat, pagination and concurrency with a mocked
+remote call. A separate disposable PostgreSQL–Neo4j check hard-kills the
+reconciler after its real tombstone commit and verifies that the sweep writes
+one receipt on restart. Neither test runs the full live API, R2 or Qdrant
+deletion path. The cleanup receipt has no cascading foreign key and contains
+no PDF text or graph payload.
 
 ## Remote generation fence and remaining activation blockers
 
@@ -91,12 +97,13 @@ recorded in staged intents and observed receipts. No worker currently passes
 it into the marked Neo4j writer.
 
 **Do not activate graph-only continuation yet.** Normal document deletion does
-not call the new tombstone primitive. After PostgreSQL proves committed upload
-deletion, that primitive can permanently mark the fence deleted and remove the
+not write a tombstone before its PostgreSQL commit. The combined-service
+retention sweep can subsequently prove committed upload deletion and call the
+tombstone primitive to permanently mark the fence deleted and remove the
 upload's concepts and publication markers in one managed Neo4j transaction.
 Real Neo4j checks cover idempotence, course scope, prepublication deletion and
 a concurrent in-flight marked write; later marked writes are rejected. It is
-disconnected because the live deletion order can fail after graph cleanup, so
+delayed because the live deletion order can fail after graph cleanup, so
 writing a permanent tombstone there could block a still-READY upload. The
 PostgreSQL intent/receipt now persist and compare it, but a coordinator must
 still prove source authority, publish, finalize and reconcile killed
@@ -104,11 +111,12 @@ or ambiguous writes across stores. Exact-marker cleanup alone cannot establish
 that no writer remains in flight.
 
 The receipt's isolated PostgreSQL test uses a mocked marker reader and the
-deleted-source helper uses a mocked Neo4j tombstone. The separate isolated
-Neo4j test exercises real marker and tombstone writes. They are **not** a
-combined PostgreSQL–Neo4j transaction, hard-kill or full deletion-reconciliation
-test. A receipt means an exact marker was observed, not that the source remains
-eligible or that the graph job is complete.
+deleted-source helper uses a mocked Neo4j tombstone. A separate isolated
+Neo4j test exercises real marker and tombstone writes. The new combined
+PostgreSQL–Neo4j runner covers one hard-kill boundary and retry through the
+retention sweep. It is **not** a full API/R2/Qdrant deletion-reconciliation or
+graph-job-completion test. A publication receipt means an exact marker was
+observed, not that the source remains eligible or the graph job is complete.
 
 ## Verification
 
@@ -119,6 +127,7 @@ intent survives schema reinitialization and is idempotent across sessions; a
 separate fixture intent survives committed document/job deletion. The runner
 uses a private temporary PostgreSQL cluster, removes its random schema and
 reports zero hosted-provider calls. It does **not** test Neo4j publication,
-receipts, cross-store crash recovery or production deletion cleanup. See the
-implementation ledger and `evaluation/graph-continuation-jobs-current.md` for
-the actual run and source hashes.
+receipts or production deletion cleanup. See the implementation ledger,
+`evaluation/graph-continuation-jobs-current.md` and
+`evaluation/graph-cross-store-recovery-current.md` for the distinct runs,
+limits and source hashes.
