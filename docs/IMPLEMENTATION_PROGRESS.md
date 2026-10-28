@@ -20,7 +20,7 @@ Updated: 2026-10-28 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: internal marked publisher passes local crash tests; automatic dispatch disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. Caller-owned PostgreSQL completion now has twelve isolated checks; remote marker reads are doubles, not Neo4j publication. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. The internal publisher now passes and checks generation in real Neo4j; the live worker remains unchanged. The real ASGI deletion route now has an 18-check local PostgreSQL/Qdrant/Neo4j/MinIO recovery matrix. A twelve-check local marked publish/complete matrix now covers five SIGKILL boundaries. Hosted R2 and bounded dispatch remain unverified. A separate retry probe now reproduces an unsafe old marked overwrite after ordinary unmarked ingestion; twelve final-attempt recovery checks pass, but this ordering blocks activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: internal marked publisher passes local crash tests; automatic dispatch disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. Caller-owned PostgreSQL completion now has twelve isolated checks; remote marker reads are doubles, not Neo4j publication. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. The internal publisher now passes and checks generation in real Neo4j; the live worker remains unchanged. The real ASGI deletion route now has an 18-check local PostgreSQL/Qdrant/Neo4j/MinIO recovery matrix. A twelve-check local marked publish/complete matrix now covers five SIGKILL boundaries. Hosted R2 and bounded dispatch remain unverified. A separate retry probe now reproduces an unsafe old marked overwrite after ordinary unmarked ingestion; twelve final-attempt recovery checks pass, but this ordering blocks activation. New opt-in baseline/attempt-cleanup fencing has fourteen real Neo4j ordering checks plus nineteen projection regressions; live processor integration is still pending. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,61 @@ Updated: 2026-10-28 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+28 October generation-compatible projection increment: the atomic replacement
+now accepts an optional positive upload source generation for baseline ingestion
+and retry graphs. It shares a remote fence with marked publication, allowing
+baseline → publication in one task/generation but rejecting the reverse, changed
+baseline payloads, foreign tasks and older generations. Internal attempt cleanup
+uses that same fence and one transaction to close the failed generation before
+removing graph/markers. A later generation may retry; permanent deletion blocks
+all generations. Empty baselines still advance the fence. No live processor,
+ordinary cleanup/vector path, API, schema, environment or dispatcher was changed.
+
+The [isolated Neo4j report](../evaluation/graph-baseline-projection-current.md)
+records fourteen new ordering checks and nineteen existing projection regressions,
+rerun because the shared marked fence changed. It covers both concurrent write
+orderings, cleanup waiting for an in-flight baseline, exact replay, same-generation
+promotion, aborted/permanently deleted generations, actual transaction rollback
+and neighbor preservation. Existing regressions cover managed retry/cancellation.
+The separate legacy replay remains unsafe: four current-task concepts became
+zero after an older marked replay. It is deliberately outside the safety-pass
+count. This run uses no PostgreSQL source/job fence, Qdrant/R2, API, actual worker,
+hosted providers or production data. The earlier cross-store/final-attempt reports
+retain historical source hashes and were not rerun or relabelled.
+
+Verification: seven new unit tests first failed for the absent generation API and
+cleanup method, then all 29 focused projection tests and 564 backend tests passed
+(full suite: 3.613 seconds from `/private/tmp`, without project `.env`). Nine
+frontend tests and TypeScript/Vite build passed (Vite 5.93 seconds). One fresh
+read-only review found no scoped blockers and explicitly did not rerun the
+real-store matrix. Disposable Neo4j container/network cleanup succeeded. Compileall, diff and all five current report-source hash checks passed. Record
+release verification separately. Phase 3 remains partial;
+actual processor and compensating cleanup integration is the next checkpoint,
+and automatic continuation stays disabled.
+
+28 October final-attempt recovery release a8eb80f60eb768bb330a1e2db292ade347134ce6:
+seven scoped files were committed and pushed only to origin/main. GitHub Verify
+run 40663663648 passed for that exact SHA. The existing free API /api/v1/ready
+returned 200 at the same revision, combined processing role, zero queued jobs,
+graph/ingestion available and no degraded services. Frontend /sample returned
+200. The prepared public API returned 200, GRAPH_READY, one document and a
+bounded list of 50 concepts. A verification script initially assumed that list
+was a mapping; parsing was corrected to the existing public response schema.
+No application response schema changed. These read-only checks do not exercise
+internal recovery or establish answer quality or capacity.
+
+Local verification: twelve real PostgreSQL/Neo4j recovery/invariant checks with
+two SIGKILL boundaries; all 557 backend tests; nine frontend tests;
+TypeScript/Vite build; compileall; diff and seven report-source hash checks.
+The ordinary retry ordering observation is separately unsafe and must not be
+counted as a safety pass. All own labelled container/network resources were
+confirmed absent; unrelated containers and Docker remain untouched. No hosted
+model/embedding/reranking calls or production test-data writes. Automatic
+continuation is disconnected and Phase 3 remains partial. Next scope: compatible
+generation fencing across ordinary graph writes and cleanup, followed by the
+actual processor/retry ordering matrix. Do not merely turn on the publisher.
+This release-verification note stays local until the next substantive release.
 
 28 October final-attempt recovery increment: the internal
 `reconcile_exhausted_publication` method now observes an exact already-committed
@@ -597,7 +652,7 @@ Release follow-up: internal extraction checkpoint `0d7124a7690471166b428dd1aa9ea
 
 The initial characterization suite is `tests/test_provider_admission_contract.py`. It makes no database or provider requests. These tests protect existing boundaries; they do not demonstrate separate-process operation or the new priority/token/cache features.
 
-Implementation order for the next run: (1) resolve the reproduced ordinary unmarked ingestion/retry versus old marked-publication ordering with compatible generation fencing across every graph writer and cleanup path. Preserve deletion, READY task provenance, retry/checkpoint semantics and rollback/cancellation guarantees. The internal publisher and final-attempt receipt recovery now have real-store crash checks; neither has a runtime dispatcher. Add graph-only processing and bounded dispatch only after the ordering gate and snapshot accounting/retention pass; the [transactional projection primitive](GRAPH_PROJECTION_REPLACEMENT.md) alone is not cross-store atomicity. Section/recovery checkpoint saves and atomic READY/job staging are verified; keep `GRAPH_CONTINUATION_SNAPSHOTS_ENABLED=false` until remaining gates pass. (2) Verify real separate API/ingestion workers, full hard-kill recovery and cross-store consistency; (3) complete hosted usage accounting where providers expose it; (4) cache versioned validated graph batches across uploads while safely rebinding provenance. See [the activation gate](GRAPH_CONTINUATION_JOBS.md#next-implementation-gate). Do not rotate the original READY task or weaken existing document fences. Accepted manual retries still follow the full original pipeline, although completed graph batches are reused. Cohere's comparison path makes two distinct requests; do not count one user question as one universal provider request. Admission/holdback primitives are tested; do not mark Phase 3 complete or claim their zero-default enforcement is active in production.
+Implementation order for the next run: (1) integrate the verified generation-aware baseline replacement and attempt cleanup into the actual processor under current PostgreSQL source/task authority. Qualify ordinary and compensating cleanup, including vector/source interactions, instead of merely replacing a method call. Legacy unmarked ingestion/retry still bypasses the new fence; the separate replay remains unsafe. Preserve deletion, READY task provenance, retry/checkpoint semantics and rollback/cancellation guarantees. The internal publisher and final-attempt receipt recovery now have real-store crash checks; neither has a runtime dispatcher. Add graph-only processing and bounded dispatch only after the ordering gate and snapshot accounting/retention pass; the [transactional projection primitive](GRAPH_PROJECTION_REPLACEMENT.md) alone is not cross-store atomicity. Section/recovery checkpoint saves and atomic READY/job staging are verified; keep `GRAPH_CONTINUATION_SNAPSHOTS_ENABLED=false` until remaining gates pass. (2) Verify real separate API/ingestion workers, full hard-kill recovery and cross-store consistency; (3) complete hosted usage accounting where providers expose it; (4) cache versioned validated graph batches across uploads while safely rebinding provenance. See [the activation gate](GRAPH_CONTINUATION_JOBS.md#next-implementation-gate). Do not rotate the original READY task or weaken existing document fences. Accepted manual retries still follow the full original pipeline, although completed graph batches are reused. Cohere's comparison path makes two distinct requests; do not count one user question as one universal provider request. Admission/holdback primitives are tested; do not mark Phase 3 complete or claim their zero-default enforcement is active in production.
 
 More workers cannot create additional free provider capacity. Current entry points: `app/services/shared_provider_service.py`, `provider_metrics.py`, `document_processing_service.py`, `ingestion_service.py`, `app/core/processing_coordinator.py`, `app/services/upload_service.py`, `app/worker.py`, `scripts/start_local.py`.
 

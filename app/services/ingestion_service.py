@@ -659,11 +659,13 @@ class IngestionService:
         upload_id: str, document_name: str, course_name: str,
         execution_token: str,
         marker: GraphProjectionMarker | None = None,
+        source_generation: int | None = None,
     ) -> None:
         """Replace one upload projection atomically; caller owns its PG fence.
 
-        Not wired to automatic continuation yet. The original READY execution
-        token must be retained so vectors and concepts remain in the same scope.
+        A source generation fences a baseline ingestion/retry projection; a
+        marker fences continuation. The live processor still uses its legacy
+        writer. The original task token keeps vectors and concepts in scope.
         """
         from app.core.blocking import run_async_safely
 
@@ -693,34 +695,22 @@ class IngestionService:
             or re.fullmatch(r"[0-9a-f]{64}", marker.payload_sha256) is None
         ):
             raise ValueError("Graph publication marker does not match the replacement identity.")
+        if source_generation is not None and (
+            marker is not None or type(source_generation) is not int or source_generation < 1
+        ):
+            raise ValueError("A baseline requires one positive source generation and no marker.")
+        generation = marker.generation if marker is not None else source_generation
+        mode = "publication" if marker is not None else "baseline"
+        digest = marker.payload_sha256 if marker is not None else (
+            hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+            if source_generation is not None else None
+        )
 
         async def replace(tx):
-            if marker is not None:
-                # The write lock acquired by SET serializes competing workers
-                # for this upload. A stale attempt cannot delete a newer graph.
-                result = await tx.run(
-                    """
-                    MERGE (fence:GraphProjectionFence {upload_id: $upload_id})
-                    ON CREATE SET fence.generation = 0, fence.deleted = false,
-                                  fence.course_id = $course_id
-                    SET fence.lock_epoch = coalesce(fence.lock_epoch, 0) + 1
-                    WITH fence
-                    WHERE fence.course_id = $course_id AND fence.deleted = false AND
-                      ($generation > fence.generation OR
-                       ($generation = fence.generation AND
-                        fence.document_task_id = $document_task_id AND
-                        fence.payload_sha256 = $payload_sha256))
-                    SET fence.generation = $generation,
-                        fence.document_task_id = $document_task_id,
-                        fence.payload_sha256 = $payload_sha256
-                    RETURN fence.upload_id AS upload_id
-                    """, upload_id=upload_id, course_id=course_id,
-                    generation=marker.generation,
-                    document_task_id=marker.document_task_id,
-                    payload_sha256=marker.payload_sha256,
-                )
-                if await result.single() is None:
-                    raise ValueError("Graph publication is older than the current upload generation.")
+            if generation is not None:
+                await self._fence_graph_projection(tx, upload_id=upload_id, course_id=course_id,
+                    execution_token=execution_token, generation=generation, mode=mode, digest=digest)
             result = await tx.run(
                 """
                 MATCH (concept:Concept {course_id: $course_id, upload_id: $upload_id})
@@ -743,6 +733,12 @@ class IngestionService:
                 """, course_id=course_id,
             )
             await result.consume()
+            if source_generation is not None:
+                result = await tx.run(
+                    """MATCH (marker:GraphPublication {course_id: $course_id, upload_id: $upload_id})
+                    DETACH DELETE marker""", course_id=course_id, upload_id=upload_id,
+                )
+                await result.consume()
             if marker is not None:
                 result = await tx.run(
                     """
@@ -767,7 +763,7 @@ class IngestionService:
 
         async def publish():
             async with self.graph_driver.session() as session:
-                if marker is not None:
+                if generation is not None:
                     # MERGE alone cannot ensure one fence per upload under
                     # concurrent creation. Keep the constraint as a write gate.
                     await self._ensure_graph_projection_fence_constraint(session)
@@ -776,6 +772,80 @@ class IngestionService:
                 await session.execute_write(replace)
 
         await run_async_safely(publish())
+
+    @staticmethod
+    async def _fence_graph_projection(
+        tx, *, upload_id: str, course_id: str, execution_token: str,
+        generation: int, mode: str, digest: str | None,
+    ) -> None:
+        # SET takes the upload write lock. A baseline may advance to publication
+        # in the same source generation, but publication cannot go backwards.
+        # An aborted attempt is closed until a higher generation; a permanent
+        # deletion is closed to every generation. Old fences lack aborted/hash
+        # fields, so absence retains their previous marked-write behavior.
+        result = await tx.run(
+            """MERGE (fence:GraphProjectionFence {upload_id: $upload_id})
+            ON CREATE SET fence.generation = 0, fence.deleted = false,
+                          fence.course_id = $course_id
+            SET fence.lock_epoch = coalesce(fence.lock_epoch, 0) + 1
+            WITH fence
+            WHERE fence.course_id = $course_id AND fence.deleted = false AND
+              ($generation > fence.generation OR
+               ($generation = fence.generation AND fence.document_task_id = $document_task_id AND
+                CASE $mode
+                  WHEN 'publication' THEN coalesce(fence.aborted, false) = false AND
+                    (fence.payload_sha256 IS NULL OR fence.payload_sha256 = $digest)
+                  WHEN 'baseline' THEN coalesce(fence.aborted, false) = false AND
+                    fence.payload_sha256 IS NULL AND
+                    (fence.baseline_sha256 IS NULL OR fence.baseline_sha256 = $digest)
+                  WHEN 'abort' THEN fence.payload_sha256 IS NULL
+                  ELSE false
+                END))
+            SET fence.generation = $generation, fence.document_task_id = $document_task_id,
+                fence.aborted = ($mode = 'abort'),
+                fence.payload_sha256 = CASE WHEN $mode = 'publication' THEN $digest ELSE null END,
+                fence.baseline_sha256 = CASE WHEN $mode = 'baseline' THEN $digest ELSE null END
+            RETURN fence.upload_id AS upload_id""",
+            upload_id=upload_id, course_id=course_id, document_task_id=execution_token,
+            generation=generation, mode=mode, digest=digest,
+        )
+        if await result.single() is None:
+            raise ValueError("Graph projection is stale, closed or already published.")
+
+    async def cleanup_graph_attempt(
+        self, upload_id: str, course_id: str, *, execution_token: str, source_generation: int,
+    ) -> None:
+        """Close a failed baseline attempt and clean its graph in one transaction.
+
+        Internal only; caller must prove current PostgreSQL attempt authority.
+        Older attempts and same-generation published output are protected. This
+        does not delete vectors/source objects or permanently delete an upload.
+        """
+        from app.core.blocking import run_async_safely
+
+        if (not all(isinstance(value, str) and value.strip() for value in
+                    (upload_id, course_id, execution_token))
+            or type(source_generation) is not int or source_generation < 1):
+            raise ValueError("Attempt cleanup requires task identity and a positive source generation.")
+
+        async def remove(tx):
+            await self._fence_graph_projection(tx, upload_id=upload_id, course_id=course_id,
+                execution_token=execution_token, generation=source_generation, mode="abort", digest=None)
+            for query in (
+                "MATCH (concept:Concept {course_id: $course_id, upload_id: $upload_id}) DETACH DELETE concept",
+                "MATCH (marker:GraphPublication {course_id: $course_id, upload_id: $upload_id}) DETACH DELETE marker",
+                """MATCH (course:Course {id: $course_id})
+                WHERE NOT (course)-[:CONTAINS]->(:Concept) DETACH DELETE course""",
+            ):
+                result = await tx.run(query, course_id=course_id, upload_id=upload_id)
+                await result.consume()
+
+        async def cleanup():
+            async with self.graph_driver.session() as session:
+                await self._ensure_graph_projection_fence_constraint(session)
+                await session.execute_write(remove)
+
+        await run_async_safely(cleanup())
 
     @staticmethod
     async def _ensure_graph_projection_fence_constraint(session) -> None:

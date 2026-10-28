@@ -1,0 +1,69 @@
+{
+  "generated_at_utc": "2026-10-28T09:42:54.454529+00:00",
+  "neo4j_version": "5.26.26",
+  "image_id": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
+  "checks": {
+    "fenced_retry_preserves_new_graph_against_exact_older_marked_replay": true,
+    "older_and_same_generation_foreign_cleanup_cannot_erase_retry": true,
+    "baseline_replay_is_idempotent_but_payload_and_task_changes_are_rejected": true,
+    "baseline_can_advance_to_marked_publication_but_never_reverse_or_abort_it": true,
+    "attempt_cleanup_closes_late_writes_but_allows_a_new_generation": true,
+    "cleanup_before_first_projection_closes_the_failed_generation": true,
+    "permanent_deletion_rejects_even_higher_baseline_marked_and_cleanup_generations": true,
+    "new_baseline_waits_for_inflight_older_publication_then_wins": true,
+    "late_publication_waits_for_inflight_new_baseline_then_is_rejected": true,
+    "attempt_cleanup_waits_for_same_generation_baseline_then_closes_it": true,
+    "failed_baseline_rolls_back_projection_and_generation_together": true,
+    "failed_cleanup_rolls_back_concept_deletion_and_aborted_generation": true,
+    "empty_baseline_still_advances_fence_without_leaving_concepts": true,
+    "other_upload_and_other_course_survive_generation_writes_and_cleanup": true
+  },
+  "legacy_projection_regressions": {
+    "merged_graph_replacement_preserves_other_uploads_and_ready_scope": true,
+    "replay_preserves_graph_content_without_duplicate_edges": true,
+    "marker_commits_atomically_and_replay_reads_exact_identity": true,
+    "marker_identity_conflict_rolls_back_projection": true,
+    "upload_cleanup_removes_only_matching_remote_marker_and_is_idempotent": true,
+    "exact_obsolete_publication_cleanup_is_idempotent_and_preserves_neighbors": true,
+    "obsolete_marker_cleanup_preserves_newer_execution_projection": true,
+    "late_old_marker_replay_cannot_overwrite_newer_task_projection": true,
+    "same_generation_different_task_cannot_replace_projection": true,
+    "same_generation_different_payload_cannot_replace_projection": true,
+    "tombstone_blocks_late_publication_and_preserves_neighbors": true,
+    "tombstone_before_first_marker_blocks_publication": true,
+    "tombstone_rejects_foreign_course_without_partial_cleanup": true,
+    "concurrent_tombstone_waits_for_inflight_publication_then_removes_it": true,
+    "real_transaction_rollback_after_delete_and_callback_failure": true,
+    "real_transaction_rollback_after_delete_and_cypher_failure": true,
+    "actual_driver_retries_entire_callback_after_injected_retryable_failure": true,
+    "repeated_cancellation_drains_actual_transaction_before_propagating": true,
+    "empty_replacement_removes_only_target_and_only_empty_course": true
+  },
+  "checks_passed": 14,
+  "legacy_checks_passed": 19,
+  "legacy_unfenced_ordering": {
+    "new_task_concepts_before": 4,
+    "new_task_concepts_after": 0,
+    "safe": false
+  },
+  "runtime_integration_enabled": false,
+  "phase3_complete": false,
+  "disposable_resources_removed": true,
+  "hosted_calls": 0,
+  "production_test_data_mutations": 0,
+  "source_sha256": {
+    "app/services/ingestion_service.py": "2c35ed30152830297bf9c3e627fabd1a952834706bda3e75cc6a5f9a8ae4dd73",
+    "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
+    "scripts/evaluate_graph_projection.py": "e748c8253e297cb5906b6fcb9097dabc9ff0fc36d0287628a5b34385dca1d6ee",
+    "scripts/evaluate_graph_baseline_projection.py": "b1d0ada6082c3d14f6e46b0b0e62833168a7be2ffa2bcb594f64552b5f4e0ac0",
+    "tests/test_graph_baseline_projection.py": "64d83584a4ecdb5841db7e1beb1c0ffa5ef97adbaed9313d3e336efc24b5c5af"
+  },
+  "limits": [
+    "No PostgreSQL source/job authority, actual processor, Qdrant, R2 or HTTP API is exercised.",
+    "Legacy ordinary writes/cleanup remain unchanged and unsafe in the separate replay probe.",
+    "New checks use explicit source generations; live integration and cleanup qualification are still required.",
+    "Outputs/failures are synthetic; no new hard-kill, capacity, semantic-quality or provider measurements.",
+    "The existing projection regressions include real rollback, managed retry and cancellation checks.",
+    "Automatic continuation remains disabled; this is not end-to-end retry or deletion acceptance."
+  ]
+}

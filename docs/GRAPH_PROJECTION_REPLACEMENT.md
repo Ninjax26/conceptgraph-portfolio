@@ -3,10 +3,10 @@
 Phase 3 increment, 14 October 2026.
 
 `IngestionService.replace_graph_extraction` replaces one upload's concepts and
-relationships inside **one Neo4j managed write transaction**. It is not called
-by the API, coordinator, ingestion processor or graph-job service yet. Existing
-uploads retain the original pipeline. Automatic continuation and snapshot staging
-remain disabled.
+relationships inside **one Neo4j managed write transaction**. The internal marked
+publisher calls it; the live API, coordinator and ingestion processor do not.
+Existing uploads retain the original pipeline. Automatic continuation and
+snapshot staging remain disabled.
 
 ## Implementation
 
@@ -63,6 +63,54 @@ call or production test-data mutation was made. See the refreshed
 
 No parsing, OCR, embedding, vector deletion, schema/environment change, provider
 call or production test-data mutation is performed by this increment.
+
+## Generation-compatible baselines and attempt cleanup — 28 October
+
+The optional `source_generation` argument now gives an initial/retry projection
+the same remote upload fence as marked continuation. Supply the positive
+**upload attempt count**, not the graph-job claim count, and the original source
+task token. It cannot be combined with a publication marker. With neither
+argument, the legacy replacement query sequence is unchanged.
+
+- A higher generation may replace an older projection. At the same generation,
+  a baseline replay must retain the exact task and canonical graph payload hash.
+- That baseline can advance to a marked publication in the same task/generation.
+  A delayed baseline cannot then overwrite or abort the published graph. A
+  different marked payload remains rejected, as before.
+- Baseline graph replacement, old-marker removal and generation advancement
+  commit together. Empty graphs still advance the fence. Failed writes roll
+  back the generation and graph together.
+- Internal `cleanup_graph_attempt` closes a failed baseline generation and
+  deletes its graph/markers in the same transaction. It rejects an older or
+  foreign task and a same-generation marked publication. Late writes to the
+  aborted attempt remain blocked, including when cleanup precedes the first
+  write. A higher generation can retry. Permanent deletion blocks every later
+  generation, including baselines and attempt cleanup.
+
+Both operations use the existing unique upload constraint and drain their
+managed transaction on cancellation. The existing fence gains optional
+`baseline_sha256` and `aborted` properties when used; old marked fences need no
+PostgreSQL migration or data rewrite. Task/source authority must still be proven
+by the caller in PostgreSQL. The remote fence alone is not authorization or a
+distributed transaction.
+
+The [new real-store report](../evaluation/graph-baseline-projection-current.md)
+records fourteen new ordering checks and nineteen rerun projection regressions
+against owned disposable Neo4j 5.26.26. New checks include both concurrent
+baseline/publication orderings, cleanup waiting for an in-flight baseline,
+rollback after real deletion, empty graphs and other-upload/course preservation.
+The existing regression matrix supplies managed-retry and cancellation coverage.
+Seven new offline tests initially failed because these entry points were absent;
+the complete backend suite now passes 564 tests. No PostgreSQL, Qdrant, R2, live
+API, models or complete ingestion-worker process is tested by this matrix.
+
+**Live integration remains pending.** The processor still calls legacy unmarked
+`cleanup_graph` and `store_graph_extraction`; failure cleanup and vector cleanup
+are unchanged. A separate replay probe again observed the newer legacy task's
+concept count fall from four to zero. Do not call this an end-to-end retry fix,
+enable dispatch or treat that unsafe observation as a safety pass. Integrate and
+qualify ordinary/compensating cleanup with source authority and real processor
+ordering next. Automatic continuation remains disabled.
 
 ## Saved-candidate replay validation (internal, not dispatched)
 
