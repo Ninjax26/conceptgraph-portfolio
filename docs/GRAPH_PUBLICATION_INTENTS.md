@@ -51,13 +51,22 @@ receipt survives document/job deletion, is immutable by intent ID, and is not
 created when the marker is absent or conflicting. The observer now compares
 the marker's generation with the stored intent and current upload generation,
 then stores it in the receipt. Its caller owns commit or rollback. The
-publisher still needs PostgreSQL job finalization and a
-reconciler for ambiguous commits, killed processes, superseded tasks and document
-deletion. Normal graph cleanup now deletes markers for the same upload and
-course along with its concepts; a late write after that cleanup must still be
+internal `complete_publication` method can now stage the observed receipt,
+graph counters/result and terminal job state in one PostgreSQL transaction.
+It reloads the validated draft, refuses provider-limited work, rechecks the
+live source/job claim after remote observation and retains the document locks.
+Caller commit makes all three durable; rollback discards them together. Original
+READY task/attempt, vector count, PDF metadata, processing timings, completion
+time and section checkpoints are preserved. A completed claim cannot complete
+again. The initial ingestion path and this method share the existing graph
+result-field formatter, including the same graph-quality classification.
+
+This is not a publisher or reconciler for ambiguous commits, killed processes,
+superseded tasks and document deletion. Normal graph cleanup now deletes
+markers for the same upload and course along with its concepts; a late write after that cleanup must still be
 found and removed. The entire fenced publication/completion unit must drain on
-cancellation. These steps and bounded dispatch remain unimplemented; automatic
-continuation stays disabled.
+cancellation. The cross-store publish/complete unit and bounded dispatch remain
+unimplemented; automatic continuation stays disabled.
 
 An internal `cleanup_graph_publication` primitive can remove one exact remote
 marker and only concepts carrying that marker's original READY task token in
@@ -139,3 +148,20 @@ receipts or production deletion cleanup. See the implementation ledger,
 `evaluation/graph-continuation-jobs-current.md` and
 `evaluation/graph-cross-store-recovery-current.md` for the distinct runs,
 limits and source hashes.
+
+## Caller-owned completion verification — 28 October
+
+The dedicated `scripts/evaluate_graph_completion.py` runner passed twelve checks
+against a disposable PostgreSQL cluster, using authored remote marker reads.
+It tests missing/conflicting markers, missing draft/intent, stale/expired claims,
+a natural lease expiry during a delayed marker read, pending deletion,
+provider-limited output, lock retention, transactional visibility/rollback and
+restart-persisted completion. It checks that original READY identity, source and
+vector metadata, initial timings and extraction checkpoints remain available.
+
+See `evaluation/graph-completion-current.json` for source fingerprints and limits.
+These checks do not publish a graph, exercise Neo4j, run an ingestion-worker
+process or prove crash recovery/cancellation drain across stores. The automatic
+worker remains disconnected. The next checkpoint is a tested coordinator that
+commits an intent, reacquires authority, publishes the exact generation, and
+completes or reconciles ambiguous writes under a drained cancellation boundary.

@@ -23,6 +23,7 @@ from app.core.exceptions import GraphStructureError
 from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
 from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationCleanupReceipt, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
+from app.services.graph_result_metadata import graph_result_metadata
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.graph_publication_candidate import (
     GraphPublicationCandidate, prepare_graph_publication, restore_graph_publication,
@@ -663,6 +664,43 @@ class GraphContinuationService:
             source_generation=generation)
         session.add(receipt)
         return receipt
+
+    async def complete_publication(
+        self, session: AsyncSession, claim: GraphJobClaim, ingestion_service: IngestionService,
+    ) -> bool:
+        """Stage exact-marker receipt, graph result and completion atomically.
+
+        Internal only: no dispatch or Neo4j write. Caller owns commit/rollback
+        and must drain its entire publish/complete transaction on cancellation.
+        A receipt alone cannot authorize completion without a current source,
+        draft and claim. A completed claim is no longer active and returns False.
+        """
+        candidate = await self.load_publication_draft(session, claim)
+        if candidate is None:
+            return False
+        graph = await self.restore_publication(session, claim, candidate)
+        if graph is None:
+            return False
+        if graph.provider_limited:
+            raise ValueError("Provider-limited graph work must be deferred, not completed.")
+        if await self.observe_publication_receipt(session, claim, ingestion_service) is None:
+            return False
+        locked = await self._locked_claim(session, claim)
+        if locked is None:
+            return False
+        record, job, _ = locked
+        if not isinstance(record.result_json, dict):
+            raise ValueError("Graph completion requires the original READY result.")
+        result = {**record.result_json, **graph_result_metadata(graph)}
+        result.pop("graph_retry_after_seconds", None)
+        result.pop("graph_retry_not_before", None)
+        record.result_json = result
+        record.graph_node_count = len(graph.nodes)
+        record.graph_edge_count = len(graph.relationships)
+        record.graph_status = result["graph_status"]
+        job.status, job.failure_category = "completed", None
+        job.claim_token = job.lease_owner = job.lease_expires_at = None
+        return True
 
     async def load_input(
         self, session: AsyncSession, claim: GraphJobClaim,

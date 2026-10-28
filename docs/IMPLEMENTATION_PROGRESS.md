@@ -20,7 +20,7 @@ Updated: 2026-10-28 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: durable removal and local four-store crash recovery verified; graph publication remains disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. The real ASGI deletion route now has an 18-check local PostgreSQL/Qdrant/Neo4j/MinIO recovery matrix. Hosted R2, other network ambiguities, graph-job publication/completion and bounded dispatch remain unverified before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: deletion recovery verified; caller-owned graph completion tested; automatic publication disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. Caller-owned PostgreSQL completion now has twelve isolated checks; remote marker reads are doubles, not Neo4j publication. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. The real ASGI deletion route now has an 18-check local PostgreSQL/Qdrant/Neo4j/MinIO recovery matrix. Hosted R2, other network ambiguities, graph-job publication/completion and bounded dispatch remain unverified before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,40 @@ Updated: 2026-10-28 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+28 October graph-completion increment: added an internal, caller-owned transaction
+that validates the saved draft and exact remote marker before staging its receipt,
+source graph result/counters and completed graph-job state together. It rejects
+provider-limited output and missing/stale/expired/deleting source authority, retains
+READY identity, vector/source metadata and checkpoints, and clears the old graph
+retry deadline. No runtime publisher or dispatcher calls it. Initial ingestion and
+completion share the same graph-result formatter; no response fields or status
+rules changed. The first full-suite run caught six ingestion failures from a missed
+local status reference during that extraction; the reference was restored and all
+550 unittest tests then passed. The dedicated PostgreSQL runner passed twelve
+checks, including transactional rollback/visibility and natural lease expiry during
+a delayed mocked marker read; the existing graph-job runner passed 48. Their
+private schemas/clusters were removed. No hosted model, embedding, reranking,
+Neo4j, Qdrant or R2 request or production test-data mutation was made by this test.
+These checks do not establish cross-store publish/complete crash recovery,
+cancellation drain or separate-worker behavior. Automatic continuation remains
+disabled and Phase 3 partial. Nine frontend tests, the TypeScript/Vite build,
+compileall, diff checks and both report source-hash checks passed. Record release
+verification separately.
+
+28 October recovery-isolation release e58d0c5750c25965cf3af91c8e5c8e65852b8dc3:
+scoped code, regressions and docs were pushed to origin/main. GitHub Verify run
+40629390627 completed successfully for this exact SHA. The existing free Render
+API /api/v1/ready returned HTTP 200 at that revision, combined processing role,
+zero queued jobs, graph/ingestion available and no degraded services. The first
+readiness call timed out during startup; the retry succeeded after the public
+sample responded. Frontend /sample and API /api/v1/public/sample returned 200;
+the sample remains GRAPH_READY. These are read-only readiness/preview checks,
+not production deletion, answer-quality or load tests. Local verification:
+548 unittest tests, nine frontend tests, TypeScript/Vite build, compileall and
+diff checks passed. The four-store matrix was not rerun for this wrapper change.
+Automatic graph continuation remains disabled; Phase 3 remains partial.
+This release-verification note is local until the next substantive release.
 
 28 October pending-removal isolation increment: two offline regressions reproduced
 a session-open or row-lock exception escaping the cleanup helper and aborting

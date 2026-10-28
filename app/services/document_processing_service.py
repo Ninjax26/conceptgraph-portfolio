@@ -14,9 +14,10 @@ from app.core.config import Settings, settings
 from app.core.exceptions import GraphStructureError
 from app.core.blocking import run_blocking_safely
 from app.core.database import AsyncSessionLocal
-from app.core.processing import ProcessingStage, assess_graph_status, classify_failure
+from app.core.processing import ProcessingStage, classify_failure
 from app.schemas.extraction import GraphExtractionResponse
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
+from app.services.graph_result_metadata import graph_result_metadata
 from app.services.parser_service import ExtractedPage, ParserService
 from app.services.storage_service import storage_service
 from app.services.upload_service import UploadService
@@ -245,41 +246,12 @@ class DocumentProcessingService:
             if not source_exists:
                 raise FileNotFoundError("The source PDF object was not found.")
 
-            graph_status = assess_graph_status(
-                len(graph.nodes),
-                len(graph.relationships),
-                sections_total=graph.sections_total,
-                sections_succeeded=graph.sections_succeeded,
-                sections_empty=graph.sections_empty,
-                batches_failed=graph.batches_failed,
-                batches_skipped=graph.batches_skipped,
-            ).value
+            graph_metadata = graph_result_metadata(graph)
+            graph_status = graph_metadata["graph_status"]
             result: dict[str, Any] = {
                 "chunks_indexed": vector_count,
                 "chunks_total": len(chunks),
-                "sections_scanned_locally": graph.sections_total,
-                "nodes_upserted": len(graph.nodes),
-                "relationships_upserted": len(graph.relationships),
-                "graph_status": graph_status,
-                "graph_sections_total": graph.sections_total,
-                "graph_sections_succeeded": graph.sections_succeeded,
-                "graph_sections_failed": graph.sections_failed,
-                "graph_sections_processed": graph.sections_processed,
-                "graph_sections_empty": graph.sections_empty,
-                "graph_batches_empty": graph.batches_empty,
-                "graph_batches_total": graph.batches_total,
-                "graph_batches_succeeded": graph.batches_succeeded,
-                "graph_batches_failed": graph.batches_failed,
-                "graph_batches_skipped": graph.batches_skipped,
-                "graph_provider_limited": graph.provider_limited,
-                "graph_extraction_budget_applied": graph.extraction_budget_applied,
-                "graph_global_linking_attempted": graph.global_linking_attempted,
-                "graph_global_linking_succeeded": graph.global_linking_succeeded,
-                "graph_global_linking_processed": graph.global_linking_processed,
-                "graph_relationship_pass_version": 4 if graph.global_linking_attempted else 0,
-                "graph_checkpointed_batches": graph.batches_succeeded,
-                "graph_failed_sections": graph.failed_section_labels,
-                "graph_batch_diagnostics": [entry.model_dump(mode="json") for entry in graph.batch_diagnostics],
+                **graph_metadata,
                 **extraction_summary,
                 "processing_seconds": round(time.perf_counter() - processing_started, 4),
                 "stage_seconds": stage_seconds,

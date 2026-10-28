@@ -805,6 +805,7 @@ async def run(args):
             "tests/test_graph_continuation_snapshot.py", "tests/test_graph_job_checkpoint_reads.py",
             "app/services/graph_job_extraction.py", "tests/test_graph_job_extraction.py",
             "app/core/config.py", "tests/test_graph_snapshot_budget.py",
+            "app/services/graph_result_metadata.py", "app/services/document_processing_service.py",
             "app/services/graph_publication_candidate.py", "tests/test_graph_publication_candidate.py",
             "app/services/ingestion_service.py", "app/services/upload_service.py", "tests/test_graph_publication_draft.py",
             "tests/test_graph_publication_intent.py", "tests/test_graph_publication_receipt.py")},

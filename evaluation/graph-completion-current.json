@@ -1,0 +1,33 @@
+{
+  "generated_at_utc": "2026-10-28T05:10:13.426004+00:00",
+  "postgres_version": "18.4 (Homebrew)",
+  "checks": {
+    "provider_limited_draft_cannot_complete_or_read_remote_marker": true,
+    "missing_marker_cannot_complete_or_change_ready_result": true,
+    "conflicting_marker_cannot_complete_or_change_ready_result": true,
+    "missing_draft_cannot_complete_or_read_remote_marker": true,
+    "missing_intent_cannot_complete_or_read_remote_marker": true,
+    "natural_lease_expiry_during_remote_read_cannot_stage_completion": true,
+    "stale_claim_cannot_read_marker_or_complete": true,
+    "expired_lease_fences_completion": true,
+    "pending_removal_fences_completion": true,
+    "staged_completion_keeps_source_lock_and_rolls_back_receipt_job_and_result": true,
+    "committed_completion_survives_restart_preserves_ready_identity_sources_and_checkpoints": true,
+    "completed_claim_cannot_complete_again": true
+  },
+  "checks_passed": 12,
+  "test_schema_removed": true,
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "source_sha256": {
+    "app/services/graph_continuation_service.py": "514d2aa855269baf4298df4ee343e308193701b3a500560529db86f3f4aa064f",
+    "app/services/graph_result_metadata.py": "6c169517745f11ffbb95a9d0ab07b93f98f12f8c5f32814d9fcf39be2f3be00a",
+    "app/services/document_processing_service.py": "ea6038b0216bf39c002c1a4bcbe55cd4438b7b8af785a6dc5a44a9f96aa98612",
+    "scripts/evaluate_graph_completion.py": "5b94d1ce10c3beed241e7fa848cc163c039c9065513df888542c6994934e5814"
+  },
+  "limitations": [
+    "Remote marker reads are authored doubles; no Neo4j write or cross-store atomicity is proven.",
+    "No API/worker dispatcher, cancellation drain, killed publisher, hosted R2 or provider use is tested.",
+    "Automatic graph-only continuation remains disconnected; this is caller-owned PostgreSQL finalization only."
+  ]
+}
