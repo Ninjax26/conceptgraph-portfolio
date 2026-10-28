@@ -95,6 +95,7 @@ class DemoRetentionService:
             await self.ingestion_service.cleanup_upload(
                 record.upload_id,
                 record.course_uuid or record.course_id,
+                **({"permanent": True} if self.config.graph_projection_fencing_enabled else {}),
             )
             shared_object = await self.upload_service.storage_key_is_shared(
                 session,

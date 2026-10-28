@@ -32,9 +32,11 @@
 - [x] Rerun the existing projection matrix because the marked fence implementation changed. Keep old retry/final-attempt evidence historical; its ordinary writer remains legacy and unsafe.
 - [x] Record actual commands/check counts/source hashes in `evaluation/graph-baseline-projection-current.*` and the implementation ledger.
 - [x] Run frontend tests/build, compile/diff/hash checks and one scoped code review.
-- [ ] Commit/push only verified code to origin, verify exact CI/API revision and prepared preview on existing free services.
+- [x] Commit/push only verified code to origin, verify exact CI/API revision and prepared preview on existing free services.
 - [x] Keep automatic continuation disabled. Next checkpoint is actual processor integration, including ordinary and compensating cleanup, before any dispatch activation.
 
 ## Verified checkpoint
 
 Fourteen new Neo4j ordering checks and nineteen legacy projection regressions passed. The separate unfenced replay remains unsafe (four concepts to zero). Seven new unit tests and the full 564-test backend suite pass; nine frontend tests/build pass. One fresh-context scoped review found no blockers. Source authority/actual processor integration remains deferred; this plan does not authorize activation.
+
+Release verified: `0df391ca32aba1ed3c7bcb67176bc10d9fa5b860`; CI run `40667339288` passed, API readiness reports that exact revision and the prepared frontend/API preview returned 200. Actual processor/compensating-cleanup qualification and activation remain outside this completed primitive plan.

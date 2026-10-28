@@ -664,8 +664,8 @@ class IngestionService:
         """Replace one upload projection atomically; caller owns its PG fence.
 
         A source generation fences a baseline ingestion/retry projection; a
-        marker fences continuation. The live processor still uses its legacy
-        writer. The original task token keeps vectors and concepts in scope.
+        marker fences continuation. The live processor uses its legacy writer
+        by default. The original task token keeps vectors and concepts in scope.
         """
         from app.core.blocking import run_async_safely
 
@@ -859,9 +859,10 @@ class IngestionService:
     async def tombstone_graph_publication(self, upload_id: str, course_id: str) -> None:
         """Fence a proven-deleted upload, then remove its projection atomically.
 
-        Internal reconciliation primitive only. The caller must prove durable
-        PostgreSQL deletion; this method has no API, worker or scheduler caller.
-        The tombstone survives marker cleanup and rejects late marked writes.
+        The caller must prove committed source absence or a durable irrevocable
+        removal request. Opt-in API/retention deletion uses the latter; intent
+        reconciliation uses the former. The tombstone survives marker cleanup
+        and rejects late generation-fenced writes.
         """
         from app.core.blocking import run_async_safely
 
@@ -998,21 +999,27 @@ class IngestionService:
             "relationships_upserted": len(graph_extraction.relationships),
         }
 
-    async def cleanup_upload(self, upload_id: str, course_id: str) -> None:
+    async def cleanup_upload(self, upload_id: str, course_id: str, *, permanent: bool = False) -> None:
         from app.core.blocking import run_blocking_safely
         await run_blocking_safely(self.cleanup_vectors, upload_id)
-        await self.cleanup_graph(upload_id, course_id)
+        if permanent:
+            await self.tombstone_graph_publication(upload_id, course_id)
+        else:
+            await self.cleanup_graph(upload_id, course_id)
 
-    def cleanup_vectors(self, upload_id: str) -> None:
+    def cleanup_vectors(self, upload_id: str, *, execution_token: str | None = None) -> None:
         """Remove only vector points for an upload."""
 
+        conditions = [FieldCondition(key="upload_id", match=MatchValue(value=upload_id))]
+        if execution_token is not None:
+            if not isinstance(execution_token, str) or not execution_token.strip():
+                raise ValueError("Attempt vector cleanup requires a nonempty task token.")
+            conditions.append(FieldCondition(key="execution_token", match=MatchValue(value=execution_token)))
         if self._collection_exists_for_cleanup():
             self.vector_client.delete(
                 collection_name=self.collection_name,
                 points_selector=FilterSelector(
-                    filter=Filter(
-                        must=[FieldCondition(key="upload_id", match=MatchValue(value=upload_id))]
-                    )
+                    filter=Filter(must=conditions)
                 ),
                 wait=True,
             )

@@ -54,6 +54,7 @@ def config(context):
         S3_BUCKET=context["bucket"], S3_ACCESS_KEY_ID="local-test-only",
         S3_SECRET_ACCESS_KEY="local-test-only-password", S3_REGION="us-east-1",
         S3_FORCE_PATH_STYLE=True, S3_AUTO_CREATE_BUCKET=True, S3_SERVER_SIDE_ENCRYPTION=None,
+        GRAPH_PROJECTION_FENCING_ENABLED=context.get("projection_fencing", False),
         PUBLIC_SAMPLE_COURSE_ID="", LEGACY_UPLOAD_DIR="/private/tmp/cg-no-legacy-deletion-fixtures")
 
 
@@ -82,6 +83,10 @@ class InjectedIngestion(IngestionService):
 
     async def cleanup_graph(self, upload_id, course_id):
         await super().cleanup_graph(upload_id, course_id)
+        self.hit("graph")
+
+    async def tombstone_graph_publication(self, upload_id, course_id):
+        await super().tombstone_graph_publication(upload_id, course_id)
         self.hit("graph")
 
 
@@ -117,6 +122,7 @@ async def request(sessions, storage, service, upload_id, *, authenticated=True, 
     with ExitStack() as stack:
         stack.enter_context(patch.object(ingest, "upload_service", InjectedUploads(service)))
         stack.enter_context(patch.object(ingest, "storage_service", storage))
+        stack.enter_context(patch.object(ingest, "settings", storage.config))
         stack.enter_context(patch.object(ingest, "document_processing_service", SimpleNamespace(ingestion_service=service)))
         stack.enter_context(patch.object(security, "demo_access_service", DemoAccessService(storage.config)))
         stack.enter_context(patch.object(security, "rate_limit_service", RateLimitService()))
@@ -171,7 +177,8 @@ async def run(args):
     network, containers, images = None, [], {}
     schema_created, checks, observations = False, {}, {}
     context = {"socket_dir":str(args.socket_dir), "port":args.port, "schema":schema,
-               "collection":"deletion_"+token, "bucket":"deletion-"+token}
+               "collection":"deletion_"+token, "bucket":"deletion-"+token,
+               "projection_fencing": args.projection_fencing}
     try:
         network = docker("network", "create", "--label", "conceptgraph.disposable-deletion="+token, name)
         specs = (
@@ -216,6 +223,13 @@ async def run(args):
         with patch.object(database,"postgres_engine",engine):
             await database.initialize_database_schema()
         service = InjectedIngestion(driver,vector,context)
+        processor_checks = {}
+        if args.projection_fencing:
+            from scripts.processor_fencing_checks import verify_processor
+            async def remove_processor_fixture(upload_id):
+                return await request(sessions, storage, service, upload_id)
+            processor_checks = await verify_processor(sessions, driver, vector, storage,
+                context["collection"], remove_processor_fixture)
 
         async def seed(*,course=None,key=None):
             if course is None:
@@ -310,11 +324,16 @@ async def run(args):
                     # discovered from retained intent even though source rows are gone.
                     async with sessions() as session:
                         intent = await session.get(GraphPublicationIntent,target.intent_id)
-                    await service.replace_graph_extraction(graph(target.upload_id),target.course.id,
-                        upload_id=target.upload_id,document_name="fixture.pdf",course_name=target.course.display_name,
-                        execution_token=intent.document_task_id,marker=GraphProjectionMarker(intent.id,intent.job_id,
-                        intent.upload_id,intent.course_id,intent.document_task_id,intent.payload_sha256,intent.source_generation))
-                    assert (await state(target))["concepts"] == 2
+                    try:
+                        await service.replace_graph_extraction(graph(target.upload_id),target.course.id,
+                            upload_id=target.upload_id,document_name="fixture.pdf",course_name=target.course.display_name,
+                            execution_token=intent.document_task_id,marker=GraphProjectionMarker(intent.id,intent.job_id,
+                            intent.upload_id,intent.course_id,intent.document_task_id,intent.payload_sha256,intent.source_generation))
+                    except ValueError:
+                        assert args.projection_fencing
+                    else:
+                        assert not args.projection_fencing
+                        assert (await state(target))["concepts"] == 2
                     await subprocess_run(manifest,recover=True)
                     assert await state(target) == absent
                     try:
@@ -326,7 +345,9 @@ async def run(args):
                         pass
                     else:
                         raise AssertionError("Late marked write bypassed committed deletion tombstone")
-                    checks["committed_deletion_discovers_late_graph_write_and_blocks_replay"] = True
+                    check_name = ("committed_deletion_blocks_late_graph_replay_before_reconciliation"
+                        if args.projection_fencing else "committed_deletion_discovers_late_graph_write_and_blocks_replay")
+                    checks[check_name] = True
                 else:
                     assert interrupted["metadata"] and interrupted["pending"] and not interrupted["eligible"], (
                         "Interrupted deletion still exposes a READY upload with incomplete evidence")
@@ -444,15 +465,21 @@ async def run(args):
         if cleanup_errors:
             raise RuntimeError("Disposable resource cleanup failed: " + ", ".join(cleanup_errors))
     report = {
-        "generated_at_utc":datetime.now(timezone.utc).isoformat(), "passed":all(checks.values()),
+        "generated_at_utc":datetime.now(timezone.utc).isoformat(),
+        "passed":all(checks.values()) and all(processor_checks.values()),
         "checks":checks, "crash_observations":observations, "elapsed_seconds":round(time.perf_counter()-started,3),
+        "projection_fencing_enabled_in_fixture": args.projection_fencing,
+        "processor_checks": processor_checks,
         "hosted_provider_calls":0, "production_test_data_mutations":0,
         "temporary_schema_containers_network_removed":True, "container_images":images,
         "postgres_version":postgres_version, "process_failure_mode":"SIGKILL at instrumented commit boundaries",
         "source_sha256":{path:hashlib.sha256((ROOT/path).read_bytes()).hexdigest() for path in (
             "app/api/endpoints/ingest.py","app/services/upload_service.py","app/services/course_service.py",
             "app/services/demo_retention_service.py","app/services/graph_continuation_service.py",
-            "app/services/ingestion_service.py","app/services/storage_service.py","scripts/evaluate_upload_deletion.py")},
+            "app/services/ingestion_service.py","app/services/storage_service.py","scripts/evaluate_upload_deletion.py",
+            "app/core/config.py","app/services/document_processing_service.py",
+            "app/services/parser_service.py","app/core/blocking.py",
+            "scripts/processor_fencing_checks.py","tests/test_processor_graph_fencing.py")},
         "limits":[
             "ASGI HTTP requests exercise the real authenticated DELETE route; this is not an external network/Render test.",
             "PostgreSQL, Qdrant and Neo4j are real disposable stores; synthetic 3-dimensional vectors are inserted without embeddings.",
@@ -461,19 +488,26 @@ async def run(args):
             "Recovery runs in a fresh process through production sweep methods, not the timer or a deployed worker.",
             "Automatic graph-only continuation remains disabled; this is not graph-job completion or an ingestion load benchmark.",
             "Existing in-flight queries that already loaded READY context are not cancelled by a subsequent deletion request.",
+            "The opt-in processor checks use a native synthetic PDF, authored graph outputs and a fixed 3-dimensional encoder; no AI/OCR semantic quality is measured.",
+            "Ingestion cancellation is graceful and drained, not a worker hard kill; delayed Qdrant writes after process death and legacy pre-rollout writers remain unqualified.",
+            "Projection fencing is enabled only in the private fixture configuration; no production environment or automatic continuation is activated.",
         ]}
-    output = ROOT/"evaluation/upload-deletion-current"
+    output = ROOT/("evaluation/processor-fencing-current" if args.projection_fencing else "evaluation/upload-deletion-current")
     output.with_suffix(".json").write_text(json.dumps(report,indent=2)+"\n")
     output.with_suffix(".md").write_text(
-        "# Isolated document deletion recovery\n\n"
+        ("# Opt-in processor and deletion fencing — isolated stores\n\n" if args.projection_fencing
+         else "# Isolated document deletion recovery\n\n") +
         f"Generated: {report['generated_at_utc']}.\n\n"
-        "Command: .venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket>.\n\n"
+        "Command: `.venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket>"
+        + (" --projection-fencing" if args.projection_fencing else "") + "`.\n\n"
         f"{len(checks)}/{len(checks)} checks passed. Zero hosted provider calls or production mutations. "
         "Temporary resources were removed.\n\n"
         +"\n".join(f"- {name}: pass" for name in checks)
+        +f"\n\nProcessor checks: {len(processor_checks)} passed.\n\n"
+        +"\n".join(f"- {name}: pass" for name in processor_checks)
         +"\n\n## Limits\n\n"+"\n".join(f"- {limit}" for limit in report["limits"])
         +"\n\nThe adjacent JSON records exact crash observations, image IDs and source hashes.\n")
-    print(json.dumps({"checks_passed":len(checks),"hosted_provider_calls":0,"temporary_resources_removed":True}))
+    print(json.dumps({"checks_passed":len(checks),"processor_checks":len(processor_checks),"hosted_provider_calls":0,"temporary_resources_removed":True}))
 
 
 if __name__ == "__main__":
@@ -485,5 +519,6 @@ if __name__ == "__main__":
     parser.add_argument("--context",type=Path)
     parser.add_argument("--upload-id")
     parser.add_argument("--boundary")
+    parser.add_argument("--projection-fencing", action="store_true")
     args = parser.parse_args()
     asyncio.run(child(args) if args.child or args.recover_child else run(args))

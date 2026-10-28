@@ -359,6 +359,7 @@ async def remove_upload(
         await document_processing_service.ingestion_service.cleanup_upload(
             record.upload_id,
             course_scope,
+            **({"permanent": True} if settings.graph_projection_fencing_enabled else {}),
         )
     except Exception as exc:
         await db.rollback()

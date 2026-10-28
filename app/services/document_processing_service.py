@@ -12,9 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, settings
 from app.core.exceptions import GraphStructureError
-from app.core.blocking import run_blocking_safely
+from app.core.blocking import run_async_safely, run_blocking_safely
 from app.core.database import AsyncSessionLocal
 from app.core.processing import ProcessingStage, classify_failure
+from app.models.document_upload import DocumentUpload
 from app.schemas.extraction import GraphExtractionResponse
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
 from app.services.graph_result_metadata import graph_result_metadata
@@ -96,7 +97,11 @@ class DocumentProcessingService:
 
             cleanup_vectors = getattr(self.ingestion_service, "cleanup_vectors", None)
             if cleanup_vectors is not None:
-                await run_blocking_safely(cleanup_vectors, upload_id)
+                if self.config.graph_projection_fencing_enabled:
+                    await self._with_current_attempt(upload_id, task_id, lease_owner,
+                        lambda session, current: run_blocking_safely(cleanup_vectors, upload_id))
+                else:
+                    await run_blocking_safely(cleanup_vectors, upload_id)
 
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.EXTRACTING
@@ -155,9 +160,13 @@ class DocumentProcessingService:
                         sum(len(chunk.text) for chunk in chunks), "document_embedding"
                     ),
                 )
-            vector_count = await run_blocking_safely(
-                self.ingestion_service.upsert_chunks_to_qdrant, chunks
-            )
+            if self.config.graph_projection_fencing_enabled:
+                vector_count = await self._with_current_attempt(upload_id, task_id, lease_owner,
+                    lambda session, current: run_blocking_safely(self.ingestion_service.upsert_chunks_to_qdrant, chunks))
+            else:
+                vector_count = await run_blocking_safely(
+                    self.ingestion_service.upsert_chunks_to_qdrant, chunks
+                )
             if vector_count != len(chunks) or vector_count <= 0:
                 raise RuntimeError("Qdrant did not commit every document chunk.")
             stage_seconds["vector_indexing"] = round(time.perf_counter() - stage_started, 4)
@@ -224,17 +233,22 @@ class DocumentProcessingService:
                 on_batch_completed=save_checkpoint,
             )
             await self._ensure_current(superseded, upload_id, task_id)
-            cleanup_graph = getattr(self.ingestion_service, "cleanup_graph", None)
-            if cleanup_graph is not None:
-                await cleanup_graph(upload_id, record.course_uuid)
-            await self.ingestion_service.store_graph_extraction(
-                graph,
-                record.course_uuid,
-                upload_id=upload_id,
-                document_name=record.original_filename,
-                course_name=record.course_id,
-                execution_token=task_id,
-            )
+            if self.config.graph_projection_fencing_enabled:
+                async def replace_current(session, current):
+                    await self.ingestion_service.replace_graph_extraction(graph, current.course_uuid,
+                        upload_id=upload_id, document_name=current.original_filename,
+                        course_name=current.course_id, execution_token=task_id,
+                        source_generation=current.attempt_count)
+                await self._with_current_attempt(upload_id, task_id, lease_owner, replace_current)
+            else:
+                cleanup_graph = getattr(self.ingestion_service, "cleanup_graph", None)
+                if cleanup_graph is not None:
+                    await cleanup_graph(upload_id, record.course_uuid)
+                await self.ingestion_service.store_graph_extraction(
+                    graph, record.course_uuid, upload_id=upload_id,
+                    document_name=record.original_filename, course_name=record.course_id,
+                    execution_token=task_id,
+                )
             await self._set_stage(
                 upload_id, task_id, lease_owner, ProcessingStage.GRAPH_BUILT
             )
@@ -322,6 +336,24 @@ class DocumentProcessingService:
         except Exception as exc:
             category, retryable, message = classify_failure(exc)
             logger.exception("PDF processing failed for upload %s", upload_id)
+            if self.config.graph_projection_fencing_enabled:
+                async def fail_current(session, current):
+                    try:
+                        await self.ingestion_service.cleanup_graph_attempt(upload_id,
+                            current.course_uuid or current.course_id,
+                            execution_token=task_id, source_generation=current.attempt_count)
+                        await run_blocking_safely(self.ingestion_service.cleanup_vectors,
+                            upload_id, execution_token=task_id)
+                    except Exception:
+                        logger.exception("Partial-write cleanup failed for upload %s", upload_id)
+                    await self.upload_service.mark_failed(session, upload_id, task_id,
+                        message, category, retryable, lease_owner=lease_owner)
+                try:
+                    await self._with_current_attempt(upload_id, task_id, lease_owner, fail_current)
+                except ProcessingAttemptSuperseded:
+                    logger.info("Skipped cleanup for superseded attempt %s", task_id)
+                return {"upload_id": upload_id, "course_id": record.course_uuid,
+                        "status": "failed", "error": message}
             current = await self._run_with_session(
                 lambda session: self.upload_service.heartbeat(
                     session,
@@ -363,6 +395,24 @@ class DocumentProcessingService:
             heartbeat_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat_task
+
+    async def _with_current_attempt(
+        self, upload_id: str, task_id: str, lease_owner: str,
+        operation: Callable[[AsyncSession, DocumentUpload], Awaitable[T]],
+    ) -> T:
+        """Retain a fresh source/task/owner row lock through a drained I/O unit.
+
+        Existing upload helpers own any stage/failure commit. Read-only units
+        roll back when the session closes; no lease or task is fabricated here.
+        """
+        async def guarded():
+            async with AsyncSessionLocal() as session:
+                current = await self.upload_service._get_current_upload(
+                    session, upload_id, task_id, lease_owner=lease_owner)
+                if current is None or current.status != "active" or UploadService.is_deleting(current):
+                    raise ProcessingAttemptSuperseded(f"Processing attempt {task_id} is no longer current for {upload_id}.")
+                return await operation(session, current)
+        return await run_async_safely(guarded())
 
     async def _set_stage(
         self,
