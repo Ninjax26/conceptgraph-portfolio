@@ -347,7 +347,12 @@ async def remove_upload(
             detail="Only ready or failed document records can be removed.",
         )
 
-    record = await upload_service.lock_for_deletion(db, upload_id)
+    cleanup_options = {}
+    if settings.graph_projection_fencing_enabled:
+        from app.services.vector_cleanup_service import VectorCleanupScope
+        cleanup_options["vector_cleanup_scope"] = VectorCleanupScope.from_url(
+            settings.qdrant_url, document_processing_service.ingestion_service.collection_name)
+    record = await upload_service.lock_for_deletion(db, upload_id, **cleanup_options)
     if record is None:
         raise HTTPException(
             status_code=409,

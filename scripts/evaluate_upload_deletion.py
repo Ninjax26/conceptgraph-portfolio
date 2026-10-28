@@ -54,6 +54,7 @@ def config(context):
         S3_BUCKET=context["bucket"], S3_ACCESS_KEY_ID="local-test-only",
         S3_SECRET_ACCESS_KEY="local-test-only-password", S3_REGION="us-east-1",
         S3_FORCE_PATH_STYLE=True, S3_AUTO_CREATE_BUCKET=True, S3_SERVER_SIDE_ENCRYPTION=None,
+        QDRANT_URL=local_url(context["qdrant"], "http"), QDRANT_COLLECTION_NAME=context["collection"],
         GRAPH_PROJECTION_FENCING_ENABLED=context.get("projection_fencing", False),
         PUBLIC_SAMPLE_COURSE_ID="", LEGACY_UPLOAD_DIR="/private/tmp/cg-no-legacy-deletion-fixtures")
 
@@ -77,8 +78,8 @@ class InjectedIngestion(IngestionService):
                 os.kill(os.getpid(), signal.SIGKILL)
             raise RuntimeError("isolated deletion interruption: " + boundary)
 
-    def cleanup_vectors(self, upload_id):
-        super().cleanup_vectors(upload_id)
+    def cleanup_vectors(self, upload_id, *, execution_token=None):
+        super().cleanup_vectors(upload_id, execution_token=execution_token)
         self.hit("vectors")
 
     async def cleanup_graph(self, upload_id, course_id):
@@ -94,11 +95,11 @@ class InjectedUploads(UploadService):
     def __init__(self, injector):
         self.injector = injector
 
-    async def lock_for_deletion(self, session, upload_id):
+    async def lock_for_deletion(self, session, upload_id, **kwargs):
         if self.injector.boundary == "before_intent_commit":
             event.listen(session.sync_session, "before_commit",
                          lambda session: self.injector.hit("before_intent_commit"), once=True)
-        result = await super().lock_for_deletion(session, upload_id)
+        result = await super().lock_for_deletion(session, upload_id, **kwargs)
         self.injector.hit("intent")
         return result
 
@@ -159,7 +160,8 @@ async def child(args):
             with patch("app.services.demo_retention_service.AsyncSessionLocal", sessions):
                 removed = await retention.resume_pending_deletions_once()
                 receipts = await retention.cleanup_deleted_graph_publications_once()
-            print(json.dumps({"removed":removed, "receipts":receipts}), flush=True)
+                vectors_checked = await retention.cleanup_deleted_vectors_once()
+            print(json.dumps({"removed":removed, "receipts":receipts, "vectors_checked":vectors_checked}), flush=True)
         else:
             response = await request(sessions, storage, service, args.upload_id)
             raise AssertionError(f"Hard-kill boundary not reached: {response.status_code}")
@@ -176,6 +178,9 @@ async def run(args):
     driver = vector = None
     network, containers, images = None, [], {}
     schema_created, checks, observations = False, {}, {}
+    worker_result = {"checks": {}, "observations": {}, "activation_safe": True}
+    vector_cleanup_checks = {}
+    lifecycle_result = {"checks": {}, "observations": {}}
     context = {"socket_dir":str(args.socket_dir), "port":args.port, "schema":schema,
                "collection":"deletion_"+token, "bucket":"deletion-"+token,
                "projection_fencing": args.projection_fencing}
@@ -225,11 +230,22 @@ async def run(args):
         service = InjectedIngestion(driver,vector,context)
         processor_checks = {}
         if args.projection_fencing:
+            if args.worker_crashes:
+                from scripts.vector_cleanup_checks import verify_vector_cleanup
+                vector_cleanup_checks = await verify_vector_cleanup(
+                    engine, sessions, driver, vector, storage, context["collection"])
             from scripts.processor_fencing_checks import verify_processor
             async def remove_processor_fixture(upload_id):
                 return await request(sessions, storage, service, upload_id)
             processor_checks = await verify_processor(sessions, driver, vector, storage,
                 context["collection"], remove_processor_fixture)
+            if args.worker_crashes:
+                from scripts.processor_crash_checks import verify_worker_crashes
+                worker_result = await verify_worker_crashes(context, sessions, driver, vector, storage,
+                    remove_processor_fixture)
+                if args.full_lifecycle:
+                    from scripts.worker_lifecycle_checks import verify_lifecycle
+                    lifecycle_result = await verify_lifecycle(context, sessions, driver, vector, storage)
 
         async def seed(*,course=None,key=None):
             if course is None:
@@ -466,13 +482,21 @@ async def run(args):
             raise RuntimeError("Disposable resource cleanup failed: " + ", ".join(cleanup_errors))
     report = {
         "generated_at_utc":datetime.now(timezone.utc).isoformat(),
-        "passed":all(checks.values()) and all(processor_checks.values()),
+        "passed":all(checks.values()) and all(processor_checks.values())
+            and all(vector_cleanup_checks.values()) and all(worker_result["checks"].values())
+            and worker_result["activation_safe"] and all(lifecycle_result["checks"].values()),
         "checks":checks, "crash_observations":observations, "elapsed_seconds":round(time.perf_counter()-started,3),
         "projection_fencing_enabled_in_fixture": args.projection_fencing,
         "processor_checks": processor_checks,
+        "vector_cleanup_checks": vector_cleanup_checks,
+        "full_lifecycle": lifecycle_result if args.full_lifecycle else None,
+        "worker_crash_qualification": worker_result if args.worker_crashes else None,
         "hosted_provider_calls":0, "production_test_data_mutations":0,
         "temporary_schema_containers_network_removed":True, "container_images":images,
-        "postgres_version":postgres_version, "process_failure_mode":"SIGKILL at instrumented commit boundaries",
+        "postgres_version":postgres_version, "process_failure_mode":(
+            "SIGKILL at seven deletion boundaries and during three accepted worker PUTs (two coordinator-only, one full worker)"
+            if args.full_lifecycle else "SIGKILL at seven deletion boundaries and during two accepted worker PUTs"
+            if args.worker_crashes else "SIGKILL at instrumented commit boundaries"),
         "source_sha256":{path:hashlib.sha256((ROOT/path).read_bytes()).hexdigest() for path in (
             "app/api/endpoints/ingest.py","app/services/upload_service.py","app/services/course_service.py",
             "app/services/demo_retention_service.py","app/services/graph_continuation_service.py",
@@ -480,36 +504,68 @@ async def run(args):
             "app/core/config.py","app/services/document_processing_service.py",
             "app/services/parser_service.py","app/core/blocking.py",
             "scripts/processor_fencing_checks.py","tests/test_processor_graph_fencing.py",
+            "scripts/processor_crash_checks.py","scripts/deferred_vector_proxy.py",
+            "tests/test_deferred_vector_proxy.py","app/core/processing_coordinator.py",
+            "app/models/document_upload.py","app/services/resource_budget_service.py",
+            "app/services/vector_cleanup_service.py","tests/test_vector_deletion_cleanup.py",
+            "scripts/vector_cleanup_checks.py",
+            "scripts/worker_lifecycle_checks.py","tests/test_worker_lifecycle_fixture.py",
+            "app/worker.py","app/main.py","app/services/worker_presence_service.py",
+            "app/core/security.py","app/services/security_service.py","app/core/database.py",
+            "app/api/endpoints/query.py",
             "app/services/rag_service.py","app/services/citation_service.py",
             "app/services/retrieval_candidates.py","tests/test_vector_attempt_scope.py")},
         "limits":[
-            "ASGI HTTP requests exercise the real authenticated DELETE route; this is not an external network/Render test.",
+            "The deletion matrix uses in-process ASGI requests; full-lifecycle mode additionally uses real loopback HTTP. Neither is a Render test.",
             "PostgreSQL, Qdrant and Neo4j are real disposable stores; synthetic 3-dimensional vectors are inserted without embeddings.",
             "MinIO exercises real local S3 PUT/HEAD/DELETE requests, not hosted Cloudflare R2.",
             "Seven explicit process boundaries use SIGKILL; four additional boundaries raise exceptions. Other packet-loss/outage timings are untested.",
-            "Recovery runs in a fresh process through production sweep methods, not the timer or a deployed worker.",
+            "Deletion-matrix recovery uses fresh processes calling production sweeps. Full-lifecycle mode additionally exercises the real local worker and retention timer; neither qualifies deployed-worker operation.",
             "Automatic graph-only continuation remains disabled; this is not graph-job completion or an ingestion load benchmark.",
             "Existing in-flight queries that already loaded READY context are not cancelled by a subsequent deletion request.",
             "The opt-in processor checks use a native synthetic PDF, authored graph outputs and a fixed 3-dimensional encoder; no AI/OCR semantic quality is measured.",
-            "Ingestion cancellation is graceful and drained, not a worker hard kill; delayed Qdrant writes after process death and legacy pre-rollout writers remain unqualified.",
+            ("Two coordinator-only schedules kill subprocesses after their complete PUT reaches the loopback proxy. Owned lease expiry is advanced and fresh coordinators recover to READY. These schedules do not exercise full entry points; full-lifecycle mode records its additional separate API/worker experiment independently. Arbitrary network faults and load remain untested."
+             if args.worker_crashes else "Ingestion cancellation is graceful and drained, not a worker hard kill; delayed Qdrant writes after process death and legacy pre-rollout writers remain unqualified."),
+            "A failed late-deletion qualification blocks activation; explicitly manual fixture cleanup is not application recovery. Mixed legacy writers remain unqualified.",
             "Projection fencing is enabled only in the private fixture configuration; no production environment or automatic continuation is activated.",
+            ("Full-lifecycle mode runs real local HTTP and worker entry points with an actual 60-second retention timer; embedding/graph/reranking/synthesis are authored adapters, not semantic or provider-capacity measurements. Fixture lease/presence/due timestamps are advanced, but lifecycle and timer methods are not mocked."
+             if args.full_lifecycle else "Full API/worker entry points and automatic retention timer are not exercised by this mode."),
         ]}
-    output = ROOT/("evaluation/processor-fencing-current" if args.projection_fencing else "evaluation/upload-deletion-current")
+    output = ROOT/("evaluation/worker-lifecycle-current" if args.full_lifecycle else
+        "evaluation/vector-deletion-recovery-current" if args.worker_crashes else
+        "evaluation/processor-fencing-current" if args.projection_fencing else "evaluation/upload-deletion-current")
     output.with_suffix(".json").write_text(json.dumps(report,indent=2)+"\n")
     output.with_suffix(".md").write_text(
-        ("# Opt-in processor and deletion fencing — isolated stores\n\n" if args.projection_fencing
+        ("# Separate API, full worker lifecycle and automatic cleanup\n\n" if args.full_lifecycle else
+         "# Durable vector cleanup and killed-worker recovery\n\n" if args.worker_crashes else
+         "# Opt-in processor and deletion fencing — isolated stores\n\n" if args.projection_fencing
          else "# Isolated document deletion recovery\n\n") +
         f"Generated: {report['generated_at_utc']}.\n\n"
         "Command: `.venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket>"
-        + (" --projection-fencing" if args.projection_fencing else "") + "`.\n\n"
-        f"{len(checks)}/{len(checks)} checks passed. Zero hosted provider calls or production mutations. "
+        + (" --projection-fencing" if args.projection_fencing else "")
+        + (" --worker-crashes" if args.worker_crashes else "")
+        + (" --full-lifecycle" if args.full_lifecycle else "") + "`.\n\n"
+        +f"Overall qualification: **{'PASS' if report['passed'] else 'FAIL — keep disabled'}**.\n\n"
+        +f"{len(checks)}/{len(checks)} deletion regression checks passed. Zero hosted provider calls or production mutations. "
         "Temporary resources were removed.\n\n"
         +"\n".join(f"- {name}: pass" for name in checks)
         +f"\n\nProcessor checks: {len(processor_checks)} passed.\n\n"
         +"\n".join(f"- {name}: pass" for name in processor_checks)
+        +("\n\n## Durable cleanup checks\n\n"+"\n".join(f"- {name}: pass" for name in vector_cleanup_checks)
+          if vector_cleanup_checks else "")
+        +("\n\n## Worker crash observations\n\n"+"\n".join(f"- {name}: pass" for name in worker_result["checks"])
+          +"\n\n```json\n"+json.dumps(worker_result["observations"], indent=2)+"\n```\n" if args.worker_crashes else "")
+        +("\n\n## Full entry points and timer\n\n"+"\n".join(f"- {name}: pass" for name in lifecycle_result["checks"])
+          +"\n\n```json\n"+json.dumps(lifecycle_result["observations"], indent=2)+"\n```\n" if args.full_lifecycle else "")
         +"\n\n## Limits\n\n"+"\n".join(f"- {limit}" for limit in report["limits"])
         +"\n\nThe adjacent JSON records exact crash observations, image IDs and source hashes.\n")
-    print(json.dumps({"checks_passed":len(checks),"processor_checks":len(processor_checks),"hosted_provider_calls":0,"temporary_resources_removed":True}))
+    print(json.dumps({"checks_passed":len(checks),"processor_checks":len(processor_checks),
+        "worker_checks": len(worker_result["checks"]), "qualification_passed": report["passed"],
+        "vector_cleanup_checks": len(vector_cleanup_checks),
+        "lifecycle_checks": len(lifecycle_result["checks"]),
+        "hosted_provider_calls":0,"temporary_resources_removed":True}))
+    if not report["passed"]:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
@@ -522,5 +578,11 @@ if __name__ == "__main__":
     parser.add_argument("--upload-id")
     parser.add_argument("--boundary")
     parser.add_argument("--projection-fencing", action="store_true")
+    parser.add_argument("--worker-crashes", action="store_true")
+    parser.add_argument("--full-lifecycle", action="store_true")
     args = parser.parse_args()
+    if args.worker_crashes and not args.projection_fencing:
+        parser.error("--worker-crashes requires --projection-fencing; production defaults must stay unchanged")
+    if args.full_lifecycle and not args.worker_crashes:
+        parser.error("--full-lifecycle requires the scoped crash/deletion qualification")
     asyncio.run(child(args) if args.child or args.recover_child else run(args))

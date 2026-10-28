@@ -25,12 +25,19 @@ class ResourceUsage:
 
 
 class ResourceBudgetService:
+    ADMISSION_LOCK_KEY = "conceptgraph:pdf-admission"
+
     def __init__(self, config: Settings = settings):
         self.config = config
 
     async def lock(self, session):
         await session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
-                              {"key": "conceptgraph:pdf-admission"})
+                              {"key": self.ADMISSION_LOCK_KEY})
+
+    async def try_lock(self, session):
+        result = await session.execute(text("SELECT pg_try_advisory_xact_lock(hashtext(:key))"),
+                                       {"key": self.ADMISSION_LOCK_KEY})
+        return bool(result.scalar_one())
 
     def chunk_reservation(self, pages):
         return min(self.config.max_chunks_per_document, pages * self.config.chunk_reservation_per_page)

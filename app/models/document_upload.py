@@ -217,6 +217,27 @@ class GraphPublicationCleanupReceipt(Base):
     cleaned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class VectorDeletionTombstone(Base):
+    """Retained cleanup authority; an empty sweep cannot prove all writes ended."""
+
+    __tablename__ = "vector_deletion_tombstones"
+    __table_args__ = (
+        CheckConstraint("length(store_sha256) = 64", name="ck_vector_deletion_store"),
+        CheckConstraint("length(trim(upload_id)) > 0 AND length(trim(task_id)) > 0", name="ck_vector_deletion_identity"),
+        Index("ix_vector_deletion_due", "store_sha256", "next_attempt_at", "upload_id", "task_id"),
+    )
+    # Deliberately no source FK: both the upload and attempts may be gone while
+    # an accepted remote request is still able to commit.
+    upload_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    task_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    store_sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    collection_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ProviderBudget(Base):
     __tablename__ = "provider_budgets"
 

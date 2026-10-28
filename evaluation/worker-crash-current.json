@@ -1,0 +1,207 @@
+{
+  "generated_at_utc": "2026-10-28T16:18:39.213383+00:00",
+  "passed": false,
+  "checks": {
+    "unauthenticated_delete_preserves_all_stores": true,
+    "authenticated_delete_removes_target_and_preserves_neighbor": true,
+    "uncommitted_deletion_preserves_ready_document_and_all_artifacts": true,
+    "hard_kill_intent_resumes_in_new_process_without_ready_leak": true,
+    "concurrent_recovery_processes_finish_one_removal": true,
+    "hard_kill_vectors_resumes_in_new_process_without_ready_leak": true,
+    "hard_kill_graph_resumes_in_new_process_without_ready_leak": true,
+    "hard_kill_storage_resumes_in_new_process_without_ready_leak": true,
+    "hard_kill_before_metadata_commit_resumes_in_new_process_without_ready_leak": true,
+    "committed_deletion_blocks_late_graph_replay_before_reconciliation": true,
+    "failure_vectors_preserves_durable_retry": true,
+    "failure_graph_preserves_durable_retry": true,
+    "failure_storage_preserves_durable_retry": true,
+    "failure_before_metadata_commit_preserves_durable_retry": true,
+    "shared_source_survives_until_last_reference_is_deleted": true,
+    "concurrent_shared_source_deletion_leaves_no_orphan": true,
+    "removed_checkpoints_and_markers_leave_only_protected_upload": true,
+    "unrelated_ready_upload_survives_all_crash_and_failure_scenarios": true
+  },
+  "crash_observations": {
+    "kill_before_intent_commit": {
+      "metadata": true,
+      "eligible": true,
+      "pending": false,
+      "vectors": 1,
+      "concepts": 2,
+      "source": true
+    },
+    "kill_intent": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 1,
+      "concepts": 2,
+      "source": true
+    },
+    "kill_vectors": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 2,
+      "source": true
+    },
+    "kill_graph": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 0,
+      "source": true
+    },
+    "kill_storage": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 0,
+      "source": false
+    },
+    "kill_before_metadata_commit": {
+      "metadata": true,
+      "eligible": false,
+      "pending": true,
+      "vectors": 0,
+      "concepts": 0,
+      "source": false
+    },
+    "kill_metadata": {
+      "metadata": false,
+      "eligible": false,
+      "pending": false,
+      "vectors": 0,
+      "concepts": 0,
+      "source": false
+    }
+  },
+  "elapsed_seconds": 62.327,
+  "projection_fencing_enabled_in_fixture": true,
+  "processor_checks": {
+    "native_pdf_full_processor_reaches_ready_with_real_stores_and_authored_ai": true,
+    "delayed_old_vector_replay_cannot_overwrite_current_processor_execution": true,
+    "real_ready_task_scope_filters_dense_and_identifier_candidates_before_limit": true,
+    "legacy_uuid_with_current_execution_payload_retains_pdf_citation_identity": true,
+    "real_manual_retry_advances_graph_generation_and_rejects_older_marked_replay": true,
+    "stale_processor_source_cannot_enter_graph_or_vector_cleanup": true,
+    "failed_processor_closes_attempt_and_removes_only_its_vector_payloads": true,
+    "authenticated_delete_tombstones_baseline_without_publication_intent": true,
+    "repeated_cancellation_drains_graph_and_source_lock_then_real_recovery_uses_new_attempt": true,
+    "processor_fixtures_remove_all_vector_and_source_artifacts_through_real_delete_route": true
+  },
+  "worker_crash_qualification": {
+    "checks": {
+      "sigkill_after_restart_releases_source_lock_after_accepted_put": true,
+      "fresh_coordinator_after_restart_recovers_second_attempt_to_ready": true,
+      "fresh_coordinator_recovers_new_attempt_and_excludes_post_sigkill_old_put": true,
+      "deletion_after_delayed_put_removes_both_attempts": true,
+      "sigkill_after_completed_delete_releases_source_lock_after_accepted_put": true,
+      "fresh_coordinator_after_completed_delete_recovers_second_attempt_to_ready": true,
+      "deleted_source_stays_ineligible_after_post_sigkill_late_put": true
+    },
+    "observations": {
+      "after_restart": {
+        "worker_exit_code": -9,
+        "captured_points": 1,
+        "delivery": {
+          "point_count": 1,
+          "body_sha256": "ec4637ebd29ab21db1105edf919450523ad46b15259d74653ab56bfbadfefb00",
+          "http_status": 200,
+          "completed": true
+        },
+        "attempt_count": 2,
+        "current_vectors_preserved": 1,
+        "old_vectors_excluded_from_ready_search": true
+      },
+      "after_completed_delete": {
+        "worker_exit_code": -9,
+        "attempt_count": 2,
+        "before_delivery": {
+          "metadata": false,
+          "eligible": false,
+          "vectors": 0,
+          "concepts": 0,
+          "source": false
+        },
+        "delivery": {
+          "point_count": 1,
+          "body_sha256": "15534bd3711bcb00cede098b065c88dbad0646ea57ef1fe8be4b265328a8b6dc",
+          "http_status": 200,
+          "completed": true
+        },
+        "after_delivery": {
+          "metadata": false,
+          "eligible": false,
+          "vectors": 1,
+          "concepts": 0,
+          "source": false
+        },
+        "fresh_runtime_sweep": {
+          "removed": 0,
+          "receipts": 0
+        },
+        "after_runtime_sweep": {
+          "metadata": false,
+          "eligible": false,
+          "vectors": 1,
+          "concepts": 0,
+          "source": false
+        },
+        "activation_safe": false,
+        "manual_fixture_vector_cleanup_confirmed": true
+      }
+    },
+    "activation_safe": false
+  },
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "temporary_schema_containers_network_removed": true,
+  "container_images": {
+    "neo4j": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
+    "qdrant": "sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c",
+    "s3": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+  },
+  "postgres_version": "18.4 (Homebrew)",
+  "process_failure_mode": "SIGKILL at seven deletion boundaries and during two accepted worker PUTs",
+  "source_sha256": {
+    "app/api/endpoints/ingest.py": "07fad8fa5d6a210c101d871e6ad840311fd4193b35c2c614bf7de87b45512b31",
+    "app/services/upload_service.py": "fc7b50657c346cec890706600d16f6fd7811b2fc4026e5eb63c0f67475a20af5",
+    "app/services/course_service.py": "1801419984e9c0a757f774ad3c46be9d180a0dc862d9b577d61ee6c7a4b01dcf",
+    "app/services/demo_retention_service.py": "4549bab77433d34603f80ae26c700ac481949e63dd6b6ea2128cc3fcb8ab2c5d",
+    "app/services/graph_continuation_service.py": "eec3302df59e4bffe46a4b8aadba95974f4473c7016b6071069ba8e8de7f2a32",
+    "app/services/ingestion_service.py": "331907c0f2453d18a29d763dfe95b6cb7268b394c2f17b35008a9f8cd9a4819c",
+    "app/services/storage_service.py": "f90c423eccd36e76d672f24c59aeff80c95634423fd0e4f5801582dc2fb9a29a",
+    "scripts/evaluate_upload_deletion.py": "e008ae9d75968c72c36099d8f7393d1f97d476c711ce53b82992e9b87e046dbd",
+    "app/core/config.py": "8e442fd1ff8f8fa38a4e2837a599b3e84764e4c9a117d28e2a0490afbb7da012",
+    "app/services/document_processing_service.py": "682f45420f3d61c64b4f49e78343e82bdba54167762b43abf7cdc07f5f6e89a5",
+    "app/services/parser_service.py": "a8fed91a103c2e7ad1ec710c07cdc0187c9ca5621f830b802e3ab53dbba11a19",
+    "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
+    "scripts/processor_fencing_checks.py": "91cc29df775c92ccf4c1576ace7adc643e941a3a3683e7bb999cf10bff7e74d7",
+    "tests/test_processor_graph_fencing.py": "1a789fc7cc85fc4e2ecc3646bd36d82b1720a8afedb348cc9be0363d5757b512",
+    "scripts/processor_crash_checks.py": "ff1937f10d189ae7a6ce5bc6f4848800856725c59835fb30de2def5ad1ed667a",
+    "scripts/deferred_vector_proxy.py": "9999c6e605a8a2c53d0aae4f6e1da4b4f6aaf620ce923c618fced3cd5caae7f4",
+    "tests/test_deferred_vector_proxy.py": "a0b268a52a1649c9482aadb3ba771f012c78991218c920fb06a55989fd859d11",
+    "app/core/processing_coordinator.py": "66ab584a51030354d306e6c2fd06414acc1ee9d4a8659025ca51e0993e8dde7a",
+    "app/services/rag_service.py": "b4b766d739d00a5c66836d8c7ebb924488537b3a9b17f47d28ee20316f7adf71",
+    "app/services/citation_service.py": "d83956fb1d60e973980028953873202a799fe6cd858f6953562a668bb77c4f90",
+    "app/services/retrieval_candidates.py": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+    "tests/test_vector_attempt_scope.py": "92d65fffa30ad1a92d0876abbb4722916734f137656a643fc4d7bfd90b9c1ba1"
+  },
+  "limits": [
+    "ASGI HTTP requests exercise the real authenticated DELETE route; this is not an external network/Render test.",
+    "PostgreSQL, Qdrant and Neo4j are real disposable stores; synthetic 3-dimensional vectors are inserted without embeddings.",
+    "MinIO exercises real local S3 PUT/HEAD/DELETE requests, not hosted Cloudflare R2.",
+    "Seven explicit process boundaries use SIGKILL; four additional boundaries raise exceptions. Other packet-loss/outage timings are untested.",
+    "Recovery runs in a fresh process through production sweep methods, not the timer or a deployed worker.",
+    "Automatic graph-only continuation remains disabled; this is not graph-job completion or an ingestion load benchmark.",
+    "Existing in-flight queries that already loaded READY context are not cancelled by a subsequent deletion request.",
+    "The opt-in processor checks use a native synthetic PDF, authored graph outputs and a fixed 3-dimensional encoder; no AI/OCR semantic quality is measured.",
+    "Two coordinator subprocesses are killed after the loopback proxy receives their complete PUT, before forwarding to Qdrant. Each owned PostgreSQL lease expiry is advanced; fresh coordinators perform actual recovery/claiming to READY. This is not the complete app.worker lifecycle, a separate API, arbitrary network faults or a load benchmark.",
+    "A failed late-deletion qualification blocks activation; explicitly manual fixture cleanup is not application recovery. Mixed legacy writers remain unqualified.",
+    "Projection fencing is enabled only in the private fixture configuration; no production environment or automatic continuation is activated."
+  ]
+}

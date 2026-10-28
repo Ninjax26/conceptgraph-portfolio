@@ -526,6 +526,8 @@ class UploadService:
         self,
         session: AsyncSession,
         upload_id: str,
+        *,
+        vector_cleanup_scope=None,
     ) -> DocumentUpload | None:
         """Persist removal before remote I/O, then return with deletion locks held.
 
@@ -548,12 +550,18 @@ class UploadService:
         record = await lock_record()
         if record is None or record.stage not in self.DELETABLE_STAGES:
             return None
-        if not self.is_deleting(record):
+        needs_commit = not self.is_deleting(record)
+        if needs_commit:
             record.result_json = {
                 **(record.result_json if isinstance(record.result_json, dict) else {}),
                 "deletion_requested": True,
                 "deletion_requested_at": datetime.now(timezone.utc).isoformat(),
             }
+        if vector_cleanup_scope is not None:
+            from app.services.vector_cleanup_service import VectorCleanupService
+            await VectorCleanupService.stage(session, record, vector_cleanup_scope)
+            needs_commit = True
+        if needs_commit:
             await session.commit()
             # The committed flag blocks retry during this lock handoff. Recheck
             # after another deletion or uploader may have acquired admission.

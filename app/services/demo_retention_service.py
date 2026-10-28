@@ -87,7 +87,12 @@ class DemoRetentionService:
             return deleted
 
     async def _delete_upload(self, session: AsyncSession, upload_id: str) -> bool:
-        record = await self.upload_service.lock_for_deletion(session, upload_id)
+        cleanup_options = {}
+        if self.config.graph_projection_fencing_enabled:
+            from app.services.vector_cleanup_service import VectorCleanupScope
+            cleanup_options["vector_cleanup_scope"] = VectorCleanupScope.from_url(
+                self.config.qdrant_url, self.ingestion_service.collection_name)
+        record = await self.upload_service.lock_for_deletion(session, upload_id, **cleanup_options)
         if record is None:
             await session.rollback()
             return False
@@ -148,6 +153,22 @@ class DemoRetentionService:
                 logger.exception("Deleted graph publication cleanup failed intent=%s", intent_id)
         return cleaned
 
+    async def cleanup_deleted_vectors_once(self) -> int:
+        if not self.config.graph_projection_fencing_enabled:
+            return 0
+        from app.services.vector_cleanup_service import VectorCleanupScope, VectorCleanupService
+        scope = VectorCleanupScope.from_url(self.config.qdrant_url, self.ingestion_service.collection_name)
+        async with AsyncSessionLocal() as session:
+            identities = await VectorCleanupService.due(session, scope)
+        checked = 0
+        for upload_id, task_id in identities:
+            try:
+                checked += await VectorCleanupService.reconcile(
+                    AsyncSessionLocal, upload_id, task_id, scope, self.ingestion_service)
+            except Exception:
+                logger.exception("Deleted vector cleanup failed upload=%s", upload_id)
+        return checked
+
     async def _cleanup_loop(self) -> None:
         while not self._stop.is_set():
             try:
@@ -174,6 +195,12 @@ class DemoRetentionService:
                 raise
             except Exception:
                 logger.exception("Deleted graph publication discovery failed")
+            try:
+                await self.cleanup_deleted_vectors_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Deleted vector cleanup discovery failed")
             try:
                 await asyncio.wait_for(
                     self._stop.wait(),

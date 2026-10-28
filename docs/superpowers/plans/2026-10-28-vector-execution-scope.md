@@ -18,7 +18,9 @@ Alternatives rejected: an ID-only change admits stale vectors; client-side filte
 - [x] Verify an old point replay cannot overwrite the current execution, stale/cross-paired/missing-task points cannot occupy dense/identifier slots, and legacy UUID citations remain compatible.
 - [x] Four-store matrix: 10 processor plus 18 deletion checks, seven deletion SIGKILL boundaries; 583 backend tests, nine frontend tests, TypeScript/Vite build, five-file compile/diff and 18 matching report hashes. Owned resources removed; zero hosted calls.
 - [x] One fresh read-only review found no scoped blockers; open activation gates were explicitly excluded from the verdict.
-- [ ] Scoped commit/push and existing free-service revision/readiness/public-preview verification.
+- [x] Scoped commit/push and existing free-service revision/readiness/public-preview verification.
+
+Release verified: `4009f78343d24e95976880b0defb450f1ced1e8b`; origin/main matches and CI run `40706813821` passed. API readiness reported that exact revision, combined role, queue zero and no degraded services. Frontend `/sample` and prepared public API sample returned 200 (one document, 50 graph-context entries, 59 displayed nodes and 40 edges). HTML availability does not establish an independent frontend revision or exercise live answer generation. No production flags were activated or provider calls made. This post-release note stays local until the next substantive commit.
 
 ## Limits and activation policy
 
