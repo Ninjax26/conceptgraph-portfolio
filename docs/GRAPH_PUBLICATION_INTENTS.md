@@ -4,19 +4,20 @@ Normal source removal now has a durable pre-cleanup flag and restart sweep;
 see [deletion recovery](DELETION_RECOVERY.md). Pending removal fences graph
 claims while retaining source metadata/checkpoints until remote cleanup has
 finished. Its authenticated ASGI route has been tested across disposable
-PostgreSQL, Qdrant, Neo4j and MinIO; hosted R2 and the full graph-job
-publication/completion protocol remain unverified. Automatic graph-only
-continuation stays disabled.
+PostgreSQL, Qdrant, Neo4j and MinIO. The internal marked publication unit has
+real-store crash checks below; hosted R2 and activation alongside ordinary
+ingestion/retry remain unverified. Automatic continuation stays disabled.
 
 `GraphPublicationIntent` is a durable record that a particular validated graph
 candidate **might** be written to Neo4j. It is separate from the unpublished
-`GraphPublicationDraft`. The new `stage_publication_intent` method is not called
-by the API, coordinator or worker. It makes no remote write and does not complete
-a graph job.
+`GraphPublicationDraft`. The live API, processing coordinator and worker do not
+call the marked publication path. The internal `publish_publication` method now
+uses `stage_publication_intent`; staging alone makes no remote write and does
+not complete a graph job.
 
-## Current contract
+## Intent staging contract
 
-- The method loads and revalidates the persisted draft under the current READY
+- `stage_publication_intent` loads and revalidates the persisted draft under the current READY
   document, graph-job claim and source snapshot. It rechecks the claim before
   staging an intent. The caller owns commit or rollback; successful calls retain
   document and job locks.
@@ -35,7 +36,7 @@ a graph job.
   changing legacy rows. Older application code can ignore them; rollback does
   not require dropping them.
 
-## Publication protocol still required
+## Internal marked publication protocol — dispatch disabled
 
 Before any caller may write remotely, it must commit the intent, reacquire the
 document → job fence, verify the exact intent/draft/source identity and hold that
@@ -45,7 +46,7 @@ alone is never permission to publish after the fence is released.
 The disconnected Neo4j replacement primitive can now write a `GraphPublication`
 marker in the same managed transaction and read it by intent ID. This marker
 is remote commit evidence only when the caller supplied an exact staged intent;
-no runtime caller does that yet. A separate `GraphPublicationReceipt` row can
+the internal publisher supplies it, but no live runtime caller does that yet. A separate `GraphPublicationReceipt` row can
 now be staged after the current fenced job reads an exact matching marker. The
 receipt survives document/job deletion, is immutable by intent ID, and is not
 created when the marker is absent or conflicting. The observer now compares
@@ -65,8 +66,9 @@ This is not a publisher or reconciler for ambiguous commits, killed processes,
 superseded tasks and document deletion. Normal graph cleanup now deletes
 markers for the same upload and course along with its concepts; a late write after that cleanup must still be
 found and removed. The entire fenced publication/completion unit must drain on
-cancellation. The cross-store publish/complete unit and bounded dispatch remain
-unimplemented; automatic continuation stays disabled.
+cancellation. The internal coordinator now drains that unit; ordinary ingestion/retry
+interactions, delayed old writes and bounded dispatch still require verification.
+Automatic continuation stays disabled.
 
 An internal `cleanup_graph_publication` primitive can remove one exact remote
 marker and only concepts carrying that marker's original READY task token in
@@ -162,6 +164,44 @@ vector metadata, initial timings and extraction checkpoints remain available.
 See `evaluation/graph-completion-current.json` for source fingerprints and limits.
 These checks do not publish a graph, exercise Neo4j, run an ingestion-worker
 process or prove crash recovery/cancellation drain across stores. The automatic
-worker remains disconnected. The next checkpoint is a tested coordinator that
-commits an intent, reacquires authority, publishes the exact generation, and
-completes or reconciles ambiguous writes under a drained cancellation boundary.
+worker remains disconnected. The next activation checks cover interactions between the internal marked
+publisher and ordinary ingestion/manual retry, delayed older writes and bounded
+dispatch. The later real-store report below covers one publish/complete unit.
+
+## Real-store publication recovery — 28 October
+
+The internal `publish_publication` method owns its sessions and commits, unlike
+the caller-owned staging/completion helpers. It commits its immutable intent in a
+first PostgreSQL session, then uses a fresh session to reacquire document/job
+locks and revalidate the current draft, intent, source generation and lease.
+Under those locks it reads the exact Neo4j marker. A matching committed marker
+is reused; an absent marker triggers the atomic marked replacement. A conflict
+fails closed. Receipt observation, graph-result updates and terminal job state
+then commit together in PostgreSQL. The existing `run_async_safely` wrapper
+drains the entire operation, including final commit and session cleanup, before
+propagating caller cancellation. A new claim can recover a saved draft without
+model calls. `False` means no active claim was completed, including an already
+completed claim; it is not permission to republish under a stale token.
+
+`scripts/evaluate_graph_publication_recovery.py` uses real disposable PostgreSQL
+and Neo4j with synthetic sources/graphs. Its twelve checks include five actual
+SIGKILL boundaries (before/after intent commit, inside the Neo4j transaction,
+after Neo4j commit, and after PostgreSQL result commit), a lost acknowledgement,
+competing publishers, repeated cancellation while retaining the source lock,
+source removal between transactions, conflicting markers and provider-limited
+drafts. Recovery checks the Neo4j fence write epoch to detect unnecessary
+rewrites, as well as the marker, receipt, job and retained READY/checkpoint data.
+
+See `evaluation/graph-publication-recovery-current.json` for hashes, image ID,
+crash observations, cleanup and limits. Recovery explicitly expires the private
+fixture lease before acquiring a fresh token; it does not benchmark a complete
+worker or natural lease-duration wait. No models, Qdrant, R2 or live API are
+used. Normal ingestion/manual retry still use their existing unmarked writes;
+interactions with late older writes and dispatch must be verified before any
+activation. Five instrumented kills do not prove every delayed server commit or
+network timing. Automatic continuation remains disabled.
+
+The final allowed graph attempt crashing after remote commit, followed by
+stopped-job reconciliation, is not covered by this matrix. The claim policy still
+stops exhausted jobs; activation needs a bounded recovery policy that can observe
+an already-committed marker without granting fresh provider attempts.

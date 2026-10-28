@@ -1,11 +1,9 @@
-"""Durable graph-job admission/claim/checkpoint foundation.
+"""Durable graph-job claims, checkpoints and internal marked publication.
 
-Not connected to the coordinator or any API route yet. Opt-in READY completion
-can stage snapshots atomically. This module does not generate or publish a
-graph. A future
-graph-only worker must publish under the document/job fence before activation.
-The disconnected deleted-source reconciliation primitive may also tombstone
-an already-deleted upload in Neo4j after a fresh PostgreSQL check.
+The live API/coordinator/worker does not call the marked publisher or completion
+path. Opt-in READY staging can persist snapshots atomically. Model extraction
+is separate; the internal publisher only consumes a validated saved draft.
+Deleted-source reconciliation may tombstone a committed-deleted upload in Neo4j.
 """
 
 from collections.abc import Sequence
@@ -18,13 +16,14 @@ from uuid import uuid4
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.blocking import run_async_safely
 from app.core.config import settings
 from app.core.exceptions import GraphStructureError
 from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
 from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationCleanupReceipt, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.graph_result_metadata import graph_result_metadata
-from app.services.ingestion_service import GraphSectionBatch, IngestionService
+from app.services.ingestion_service import GraphProjectionMarker, GraphSectionBatch, IngestionService
 from app.services.graph_publication_candidate import (
     GraphPublicationCandidate, prepare_graph_publication, restore_graph_publication,
 )
@@ -664,6 +663,67 @@ class GraphContinuationService:
             source_generation=generation)
         session.add(receipt)
         return receipt
+
+    async def publish_publication(
+        self, sessions: async_sessionmaker[AsyncSession], claim: GraphJobClaim,
+        ingestion_service: IngestionService,
+    ) -> bool:
+        """Publish one saved draft and complete its job; no runtime dispatcher.
+
+        Commit the durable intent before remote I/O, then reacquire and retain
+        source/job locks through the write, observed receipt and final commit.
+        An exact existing marker recovers an ambiguous commit without rewriting.
+        Cancellation drains this entire unit before releasing its sessions.
+        Process kills and failed acknowledgements leave the intent for recovery.
+        """
+        async def publish():
+            async with sessions() as session:
+                intent = await self.stage_publication_intent(session, claim)
+                if intent is None:
+                    return False
+                intent_id = intent.id
+                await session.commit()
+            async with sessions() as session:
+                candidate = await self.load_publication_draft(session, claim)
+                if candidate is None:
+                    return False
+                graph = await self.restore_publication(session, claim, candidate)
+                if graph is None:
+                    return False
+                if graph.provider_limited:
+                    raise ValueError("Provider-limited graph work must be deferred, not published.")
+                locked = await self._locked_claim(session, claim)
+                if locked is None:
+                    return False
+                record, job, _ = locked
+                if not isinstance(record.result_json, dict):
+                    raise ValueError("Graph publication requires the original READY result.")
+                intent = (await session.execute(select(GraphPublicationIntent).where(
+                    GraphPublicationIntent.id == intent_id).with_for_update()
+                    .execution_options(populate_existing=True))).scalar_one_or_none()
+                generation = record.attempt_count
+                if (intent is None or type(generation) is not int or generation < 1
+                    or (intent.job_id, intent.upload_id, intent.document_task_id,
+                        intent.course_id, intent.payload_sha256, intent.source_generation)
+                    != (job.id, record.upload_id, record.task_id, record.course_uuid,
+                        candidate.sha256, generation)):
+                    raise ValueError("Committed publication intent no longer matches the source.")
+                marker = GraphProjectionMarker(intent.id, job.id, record.upload_id,
+                    record.course_uuid, record.task_id, candidate.sha256, generation)
+                observed = await ingestion_service.read_graph_publication_marker(intent.id)
+                if observed is not None and observed != marker:
+                    raise ValueError("Remote graph marker conflicts with the publication intent.")
+                if await self._locked_claim(session, claim) is None:
+                    return False  # A slow marker read may have outlasted the lease.
+                if observed is None:
+                    await ingestion_service.replace_graph_extraction(graph, record.course_uuid,
+                        upload_id=record.upload_id, document_name=record.original_filename,
+                        course_name=record.course_id, execution_token=record.task_id, marker=marker)
+                if not await self.complete_publication(session, claim, ingestion_service):
+                    return False
+                await session.commit()
+                return True
+        return await run_async_safely(publish())
 
     async def complete_publication(
         self, session: AsyncSession, claim: GraphJobClaim, ingestion_service: IngestionService,

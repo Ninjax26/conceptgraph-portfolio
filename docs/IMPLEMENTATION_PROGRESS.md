@@ -20,7 +20,7 @@ Updated: 2026-10-28 (India). This is the current roadmap; older numbered scaling
 | --- | --- | --- |
 | 1 — Evidence selection | Integrated; known gaps remain | [Integration report](../evaluation/phase1-integration.md). Original 31/35 source completeness, 10/10 gate refusals; new authored comparison holdout 4/4 and 2/2 across 10/50/100 PDFs. Known missing-attribute cases and four original source misses remain. |
 | 2 — Offline quality evaluation | Tooling verified; semantic review pending | [Quality report](../evaluation/quality-evaluation.md). 12 deterministic fallback captures, 20 valid citation indices, 21 literal excerpts, six known snapshot links. No fresh model generation; 12 answers and 44 graph edges are unreviewed. |
-| 3 — Provider-safe ingestion | Partial: deletion recovery verified; caller-owned graph completion tested; automatic publication disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. Caller-owned PostgreSQL completion now has twelve isolated checks; remote marker reads are doubles, not Neo4j publication. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. Source generation is recorded in intents and compared in receipts, but no worker passes it to Neo4j. The real ASGI deletion route now has an 18-check local PostgreSQL/Qdrant/Neo4j/MinIO recovery matrix. Hosted R2, other network ambiguities, graph-job publication/completion and bounded dispatch remain unverified before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
+| 3 — Provider-safe ingestion | Partial: internal marked publisher passes local crash tests; automatic dispatch disabled | Fenced replay deployed at `5034ae6`; bounded drafts at `f08bc48`; provider admission and Cohere telemetry at `0c497da`; distinct durable [publication intent](GRAPH_PUBLICATION_INTENTS.md) at `9cffa4a`; optional Neo4j marker/read primitive at `db97255`; disconnected observed-marker receipt at `81b8a4a`; matching marker cleanup at `0ab762a`; exact obsolete-marker cleanup primitive at `6c3c699`; bounded deleted-source discovery at `4d9a57e`. The worker calls none of the publication operations. Caller-owned PostgreSQL completion now has twelve isolated checks; remote marker reads are doubles, not Neo4j publication. A local Neo4j test reproduced a late old overwrite; a disconnected remote generation fence rejects that replay. A combined PostgreSQL–Neo4j hard-kill check and runtime deleted-intent sweep now cover one cleanup boundary. The internal publisher now passes and checks generation in real Neo4j; the live worker remains unchanged. The real ASGI deletion route now has an 18-check local PostgreSQL/Qdrant/Neo4j/MinIO recovery matrix. A twelve-check local marked publish/complete matrix now covers five SIGKILL boundaries. Hosted R2, delayed old writes against ordinary ingestion/manual retries and bounded dispatch remain unverified before activation. Cohere rerank and Qdrant Cloud document/query requests reserve estimated budget; Cohere rerank reports search units. Qdrant-hosted usage is still unknown. Full provider-cost attribution, split-worker tests and cross-upload cache remain unfinished. |
 | 4 — Realistic scaling | Pending | Validate separate-process behavior with varied local fixtures and hard-kill recovery; disclose all doubles. |
 | 5 — Profile-guided storage/search | Pending | Measure first, then optimize actual filter/index/write/traversal bottlenecks. |
 | 6 — Document understanding | Pending | Coordinates/order/tables, uncertainty review/corrections and human-reference OCR tests. |
@@ -28,6 +28,47 @@ Updated: 2026-10-28 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+28 October internal marked-publication increment: implemented a coordinator that
+commits an intent, reacquires source/job authority in a fresh PostgreSQL session,
+revalidates the saved draft/generation, reuses an exact existing Neo4j marker or
+performs the marked replacement, and commits receipt/result/job completion.
+Cancellation drains the entire unit before releasing sessions. The real-store
+runner first failed because this coordinator was absent, then passed twelve
+checks with five actual SIGKILL boundaries, lost acknowledgement, repeated
+cancellation, competing publishers, deletion in the intent gap, marker conflicts
+and provider-limited output. It uses real disposable PostgreSQL and Neo4j with
+synthetic evidence; no models, Qdrant, R2 or live API. Recovery explicitly expires
+fixture leases before a fresh claim. Fresh Neo4j emitted missing-label/property
+notifications during the first marker lookup; the assertions passed. The runner
+removes its own schema/container/network and records source hashes and image ID.
+Automatic dispatch remains disconnected. Existing unmarked ingestion/retry writes,
+delayed old server commits, bounded dispatch and separate-worker behavior remain
+activation blockers. Final-attempt crashes and stopped-job reconciliation are
+also outside this matrix; exhausted claims still stop under the existing policy.
+No production data was mutated. Final verification passed: 553 unittest tests,
+nine frontend tests, TypeScript/Vite build, compileall, diff checks and current
+report source hashes. Older passed matrices were not rerun; their reports retain
+their own prior source hashes. The disposable test resources were removed. Docker
+Desktop was initially off and was started for testing; other existing ConceptGraph
+and FaultLab containers were active afterward, so they and Docker were preserved.
+Record the scoped release separately; Phase 3 remains partial.
+
+28 October graph-completion release 7b8393c9e99849bfa4436ccb23ae19457d141109:
+11 scoped files were pushed to origin/main. GitHub Verify run 40636575428 passed
+for this exact SHA. The existing free Render API /api/v1/ready returned HTTP 200
+at that revision, combined processing role, zero queued jobs, graph/ingestion
+available and no degraded services. Frontend /sample and public sample data
+returned 200; one prepared document remains GRAPH_READY. These read-only checks
+do not exercise the disconnected completion method or answer quality. Final
+local verification: 12 PostgreSQL completion checks, 48 PostgreSQL graph-job
+checks, 550 unittest tests, nine frontend tests, TypeScript/Vite build,
+compileall, diff checks and report source-hash checks passed. Test schemas,
+private clusters and temporary compile cache were removed. A process-list
+inspection was denied by the sandbox; the runners' cleanup completed. No hosted
+model/embedding/reranking calls or production test-data mutations were made.
+Automatic publication/continuation remains disabled and Phase 3 partial.
+This release-verification note is local until the next substantive release.
 
 28 October graph-completion increment: added an internal, caller-owned transaction
 that validates the saved draft and exact remote marker before staging its receipt,
