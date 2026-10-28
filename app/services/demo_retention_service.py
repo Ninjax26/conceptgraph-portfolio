@@ -119,8 +119,13 @@ class DemoRetentionService:
             upload_ids = await self.upload_service.list_pending_deletion_ids(session, limit=50)
         removed = 0
         for upload_id in upload_ids:
-            async with AsyncSessionLocal() as session:
-                removed += await self._delete_upload(session, upload_id)
+            try:
+                async with AsyncSessionLocal() as session:
+                    removed += await self._delete_upload(session, upload_id)
+            except Exception:
+                # Session entry and lock acquisition precede the helper's
+                # remote-I/O guard. Keep the failed request pending for retry.
+                logger.exception("Pending document removal failed upload=%s", upload_id)
         return removed
 
     async def cleanup_deleted_graph_publications_once(self) -> int:

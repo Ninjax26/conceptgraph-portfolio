@@ -40,7 +40,10 @@ hours). This recovery also starts when automatic demo expiry is disabled.
 Expiry and public-sample exclusions still apply to automatic expiry; they do
 not cancel a removal already explicitly requested. A pure API-role process
 depends on its worker running the loop. A user may also repeat DELETE on a
-retained pending record.
+retained pending record. Each discovered removal owns a fresh session. A
+session-open or row-lock exception is logged for that upload and leaves the
+durable request available for retry, while later uploads in the same bounded
+batch continue. Cancellation still propagates to stop the sweep.
 
 Queries beginning after the flag commit obtain only eligible READY documents.
 Already-running queries that loaded their READY context earlier are not

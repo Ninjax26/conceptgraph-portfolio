@@ -1,6 +1,6 @@
 # ConceptGraph implementation and verification ledger
 
-Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling phases in the handbook describe earlier work.
+Updated: 2026-10-28 (India). This is the current roadmap; older numbered scaling phases in the handbook describe earlier work.
 
 ## Operating boundaries
 
@@ -28,6 +28,37 @@ Updated: 2026-10-27 (India). This is the current roadmap; older numbered scaling
 | 8 — Repeatable semantic evaluation | Pending human review | Extend Phase 2 foundation; do not confuse mechanical checks with reviewed correctness. |
 
 ## Phase 3 — Scale ingestion without overwhelming providers
+
+28 October pending-removal isolation increment: two offline regressions reproduced
+a session-open or row-lock exception escaping the cleanup helper and aborting
+the remaining bounded recovery batch. The per-upload session boundary now logs
+that failure and continues with the next upload. The failed request stays pending;
+no marker, checkpoint, lock order, storage operation, or retry deadline changes.
+Cancellation still propagates. Three regression checks passed, including later
+remote cleanup/metadata removal and cancellation; the full unittest suite passed
+548 tests. Nine frontend tests passed. No hosted provider request or production
+test-data mutation was made. The earlier 18-check four-store report records its
+own prior source hashes; it was not rerun for this exception-boundary change.
+Automatic graph-only publication/continuation remains disabled and Phase 3 partial.
+TypeScript/Vite production build, compileall and diff checks passed. Record
+release verification separately.
+
+27 October durable-deletion release
+c691dc30a0e4dee329a7899fbee496cbcb253e91 (application fix 4fadd1e,
+unittest compatibility correction c691dc3): scoped code, tests and sanitized
+reports were pushed to origin/main. [GitHub CI run 40519193253](https://github.com/Ninjax26/conceptgraph-portfolio/actions/runs/40519193253)
+passed. The existing free Render API /api/v1/ready returned HTTP 200 at this
+exact revision, combined processing role, graph/ingestion available and no
+degraded services. The frontend /sample returned HTTP 200; its public data
+endpoint returned one prepared document with GRAPH_READY. These public
+checks do not exercise production deletion. Local evidence: 18 four-store
+deletion/recovery checks (MinIO for S3), 48 PostgreSQL graph-job checks,
+545 tests under the exact unittest CI command, nine frontend tests,
+TypeScript/Vite build, compileall and diff/source-hash checks passed. All
+disposable local resources were removed. No hosted model/embedding/reranking
+calls or production test-data mutations were made. Automatic graph-only
+continuation remains disabled, and Phase 3 is partial. This release-verification
+note is local until the next substantive release.
 
 27 October verification correction: application/recovery changes were pushed
 as 4fadd1e and the Render API served that exact revision with healthy readiness
