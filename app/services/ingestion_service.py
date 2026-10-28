@@ -114,6 +114,11 @@ class IngestionService:
         if not chunks:
             return 0
 
+        # Validate every identity before embedding or touching the remote store.
+        point_ids = [self._qdrant_point_id(chunk.id, execution=(
+            chunk.metadata.get("upload_id"), chunk.metadata.get("execution_token"),
+        ) if settings.graph_projection_fencing_enabled else None) for chunk in chunks]
+
         if settings.embedding_provider == "qdrant_cloud":
             self._ensure_qdrant_collection(vector_size=settings.embedding_dimension)
             vectors = [
@@ -132,7 +137,7 @@ class IngestionService:
 
         points = [
             PointStruct(
-                id=self._qdrant_point_id(chunk.id),
+                id=point_id,
                 vector=vector,
                 payload={
                     **chunk.metadata,
@@ -140,7 +145,7 @@ class IngestionService:
                     "identifier_terms": identifier_terms(chunk.text),
                 },
             )
-            for chunk, vector in zip(chunks, vectors, strict=True)
+            for chunk, vector, point_id in zip(chunks, vectors, point_ids, strict=True)
         ]
         self.vector_client.upsert(collection_name=self.collection_name, points=points)
         return len(points)
@@ -1117,7 +1122,10 @@ class IngestionService:
     def _ensure_qdrant_payload_indexes(self) -> None:
         collection = self.vector_client.get_collection(self.collection_name)
         payload_schema = collection.payload_schema or {}
-        for field in ("upload_id", "identifier_terms"):
+        fields = ["upload_id", "identifier_terms"]
+        if settings.graph_projection_fencing_enabled:
+            fields.append("execution_token")
+        for field in fields:
             if field in payload_schema:
                 continue
             try:
@@ -1934,10 +1942,19 @@ class IngestionService:
         )
 
     @staticmethod
-    def _qdrant_point_id(chunk_id: str) -> str:
+    def _qdrant_point_id(
+        chunk_id: str, *, execution: tuple[str, str] | None = None,
+    ) -> str:
         import uuid
 
-        return str(uuid.uuid5(uuid.NAMESPACE_URL, chunk_id))
+        if execution is None:
+            return str(uuid.uuid5(uuid.NAMESPACE_URL, chunk_id))
+        if (not isinstance(execution, tuple) or len(execution) != 2
+            or not all(isinstance(value, str) and value.strip() for value in (*execution, chunk_id))):
+            raise ValueError("Attempt-scoped vectors require chunk, upload and execution identities.")
+        namespace = uuid.uuid5(uuid.NAMESPACE_URL, "conceptgraph:vector-execution:v1")
+        identity = json.dumps([*execution, chunk_id], ensure_ascii=False, separators=(",", ":"))
+        return str(uuid.uuid5(namespace, identity))
 
     @staticmethod
     def _course_id_from_chunks(chunks: Sequence[DocumentChunk]) -> str:

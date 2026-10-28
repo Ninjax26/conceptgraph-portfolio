@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -12,7 +13,7 @@ from neo4j import AsyncDriver
 from pydantic import BaseModel, ConfigDict, Field
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
-from qdrant_client.models import Document, FieldCondition, Filter, MatchAny
+from qdrant_client.models import Document, FieldCondition, Filter, MatchAny, MatchValue
 
 from app.core.config import settings
 from app.core.database import neo4j_driver, qdrant_client
@@ -124,6 +125,11 @@ class RetrievalService:
         top_k = settings.retrieval_candidate_limit if top_k is None else top_k
         if not 1 <= top_k <= 100:
             raise ValueError("The retrieval candidate count must be between 1 and 100.")
+        vector_scope = {}
+        if settings.graph_projection_fencing_enabled:
+            document_tasks = {document.upload_id: document.task_id for document in context.documents}
+            self._vector_scope_filter(context.document_ids, document_tasks)
+            vector_scope["document_tasks"] = document_tasks
         mode = RetrievalMode(retrieval_mode)
         graph_started = time.perf_counter()
         if mode is RetrievalMode.VECTOR_ONLY:
@@ -189,6 +195,7 @@ class RetrievalService:
             context.document_ids,
             top_k,
             metadata=retrieval_metadata,
+            **vector_scope,
         )
         graph_result.metadata.update({
             "candidates": retrieval_metadata,
@@ -422,12 +429,14 @@ class RetrievalService:
         top_k: int | None = None,
         *,
         metadata: dict[str, Any] | None = None,
+        document_tasks: Mapping[str, str] | None = None,
     ) -> list[Any]:
         top_k = settings.retrieval_candidate_limit if top_k is None else top_k
         if not 1 <= top_k <= 100:
             raise ValueError("The retrieval candidate count must be between 1 and 100.")
         if not document_ids:
             return []
+        query_filter = self._vector_scope_filter(document_ids, document_tasks)
         stage_timings: dict[str, float] = {}
         if metadata is not None:
             metadata["timings"] = stage_timings
@@ -460,15 +469,6 @@ class RetrievalService:
         stage_timings["query_embedding_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
         if metadata is not None:
             metadata["embedding_execution"] = "hosted_in_dense_search" if settings.embedding_provider == "qdrant_cloud" else "local"
-        query_filter = Filter(
-            must=[
-                FieldCondition(
-                    key="upload_id",
-                    match=MatchAny(any=document_ids),
-                )
-            ]
-        )
-
         stage_started = time.perf_counter()
         try:
             results = self.vector_client.query_points(
@@ -528,6 +528,22 @@ class RetrievalService:
                              "merged_count": len(merged), "identifier_terms_count": len(terms),
                              "identifier_lookup_used": bool(lexical), "fallback_reason": fallback_reason})
         return merged
+
+    @staticmethod
+    def _vector_scope_filter(document_ids: list[str], document_tasks: Mapping[str, str] | None) -> Filter:
+        if document_tasks is None and not settings.graph_projection_fencing_enabled:
+            return Filter(must=[FieldCondition(key="upload_id", match=MatchAny(any=document_ids))])
+        if (not isinstance(document_tasks, Mapping) or set(document_tasks) != set(document_ids)
+            or not all(isinstance(value, str) and value.strip()
+                       for pair in document_tasks.items() for value in pair)):
+            raise ValueError("Vector search requires each eligible document's current execution identity.")
+        # Pair each task with its own document. Independent MatchAny sets would
+        # admit cross-paired or stale payloads. Keep this inside must so lexical
+        # lookup inherits the same scope before applying its candidate limit.
+        return Filter(must=[Filter(should=[Filter(must=[
+            FieldCondition(key="upload_id", match=MatchValue(value=upload_id)),
+            FieldCondition(key="execution_token", match=MatchValue(value=task_id)),
+        ]) for upload_id, task_id in document_tasks.items()])])
 
     @staticmethod
     def _point_to_chunk(point: Any) -> dict[str, Any]:

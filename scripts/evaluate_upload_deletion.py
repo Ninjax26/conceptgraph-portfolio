@@ -479,7 +479,9 @@ async def run(args):
             "app/services/ingestion_service.py","app/services/storage_service.py","scripts/evaluate_upload_deletion.py",
             "app/core/config.py","app/services/document_processing_service.py",
             "app/services/parser_service.py","app/core/blocking.py",
-            "scripts/processor_fencing_checks.py","tests/test_processor_graph_fencing.py")},
+            "scripts/processor_fencing_checks.py","tests/test_processor_graph_fencing.py",
+            "app/services/rag_service.py","app/services/citation_service.py",
+            "app/services/retrieval_candidates.py","tests/test_vector_attempt_scope.py")},
         "limits":[
             "ASGI HTTP requests exercise the real authenticated DELETE route; this is not an external network/Render test.",
             "PostgreSQL, Qdrant and Neo4j are real disposable stores; synthetic 3-dimensional vectors are inserted without embeddings.",

@@ -16,6 +16,8 @@ from app.models.document_upload import Course, DocumentUpload, GraphPublicationI
 from app.schemas.extraction import ConceptNode, ConceptRelationship, GraphExtractionResponse
 from app.services import document_processing_service as processing
 from app.services import ingestion_service as ingestion_module
+from app.services import rag_service as retrieval_module
+from app.services.citation_service import build_sources
 from app.services.course_service import CourseService
 from app.services.ingestion_service import GraphProjectionMarker, IngestionService
 from app.services.parser_service import ParserService
@@ -36,7 +38,8 @@ async def verify_processor(sessions, driver, vector, storage, collection, remove
             "before sending packets to a server. TCP provides a connection between endpoints. "
             "TLS protects the connection. HTTPS carries an HTTP request over TLS. "
             "A certificate identifies the server. This synthetic networking lesson is used "
-            "only to verify document processing and source provenance.", fontsize=12)
+            "only to verify document processing and source provenance. "
+            "PMP-104 requires monthly inspection in this authored fixture.", fontsize=12)
         content = pdf.tobytes()
 
     class AuthoredGraph(IngestionService):
@@ -68,6 +71,9 @@ async def verify_processor(sessions, driver, vector, storage, collection, remove
             return self.last_graph
 
     service = AuthoredGraph()
+    retrieval = retrieval_module.RetrievalService(graph_driver=driver, vector_client=vector)
+    retrieval.collection_name = collection
+    retrieval._embedding_model = SimpleNamespace(encode=lambda text, **kw: np.array([1., 0., 0.]))
     processor = processing.DocumentProcessingService(config=cfg, ingestion_service=service,
         parser_service=ParserService(ocr_enabled=False), upload_service=uploads)
 
@@ -102,6 +108,7 @@ async def verify_processor(sessions, driver, vector, storage, collection, remove
         stack.enter_context(patch.object(processing, "storage_service", storage))
         stack.enter_context(patch.object(processing, "settings", cfg))
         stack.enter_context(patch.object(ingestion_module, "settings", cfg))
+        stack.enter_context(patch.object(retrieval_module, "settings", cfg))
         item = await create()
         result = await run(item)
         assert result["status"] == "ready" and result["graph_status"] == "GRAPH_PARTIAL"
@@ -113,6 +120,11 @@ async def verify_processor(sessions, driver, vector, storage, collection, remove
         checks["native_pdf_full_processor_reaches_ready_with_real_stores_and_authored_ai"] = True
 
         old_graph, old_task = service.last_graph, item.task
+        old_vectors, _ = await asyncio.to_thread(vector.scroll, collection,
+            scroll_filter=models.Filter(must=[models.FieldCondition(key="upload_id",
+                match=models.MatchValue(value=item.upload))]), with_payload=True, with_vectors=True, limit=100)
+        old_points = [models.PointStruct(id=point.id, vector=point.vector, payload=point.payload)
+            for point in old_vectors]
         marker = GraphProjectionMarker(str(uuid4()), str(uuid4()), item.upload, item.course.id,
             old_task, "a"*64, 1)
         await service.replace_graph_extraction(old_graph, item.course.id, upload_id=item.upload,
@@ -126,6 +138,43 @@ async def verify_processor(sessions, driver, vector, storage, collection, remove
                 lease_owner="processor-fixture", lease_seconds=180)
         service.connected = True
         assert (await run(item))["graph_status"] == "GRAPH_READY"
+        current_vector_count = await vectors(item, item.task)
+        await asyncio.to_thread(vector.upsert, collection, points=old_points, wait=True)
+        assert await vectors(item, item.task) == current_vector_count > 0, \
+            "A delayed old vector request overwrote the current READY execution"
+        checks["delayed_old_vector_replay_cannot_overwrite_current_processor_execution"] = True
+        assert "execution_token" in (await asyncio.to_thread(vector.get_collection, collection)).payload_schema
+        async with sessions() as session:
+            ready = await CourseService().get_ready_context(session, item.course.id)
+            evidence = await retrieval.retrieve("Inspect PMP-104", ready, top_k=1, retrieval_mode="vector_only")
+        assert len(evidence["chunks"]) == 1
+        assert evidence["chunks"][0]["metadata"]["execution_token"] == item.task
+        assert evidence["graph_metadata"]["candidates"]["dense_count"] == 1
+        assert evidence["graph_metadata"]["candidates"]["identifier_count"] == 1
+        checks["real_ready_task_scope_filters_dense_and_identifier_candidates_before_limit"] = True
+
+        current_points, _ = await asyncio.to_thread(vector.scroll, collection,
+            scroll_filter=models.Filter(must=[models.FieldCondition(key="upload_id", match=models.MatchValue(value=item.upload)),
+                models.FieldCondition(key="execution_token", match=models.MatchValue(value=item.task))]),
+            with_payload=True, with_vectors=True, limit=100)
+        assert len(current_points) == 1
+        current_point = current_points[0]
+        legacy_id = service._qdrant_point_id(current_point.payload["chunk_id"])
+        await asyncio.to_thread(vector.delete, collection,
+            points_selector=models.PointIdsList(points=[current_point.id]), wait=True)
+        await asyncio.to_thread(vector.upsert, collection, points=[models.PointStruct(id=legacy_id,
+            vector=current_point.vector, payload=current_point.payload)], wait=True)
+        legacy = await asyncio.to_thread(retrieval.search_qdrant, "Inspect PMP-104", [], [], [item.upload], 1,
+            document_tasks={item.upload: item.task})
+        assert len(legacy) == 1 and legacy[0]["id"] == legacy_id
+        source = build_sources(legacy)[0]
+        assert source["document_id"] == item.upload and source["page_number"] == 1
+        assert source["preview_url"] == f"/ingest/uploads/{item.upload}/preview#page=1"
+        await asyncio.to_thread(vector.upsert, collection, points=[models.PointStruct(id=current_point.id,
+            vector=current_point.vector, payload=current_point.payload)], wait=True)
+        await asyncio.to_thread(vector.delete, collection,
+            points_selector=models.PointIdsList(points=[legacy_id]), wait=True)
+        checks["legacy_uuid_with_current_execution_payload_retains_pdf_citation_identity"] = True
         try:
             await service.replace_graph_extraction(old_graph, item.course.id, upload_id=item.upload,
                 document_name="processor-fixture.pdf", course_name=item.course.display_name,

@@ -1,6 +1,6 @@
 # Opt-in processor and deletion fencing — isolated stores
 
-Generated: 2026-10-28T13:59:23.009587+00:00.
+Generated: 2026-10-28T14:28:20.220090+00:00.
 
 Command: `.venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket> --projection-fencing`.
 
@@ -25,9 +25,12 @@ Command: `.venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <pri
 - removed_checkpoints_and_markers_leave_only_protected_upload: pass
 - unrelated_ready_upload_survives_all_crash_and_failure_scenarios: pass
 
-Processor checks: 7 passed.
+Processor checks: 10 passed.
 
 - native_pdf_full_processor_reaches_ready_with_real_stores_and_authored_ai: pass
+- delayed_old_vector_replay_cannot_overwrite_current_processor_execution: pass
+- real_ready_task_scope_filters_dense_and_identifier_candidates_before_limit: pass
+- legacy_uuid_with_current_execution_payload_retains_pdf_citation_identity: pass
 - real_manual_retry_advances_graph_generation_and_rejects_older_marked_replay: pass
 - stale_processor_source_cannot_enter_graph_or_vector_cleanup: pass
 - failed_processor_closes_attempt_and_removes_only_its_vector_payloads: pass

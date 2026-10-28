@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-28T13:59:23.009587+00:00",
+  "generated_at_utc": "2026-10-28T14:28:20.220090+00:00",
   "passed": true,
   "checks": {
     "unauthenticated_delete_preserves_all_stores": true,
@@ -79,10 +79,13 @@
       "source": false
     }
   },
-  "elapsed_seconds": 96.065,
+  "elapsed_seconds": 200.985,
   "projection_fencing_enabled_in_fixture": true,
   "processor_checks": {
     "native_pdf_full_processor_reaches_ready_with_real_stores_and_authored_ai": true,
+    "delayed_old_vector_replay_cannot_overwrite_current_processor_execution": true,
+    "real_ready_task_scope_filters_dense_and_identifier_candidates_before_limit": true,
+    "legacy_uuid_with_current_execution_payload_retains_pdf_citation_identity": true,
     "real_manual_retry_advances_graph_generation_and_rejects_older_marked_replay": true,
     "stale_processor_source_cannot_enter_graph_or_vector_cleanup": true,
     "failed_processor_closes_attempt_and_removes_only_its_vector_payloads": true,
@@ -106,15 +109,19 @@
     "app/services/course_service.py": "1801419984e9c0a757f774ad3c46be9d180a0dc862d9b577d61ee6c7a4b01dcf",
     "app/services/demo_retention_service.py": "4549bab77433d34603f80ae26c700ac481949e63dd6b6ea2128cc3fcb8ab2c5d",
     "app/services/graph_continuation_service.py": "eec3302df59e4bffe46a4b8aadba95974f4473c7016b6071069ba8e8de7f2a32",
-    "app/services/ingestion_service.py": "62093799f19ec27cc865b802e172448fc86b193d7c03cdafe7e067c8114392d1",
+    "app/services/ingestion_service.py": "331907c0f2453d18a29d763dfe95b6cb7268b394c2f17b35008a9f8cd9a4819c",
     "app/services/storage_service.py": "f90c423eccd36e76d672f24c59aeff80c95634423fd0e4f5801582dc2fb9a29a",
-    "scripts/evaluate_upload_deletion.py": "d3f52ed09142590679fd255c26f69b818016e540a15f2a1776caf38d3bc825f3",
+    "scripts/evaluate_upload_deletion.py": "67464c81553fc6505a4f731010a562fef3975df395bcc202233d014ebc220a32",
     "app/core/config.py": "8e442fd1ff8f8fa38a4e2837a599b3e84764e4c9a117d28e2a0490afbb7da012",
     "app/services/document_processing_service.py": "682f45420f3d61c64b4f49e78343e82bdba54167762b43abf7cdc07f5f6e89a5",
     "app/services/parser_service.py": "a8fed91a103c2e7ad1ec710c07cdc0187c9ca5621f830b802e3ab53dbba11a19",
     "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
-    "scripts/processor_fencing_checks.py": "e24ffa039e45fe57156f5e8140a836be88ced429424348b687d4c72dc4d67e00",
-    "tests/test_processor_graph_fencing.py": "1a789fc7cc85fc4e2ecc3646bd36d82b1720a8afedb348cc9be0363d5757b512"
+    "scripts/processor_fencing_checks.py": "91cc29df775c92ccf4c1576ace7adc643e941a3a3683e7bb999cf10bff7e74d7",
+    "tests/test_processor_graph_fencing.py": "1a789fc7cc85fc4e2ecc3646bd36d82b1720a8afedb348cc9be0363d5757b512",
+    "app/services/rag_service.py": "b4b766d739d00a5c66836d8c7ebb924488537b3a9b17f47d28ee20316f7adf71",
+    "app/services/citation_service.py": "d83956fb1d60e973980028953873202a799fe6cd858f6953562a668bb77c4f90",
+    "app/services/retrieval_candidates.py": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+    "tests/test_vector_attempt_scope.py": "92d65fffa30ad1a92d0876abbb4722916734f137656a643fc4d7bfd90b9c1ba1"
   },
   "limits": [
     "ASGI HTTP requests exercise the real authenticated DELETE route; this is not an external network/Render test.",

@@ -17,7 +17,7 @@
 - [x] Full backend suite: 570 tests pass; the first real fixture rejected its mismatched dimension setting, which was corrected to three without changing runtime validation.
 - [x] One fresh read-only review found no scoped correctness blockers; qualify old docstrings for default/opt-in callers.
 - [x] Finish final store report, nine frontend tests/build, compile/diff and 14 current hash checks; all own disposable resources were removed.
-- [ ] Commit/push only scoped verified code and verify exact free-service revision/readiness/public preview.
+- [x] Commit/push only scoped verified code and verify exact free-service revision/readiness/public preview.
 
 ## Acceptance still open
 
@@ -25,3 +25,5 @@
 - Legacy pre-rollout unmarked writers and out-of-band legacy helpers require a drain/compatibility policy before activation.
 - MinIO proves local S3 operations, not hosted R2. Synthetic vectors/graphs prove storage boundaries, not AI/OCR quality or load capacity.
 - Keep both `GRAPH_PROJECTION_FENCING_ENABLED=false` and `GRAPH_CONTINUATION_SNAPSHOTS_ENABLED=false` in production. Broader Phase 3 dispatch, accounting, split-worker and cache gates remain open.
+
+Release verified: `32deae61fe43ea62f90e7a3f6f7862ef8d564db4`; CI run `40702763635` passed, API readiness reported that exact revision and prepared frontend/API preview returned 200. The integration and continuation gates were not activated. Remaining hard-kill/Qdrant/legacy-rollout gates remain open.
