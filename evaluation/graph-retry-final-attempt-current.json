@@ -1,0 +1,54 @@
+{
+  "generated_at_utc": "2026-10-28T09:18:42.815171+00:00",
+  "postgres_version": "18.4 (Homebrew)",
+  "neo4j_image_id": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
+  "checks": {
+    "postgresql_stale_claim_stays_fenced_after_ordinary_retry": true,
+    "last_attempt_crash_preserves_attempt_limit_and_remote_commit": true,
+    "read_only_final_attempt_recovery_finishes_once_without_extra_claim_or_remote_write": true,
+    "available_attempts_active_lease_and_other_stop_reasons_do_not_enter_receipt_recovery": true,
+    "pending_removal_does_not_complete_through_receipt_recovery": true,
+    "missing_remote_commit_never_grants_work_or_completes_exhausted_job": true,
+    "conflicting_remote_marker_cannot_complete_or_mutate_bookkeeping": true,
+    "changed_extraction_contract_fails_before_remote_observation": true,
+    "concurrent_expired_final_attempt_observers_finish_one_receipt_without_new_claim": true,
+    "bookkeeping_rollback_leaves_retryable_receipt_observation": true,
+    "repeated_cancellation_drains_receipt_commit_while_source_lock_fences_competitor": true,
+    "sigkill_after_read_only_completion_commit_is_idempotently_durable": true
+  },
+  "checks_passed": 12,
+  "observations": {
+    "ordinary_retry_ordering": {
+      "new_task_concepts_before": 2,
+      "new_task_concepts_after": 0,
+      "late_old_write_rejected": false,
+      "safe": false,
+      "method": "Explicit replay of the exact old remote operation after real retry and unmarked write; not a timed network-delay experiment."
+    }
+  },
+  "ordinary_retry_race_safe": false,
+  "activation_blockers": [
+    "An old marked replay can overwrite a newer ordinary unmarked retry projection."
+  ],
+  "runtime_dispatch_connected": false,
+  "phase3_complete": false,
+  "temporary_resources_removed": true,
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "source_sha256": {
+    "app/services/graph_continuation_service.py": "eec3302df59e4bffe46a4b8aadba95974f4473c7016b6071069ba8e8de7f2a32",
+    "app/services/ingestion_service.py": "15206107973c632cab5999644d8305ca434dd3b4b715ae16ca1d51317a62e9c3",
+    "app/services/upload_service.py": "fc7b50657c346cec890706600d16f6fd7811b2fc4026e5eb63c0f67475a20af5",
+    "app/services/graph_result_metadata.py": "6c169517745f11ffbb95a9d0ab07b93f98f12f8c5f32814d9fcf39be2f3be00a",
+    "scripts/evaluate_graph_retry_final_attempt.py": "485e1db2e0533dfae737f902a932f14c6ad5932dd9b812dbd1cab7e0be3ee9dc",
+    "scripts/evaluate_graph_publication_recovery.py": "1676a7792b0ef2464620d62796a6ede2c7d144b9f249bd3ca0a292d173595ae7",
+    "tests/test_graph_final_attempt_recovery.py": "df4c20beb5d0b17ff7c8b1dba44386a12513a7dccccb9f75e2eb35a597a2cf9a"
+  },
+  "limits": [
+    "Ordinary retry uses real upload lifecycle methods and unmarked graph methods, but not the live API, vector writes or full processor.",
+    "Old remote work is adversarially replayed after the retry; this does not emulate packet delay or every server timing.",
+    "The final attempt is reached by advancing the private fixture counter, not consuming provider attempts; its lease is explicitly expired.",
+    "Recovery only observes exact existing markers; it must not extract, publish or grant another claim.",
+    "No models, Qdrant, R2, hosted data, production test mutations or automatic dispatcher are exercised."
+  ]
+}

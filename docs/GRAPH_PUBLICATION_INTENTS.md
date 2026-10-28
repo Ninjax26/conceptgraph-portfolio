@@ -205,3 +205,44 @@ The final allowed graph attempt crashing after remote commit, followed by
 stopped-job reconciliation, is not covered by this matrix. The claim policy still
 stops exhausted jobs; activation needs a bounded recovery policy that can observe
 an already-committed marker without granting fresh provider attempts.
+
+## Final-attempt recovery and ordinary retry probe — 28 October
+
+`reconcile_exhausted_publication` now handles one exact retained intent in its
+own cancellation-drained transaction. It accepts only a matching, retained READY
+source whose graph job exhausted its attempt allowance and either stopped for
+`attempt_limit` or has an expired final running lease. It never grants a claim,
+increments attempts, calls a model or writes Neo4j. Under document → job locks,
+it revalidates the snapshot, extraction contract, saved draft and intent, reads
+the exact remote marker and commits receipt/result/job completion together.
+Missing or conflicting markers cannot complete work. Source identity, initial
+completion time, vector count and checkpoints remain unchanged. An already
+completed job returns false before another remote observation. This helper is
+internal and has no runtime dispatcher or API caller.
+
+The dedicated `scripts/evaluate_graph_retry_final_attempt.py` passed twelve
+recovery/invariant checks against disposable PostgreSQL and Neo4j, including
+two actual SIGKILL boundaries: final-attempt remote commit before PostgreSQL
+completion, and the read-only completion commit. It also covers concurrent
+observers, repeated cancellation while retaining the source lock, bookkeeping
+rollback, marker conflicts, changed extraction contracts and ineligible jobs.
+Private fixture counters are advanced to the last allowed attempt and leases
+are explicitly expired; no provider calls are consumed to reach that state.
+The Neo4j fence write epoch stays unchanged during receipt recovery.
+
+**Ordinary retry ordering is unsafe in the separate adversarial probe.** After
+a real manual retry and its ordinary unmarked Neo4j write, replaying an exact
+older marked operation replaced that newer task's two concepts: the count for
+the current task fell from two to zero. PostgreSQL correctly rejects its stale
+claim, but ordinary writes do not advance the remote generation fence. The probe
+explicitly replays an older remote request; it is not a timed packet-delay test
+or a full API/vector-ingestion benchmark. This is a confirmed activation blocker,
+not a passing graph-safety assertion. No ordinary ingestion writes are changed
+by this increment. All graph writers and cleanup paths need compatible generation
+fencing before automatic publication can be enabled.
+
+See [the report](../evaluation/graph-retry-final-attempt-current.md) and its JSON
+for source hashes, image identity, cleanup and limits. The earlier twelve-check
+publication matrix was not rerun; its historical hashes remain its own scope.
+No models, Qdrant, R2 or production data were used. Phase 3 remains partial and
+automatic continuation remains disabled.

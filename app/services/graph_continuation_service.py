@@ -749,6 +749,14 @@ class GraphContinuationService:
         if locked is None:
             return False
         record, job, _ = locked
+        self._stage_completed_result(record, job, graph)
+        return True
+
+    @staticmethod
+    def _stage_completed_result(
+        record: DocumentUpload, job: GraphContinuationJob, graph: GraphExtractionResponse,
+    ) -> None:
+        """Caller retains source/job locks and commits receipt/result together."""
         if not isinstance(record.result_json, dict):
             raise ValueError("Graph completion requires the original READY result.")
         result = {**record.result_json, **graph_result_metadata(graph)}
@@ -760,7 +768,93 @@ class GraphContinuationService:
         record.graph_status = result["graph_status"]
         job.status, job.failure_category = "completed", None
         job.claim_token = job.lease_owner = job.lease_expires_at = None
-        return True
+
+    async def reconcile_exhausted_publication(
+        self, sessions: async_sessionmaker[AsyncSession], intent_id: str,
+        ingestion_service: IngestionService,
+    ) -> bool:
+        """Finish an already committed final attempt without granting more work.
+
+        Internal only: observe the exact Neo4j marker, never write the graph or
+        acquire a new claim. Hold source/job locks through receipt/result commit;
+        drain the entire unit on cancellation. Missing evidence remains stopped.
+        """
+        if not isinstance(intent_id, str) or not intent_id.strip():
+            raise ValueError("Graph publication intent ID is required.")
+
+        async def reconcile():
+            async with sessions() as session:
+                intent = (await session.execute(select(GraphPublicationIntent).where(
+                    GraphPublicationIntent.id == intent_id))).scalar_one_or_none()
+                if intent is None:
+                    return False
+                record = await self._document(session, intent.upload_id)
+                job = await self._job(session, intent.upload_id)
+                now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
+                if (not self._ready(record) or job is None or job.id != intent.job_id
+                    or record.task_id != intent.document_task_id
+                    or job.document_task_id != record.task_id
+                    or record.created_at < now - timedelta(days=settings.demo_upload_retention_days)
+                    or job.attempt_count < job.max_attempts):
+                    return False
+                exhausted = job.status == "stopped" and job.failure_category == "attempt_limit"
+                expired = (job.status == "running" and job.lease_expires_at is not None
+                           and job.lease_expires_at <= now)
+                if not (exhausted or expired):
+                    return False
+
+                chunks = snapshot_chunks(job.snapshot_json, record)
+                if (snapshot_digest(job.snapshot_json) != job.snapshot_sha256
+                    or extraction_contract(chunks) != job.contract_sha256):
+                    raise ValueError("Graph snapshot/configuration changed.")
+                draft = (await session.execute(select(GraphPublicationDraft).where(
+                    GraphPublicationDraft.job_id == job.id).with_for_update()
+                    .execution_options(populate_existing=True))).scalar_one_or_none()
+                if draft is None:
+                    return False
+                candidate = GraphPublicationCandidate(draft.payload_json, draft.payload_sha256)
+                graph = restore_graph_publication(candidate, chunks, upload_id=record.upload_id,
+                    course_id=record.course_uuid, document_task_id=record.task_id,
+                    document_name=record.original_filename)
+                if graph.provider_limited:
+                    raise ValueError("Provider-limited graph work must be deferred, not completed.")
+                intent = (await session.execute(select(GraphPublicationIntent).where(
+                    GraphPublicationIntent.id == intent_id).with_for_update()
+                    .execution_options(populate_existing=True))).scalar_one_or_none()
+                if intent is None:
+                    return False
+                generation = record.attempt_count
+                if type(generation) is not int or generation <= 0:
+                    raise ValueError("Graph publication requires a positive source generation.")
+                marker = GraphProjectionMarker(intent.id, job.id, record.upload_id,
+                    record.course_uuid, record.task_id, candidate.sha256, generation)
+                identity = (marker.id, marker.job_id, marker.upload_id, marker.course_id,
+                            marker.document_task_id, marker.payload_sha256, marker.generation)
+                if (intent.id, intent.job_id, intent.upload_id, intent.course_id,
+                    intent.document_task_id, intent.payload_sha256, intent.source_generation) != identity:
+                    raise ValueError("Graph publication intent no longer matches the source.")
+                observed = await ingestion_service.read_graph_publication_marker(intent.id)
+                if observed is None:
+                    return False
+                if observed != marker:
+                    raise ValueError("Remote graph marker conflicts with the publication intent.")
+                receipt = (await session.execute(select(GraphPublicationReceipt).where(
+                    GraphPublicationReceipt.intent_id == intent.id).with_for_update()
+                    .execution_options(populate_existing=True))).scalar_one_or_none()
+                if receipt is not None:
+                    if (receipt.intent_id, receipt.job_id, receipt.upload_id, receipt.course_id,
+                        receipt.document_task_id, receipt.payload_sha256, receipt.source_generation) != identity:
+                        raise ValueError("Graph publication receipt conflicts with the observed marker.")
+                else:
+                    session.add(GraphPublicationReceipt(intent_id=intent.id, job_id=job.id,
+                        upload_id=record.upload_id, course_id=record.course_uuid,
+                        document_task_id=record.task_id, payload_sha256=candidate.sha256,
+                        source_generation=generation))
+                self._stage_completed_result(record, job, graph)
+                await session.commit()
+                return True
+
+        return await run_async_safely(reconcile())
 
     async def load_input(
         self, session: AsyncSession, claim: GraphJobClaim,
