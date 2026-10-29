@@ -185,7 +185,7 @@ async def run(args):
     schema_startup_checks = {}
     context = {"socket_dir":str(args.socket_dir), "port":args.port, "schema":schema,
                "collection":"deletion_"+token, "bucket":"deletion-"+token,
-               "projection_fencing": args.projection_fencing}
+               "projection_fencing": args.projection_fencing,"fleet_inventory":args.fleet_inventory}
     try:
         network = docker("network", "create", "--label", "conceptgraph.disposable-deletion="+token, name)
         specs = (
@@ -527,6 +527,7 @@ async def run(args):
             "app/services/vector_rollout_audit.py","tests/test_vector_rollout_audit.py",
             "scripts/vector_rollout_checks.py",
             "scripts/schema_startup_checks.py","tests/test_schema_startup_columns.py",
+            "app/services/rollout_inventory.py","tests/test_rollout_inventory.py","scripts/fleet_inventory_checks.py",
             "app/services/rag_service.py","app/services/citation_service.py",
             "app/services/retrieval_candidates.py","tests/test_vector_attempt_scope.py")},
         "limits":[
@@ -545,14 +546,17 @@ async def run(args):
             ("Full-lifecycle mode runs real local HTTP and worker entry points with an actual 60-second retention timer; embedding/graph/reranking/synthesis are authored adapters, not semantic or provider-capacity measurements. Fixture lease/presence/due timestamps are advanced, but lifecycle and timer methods are not mocked."
              if args.full_lifecycle else "Full API/worker entry points and automatic retention timer are not exercised by this mode."),
             "Vector rollout audits inspect caller-supplied configuration and bounded metadata snapshots. They do not prove historical embedding origin, physical endpoint identity, PostgreSQL/Neo4j/R2 fleet compatibility, concurrent snapshot stability or legacy-writer drain; they never authorize activation or repair payloads.",
+            "Optional fleet inventory captures the two actual local API/worker processes and controller drift probes using READ ONLY SQL, database info, collection schema and HEAD. Matching supplied observations do not discover unknown processes, prove physical identity/equal permissions or certify drain/activation. No production inventory is collected.",
         ]}
-    output = ROOT/("evaluation/vector-rollout-audit-current" if args.vector_rollout_audit else
+    output = ROOT/("evaluation/fleet-inventory-current" if args.fleet_inventory else
+        "evaluation/vector-rollout-audit-current" if args.vector_rollout_audit else
         "evaluation/worker-lifecycle-current" if args.full_lifecycle else
         "evaluation/vector-deletion-recovery-current" if args.worker_crashes else
         "evaluation/processor-fencing-current" if args.projection_fencing else "evaluation/upload-deletion-current")
     output.with_suffix(".json").write_text(json.dumps(report,indent=2)+"\n")
     output.with_suffix(".md").write_text(
-        ("# Read-only vector rollout preflight — isolated metadata\n\n" if args.vector_rollout_audit else
+        ("# Separate-process read-only inventory — isolated stores\n\n" if args.fleet_inventory else
+         "# Read-only vector rollout preflight — isolated metadata\n\n" if args.vector_rollout_audit else
          "# Separate API, full worker lifecycle and automatic cleanup\n\n" if args.full_lifecycle else
          "# Durable vector cleanup and killed-worker recovery\n\n" if args.worker_crashes else
          "# Opt-in processor and deletion fencing — isolated stores\n\n" if args.projection_fencing
@@ -561,7 +565,8 @@ async def run(args):
         "Command: `.venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket>"
         + (" --projection-fencing" if args.projection_fencing else "")
         + (" --worker-crashes" if args.worker_crashes else "")
-        + (" --full-lifecycle" if args.full_lifecycle else "") + "`.\n\n"
+        + (" --full-lifecycle" if args.full_lifecycle else "")
+        + (" --fleet-inventory" if args.fleet_inventory else "") + "`.\n\n"
         + ("Audit option: `--vector-rollout-audit` (read-only auditor; fixture setup/teardown writes only owned synthetic data).\n\n" if args.vector_rollout_audit else "")
         +f"Overall qualification: **{'PASS' if report['passed'] else 'FAIL — keep disabled'}**.\n\n"
         +f"{len(checks)}/{len(checks)} deletion regression checks passed. Zero hosted provider calls or production mutations. "
@@ -605,6 +610,7 @@ if __name__ == "__main__":
     parser.add_argument("--worker-crashes", action="store_true")
     parser.add_argument("--full-lifecycle", action="store_true")
     parser.add_argument("--vector-rollout-audit", action="store_true")
+    parser.add_argument("--fleet-inventory", action="store_true")
     args = parser.parse_args()
     if args.worker_crashes and not args.projection_fencing:
         parser.error("--worker-crashes requires --projection-fencing; production defaults must stay unchanged")
@@ -612,4 +618,6 @@ if __name__ == "__main__":
         parser.error("--full-lifecycle requires the scoped crash/deletion qualification")
     if args.vector_rollout_audit and not args.projection_fencing:
         parser.error("--vector-rollout-audit requires the explicitly opted-in private fixture")
+    if args.fleet_inventory and not args.full_lifecycle:
+        parser.error("--fleet-inventory requires actual API/worker lifecycle processes")
     asyncio.run(child(args) if args.child or args.recover_child else run(args))

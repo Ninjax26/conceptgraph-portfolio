@@ -1,6 +1,7 @@
 """Full local entry points, real stores/timer, explicitly offline AI adapters."""
 import argparse
 import asyncio
+import hashlib
 from contextlib import ExitStack
 import json
 from pathlib import Path
@@ -12,6 +13,7 @@ import time
 from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
+from urllib.parse import urlencode
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -44,6 +46,13 @@ def lifecycle_config(base, role):
         "processing_queue_capacity": 2, "processing_dispatch_interval_seconds": .25,
         "processing_lease_seconds": 60, "processing_heartbeat_seconds": 5,
         "demo_cleanup_interval_seconds": 60, "graph_continuation_snapshots_enabled": False})
+
+
+def inventory_fixture_config(config, context):
+    """Describe the actual privately injected clients, without changing env files."""
+    query = urlencode({"host":context["socket_dir"],"port":context["port"]})
+    return config.model_copy(update={"database_url":"postgresql+asyncpg://cg_budget@/postgres?"+query,
+                                     "neo4j_uri":context["neo4j"]})
 
 
 class OfflineReranker:
@@ -85,6 +94,8 @@ async def child(args):
         vector = QdrantClient(url=local_url(context["vector_transport"], "http"), timeout=5,
             check_compatibility=False, cloud_inference=False)
     cfg = lifecycle_config(storage.config, args.role)
+    if context.get("fleet_inventory"):
+        cfg = inventory_fixture_config(cfg, context)
     sessions = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
     ingestion = AuthoredIngestion(driver, vector, context["collection"])
     processor = processing.DocumentProcessingService(config=cfg, ingestion_service=ingestion,
@@ -122,6 +133,17 @@ async def child(args):
         stack.enter_context(patch.object(query, "get_rerank_service", lambda: OfflineReranker()))
         stack.enter_context(patch.object(query, "get_synthesis_service", lambda: OfflineSynthesis()))
         main.app.dependency_overrides[query.get_retrieval_service] = lambda: retrieval
+        if context.get("fleet_inventory"):
+            from app.services.rollout_inventory import collect_inventory
+            names = ("app/core/database.py","app/core/processing_coordinator.py","app/worker.py","app/main.py",
+                "app/services/ingestion_service.py","app/services/rag_service.py",
+                "app/services/rollout_inventory.py","scripts/worker_lifecycle_checks.py")
+            code_digest = hashlib.sha256(json.dumps({name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
+                for name in names},sort_keys=True).encode()).hexdigest()
+            inventory = await collect_inventory(cfg, engine, driver, vector, storage, code_sha256=code_digest)
+            inventory_path = args.context.with_suffix(f".{args.role}.inventory.json")
+            inventory_path.write_text(json.dumps(inventory))
+            inventory_path.chmod(0o600)
         if args.role == "worker":
             await worker.run_worker()
         else:
@@ -264,6 +286,14 @@ async def verify_lifecycle(context, sessions, driver, vector, storage):
                     status = await ready()
                     assert status["ingestion_available"] and status["active_workers"] == 1
                     assert status["processing_queue_depth"] == 0
+                    if context.get("fleet_inventory"):
+                        from scripts.fleet_inventory_checks import verify_inventory
+                        inventories = [json.loads(manifest.with_suffix(f".{role}.inventory.json").read_text())
+                            for role in ("api","worker")]
+                        assert [m["pid"] for m in inventories] == [api.pid,worker.pid]
+                        inventory_result = await verify_inventory(context, sessions, driver, vector, storage, inventories)
+                        checks.update(inventory_result["checks"])
+                        observations["fleet_inventory"] = inventory_result["observations"]
                     answer = await client.post("/api/v1/query", headers=headers, json=question)
                     assert answer.status_code == 200, answer.text
                     payload = answer.json()
