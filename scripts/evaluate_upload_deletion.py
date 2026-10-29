@@ -48,6 +48,13 @@ def local_url(value, scheme):
     return value
 
 
+def qualification_command(args):
+    modes = ("projection_fencing", "worker_crashes", "full_lifecycle",
+             "vector_rollout_audit", "fleet_inventory", "drain_rollback")
+    return (".venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket>"
+            + "".join(" --"+name.replace("_", "-") for name in modes if getattr(args, name)))
+
+
 def config(context):
     return Settings(_env_file=None, REQUIRE_UPLOAD_AUTH=True, DEMO_ACCESS_TOKEN=TOKEN,
         OBJECT_STORAGE_BACKEND="s3", S3_ENDPOINT_URL=local_url(context["s3"], "http"),
@@ -181,6 +188,7 @@ async def run(args):
     worker_result = {"checks": {}, "observations": {}, "activation_safe": True}
     vector_cleanup_checks = {}
     lifecycle_result = {"checks": {}, "observations": {}}
+    transition_result = {"checks": {}, "observations": {}}
     rollout_result = {"checks": {}, "observations": {}}
     schema_startup_checks = {}
     context = {"socket_dir":str(args.socket_dir), "port":args.port, "schema":schema,
@@ -251,6 +259,9 @@ async def run(args):
                 from scripts.processor_crash_checks import verify_worker_crashes
                 worker_result = await verify_worker_crashes(context, sessions, driver, vector, storage,
                     remove_processor_fixture)
+                if args.drain_rollback:
+                    from scripts.drain_rollback_checks import verify_drain_rollback
+                    transition_result = await verify_drain_rollback(context, sessions, driver, vector, storage)
                 if args.full_lifecycle:
                     from scripts.worker_lifecycle_checks import verify_lifecycle
                     lifecycle_result = await verify_lifecycle(context, sessions, driver, vector, storage)
@@ -493,7 +504,8 @@ async def run(args):
         "passed":all(checks.values()) and all(processor_checks.values())
             and all(vector_cleanup_checks.values()) and all(worker_result["checks"].values())
             and worker_result["activation_safe"] and all(lifecycle_result["checks"].values())
-            and all(rollout_result["checks"].values()) and all(schema_startup_checks.values()),
+            and all(rollout_result["checks"].values()) and all(schema_startup_checks.values())
+            and all(transition_result["checks"].values()),
         "checks":checks, "crash_observations":observations, "elapsed_seconds":round(time.perf_counter()-started,3),
         "projection_fencing_enabled_in_fixture": args.projection_fencing,
         "processor_checks": processor_checks,
@@ -501,6 +513,7 @@ async def run(args):
         "full_lifecycle": lifecycle_result if args.full_lifecycle else None,
         "vector_rollout_audit": rollout_result if args.vector_rollout_audit else None,
         "schema_startup_checks": schema_startup_checks,
+        "drain_rollback": transition_result if args.drain_rollback else None,
         "worker_crash_qualification": worker_result if args.worker_crashes else None,
         "hosted_provider_calls":0, "production_test_data_mutations":0,
         "temporary_schema_containers_network_removed":True, "container_images":images,
@@ -528,6 +541,8 @@ async def run(args):
             "scripts/vector_rollout_checks.py",
             "scripts/schema_startup_checks.py","tests/test_schema_startup_columns.py",
             "app/services/rollout_inventory.py","tests/test_rollout_inventory.py","scripts/fleet_inventory_checks.py",
+            "scripts/drain_rollback_checks.py","tests/test_legacy_read_snapshot.py",
+            "tests/test_qualification_command.py",
             "app/services/rag_service.py","app/services/citation_service.py",
             "app/services/retrieval_candidates.py","tests/test_vector_attempt_scope.py")},
         "limits":[
@@ -547,27 +562,26 @@ async def run(args):
              if args.full_lifecycle else "Full API/worker entry points and automatic retention timer are not exercised by this mode."),
             "Vector rollout audits inspect caller-supplied configuration and bounded metadata snapshots. They do not prove historical embedding origin, physical endpoint identity, PostgreSQL/Neo4j/R2 fleet compatibility, concurrent snapshot stability or legacy-writer drain; they never authorize activation or repair payloads.",
             "Optional fleet inventory captures the two actual local API/worker processes and controller drift probes using READ ONLY SQL, database info, collection schema and HEAD. Matching supplied observations do not discover unknown processes, prove physical identity/equal permissions or certify drain/activation. No production inventory is collected.",
+            "Optional drain/rollback rehearses only this current binary in legacy/scoped/legacy modes and accounts for its seven known child processes and one held vector PUT. Stop receipts observe awaited real coordinator.stop; the scoped transport timeout is extended only in this private fixture. Historical binaries, unknown writers, arbitrary in-flight requests and production drain remain unqualified. The stale replay and exact-task reconciliation are explicit controller actions, not automatic runtime rollback or repair. Durable obligations are retained through rollback; global activation remains false.",
         ]}
-    output = ROOT/("evaluation/fleet-inventory-current" if args.fleet_inventory else
+    output = ROOT/("evaluation/drain-rollback-current" if args.drain_rollback else
+        "evaluation/fleet-inventory-current" if args.fleet_inventory else
         "evaluation/vector-rollout-audit-current" if args.vector_rollout_audit else
         "evaluation/worker-lifecycle-current" if args.full_lifecycle else
         "evaluation/vector-deletion-recovery-current" if args.worker_crashes else
         "evaluation/processor-fencing-current" if args.projection_fencing else "evaluation/upload-deletion-current")
     output.with_suffix(".json").write_text(json.dumps(report,indent=2)+"\n")
     output.with_suffix(".md").write_text(
-        ("# Separate-process read-only inventory — isolated stores\n\n" if args.fleet_inventory else
+        ("# Current-binary known-cohort drain and rollback — isolated stores\n\n" if args.drain_rollback else
+         "# Separate-process read-only inventory — isolated stores\n\n" if args.fleet_inventory else
          "# Read-only vector rollout preflight — isolated metadata\n\n" if args.vector_rollout_audit else
          "# Separate API, full worker lifecycle and automatic cleanup\n\n" if args.full_lifecycle else
          "# Durable vector cleanup and killed-worker recovery\n\n" if args.worker_crashes else
          "# Opt-in processor and deletion fencing — isolated stores\n\n" if args.projection_fencing
          else "# Isolated document deletion recovery\n\n") +
         f"Generated: {report['generated_at_utc']}.\n\n"
-        "Command: `.venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket>"
-        + (" --projection-fencing" if args.projection_fencing else "")
-        + (" --worker-crashes" if args.worker_crashes else "")
-        + (" --full-lifecycle" if args.full_lifecycle else "")
-        + (" --fleet-inventory" if args.fleet_inventory else "") + "`.\n\n"
-        + ("Audit option: `--vector-rollout-audit` (read-only auditor; fixture setup/teardown writes only owned synthetic data).\n\n" if args.vector_rollout_audit else "")
+        "Command: `"+qualification_command(args)+"`.\n\n"
+        + ("Vector audit is read-only; fixture setup/teardown writes only owned synthetic data.\n\n" if args.vector_rollout_audit else "")
         +f"Overall qualification: **{'PASS' if report['passed'] else 'FAIL — keep disabled'}**.\n\n"
         +f"{len(checks)}/{len(checks)} deletion regression checks passed. Zero hosted provider calls or production mutations. "
         "Temporary resources were removed.\n\n"
@@ -584,6 +598,8 @@ async def run(args):
           +"\n\n```json\n"+json.dumps(rollout_result["observations"], indent=2)+"\n```\n" if args.vector_rollout_audit else "")
         +("\n\n## Current-schema startup\n\n"+"\n".join(f"- {name}: pass" for name in schema_startup_checks)
           if schema_startup_checks else "")
+        +("\n\n## Known-cohort drain and rollback\n\n"+"\n".join(f"- {name}: pass" for name in transition_result["checks"])
+          +"\n\n```json\n"+json.dumps(transition_result["observations"], indent=2)+"\n```\n" if args.drain_rollback else "")
         +"\n\n## Limits\n\n"+"\n".join(f"- {limit}" for limit in report["limits"])
         +"\n\nThe adjacent JSON records exact crash observations, image IDs and source hashes.\n")
     print(json.dumps({"checks_passed":len(checks),"processor_checks":len(processor_checks),
@@ -592,6 +608,7 @@ async def run(args):
         "lifecycle_checks": len(lifecycle_result["checks"]),
         "rollout_checks": len(rollout_result["checks"]),
         "schema_startup_checks": len(schema_startup_checks),
+        "drain_rollback_checks": len(transition_result["checks"]),
         "hosted_provider_calls":0,"temporary_resources_removed":True}))
     if not report["passed"]:
         raise SystemExit(1)
@@ -611,6 +628,7 @@ if __name__ == "__main__":
     parser.add_argument("--full-lifecycle", action="store_true")
     parser.add_argument("--vector-rollout-audit", action="store_true")
     parser.add_argument("--fleet-inventory", action="store_true")
+    parser.add_argument("--drain-rollback", action="store_true")
     args = parser.parse_args()
     if args.worker_crashes and not args.projection_fencing:
         parser.error("--worker-crashes requires --projection-fencing; production defaults must stay unchanged")
@@ -620,4 +638,6 @@ if __name__ == "__main__":
         parser.error("--vector-rollout-audit requires the explicitly opted-in private fixture")
     if args.fleet_inventory and not args.full_lifecycle:
         parser.error("--fleet-inventory requires actual API/worker lifecycle processes")
+    if args.drain_rollback and not (args.fleet_inventory and args.vector_rollout_audit):
+        parser.error("--drain-rollback requires --fleet-inventory and --vector-rollout-audit")
     asyncio.run(child(args) if args.child or args.recover_child else run(args))

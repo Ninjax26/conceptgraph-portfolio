@@ -52,7 +52,7 @@ async def verify_vector_rollout(sessions, vector, config, collection):
 
     def point(chunk, *, task=current_task, course_id=course.id, physical=None):
         return models.PointStruct(id=physical or IngestionService._qdrant_point_id(chunk), vector=[1.,0.,0.],
-            payload={"upload_id":upload,"course_id":course_id,"execution_token":task,"chunk_id":chunk,
+            payload={"upload_id":upload,"document_id":course_id,"execution_token":task,"chunk_id":chunk,
                 "page_number":1,"text":"Synthetic private-looking text excluded from audit projection"})
     baseline = [point(f"{upload}:1:{i}", physical=(IngestionService._qdrant_point_id(
         f"{upload}:1:{i}", execution=(upload,current_task)) if i == 1 else None)) for i in range(3)]

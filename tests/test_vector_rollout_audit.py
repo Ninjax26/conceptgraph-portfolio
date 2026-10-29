@@ -22,7 +22,7 @@ def source(**changes):
 
 
 def point(**changes):
-    return SimpleNamespace(id="legacy-physical-id", payload=dict(upload_id="upload", course_id="course",
+    return SimpleNamespace(id="legacy-physical-id", payload=dict(upload_id="upload", document_id="course",
         execution_token="current", chunk_id="logical", page_number=1) | changes)
 
 
@@ -33,6 +33,17 @@ def client(pages):
 
 
 class VectorRolloutAuditTests(unittest.IsolatedAsyncioTestCase):
+    async def test_real_parser_payload_uses_document_id_for_the_canonical_course(self):
+        from app.services.parser_service import ParserService
+        chunk = ParserService(ocr_enabled=False).chunk_pages(
+            [(1, "DNS Resolution\nDNS translates a domain name into an IP address before routing packets.")],
+            "course", "upload", "synthetic.pdf")[0]
+        native = SimpleNamespace(id="existing-native-point", payload={**chunk.metadata,
+            "execution_token":"current"})
+        result = await self.audit(client([([native], None)]))
+        self.assertTrue(result["read_coverage_ok"], result)
+        self.assertTrue(result["cleanup_payloads_trackable"], result)
+
     def setUp(self):
         self.contract = VectorReadContract.from_settings(config())
         self.identity = ReadyVectorIdentity.from_record(source(), known_tasks={"current", "old"})
@@ -83,7 +94,7 @@ class VectorRolloutAuditTests(unittest.IsolatedAsyncioTestCase):
         arguments = vector.scroll.call_args.kwargs
         self.assertFalse(arguments["with_vectors"])
         self.assertEqual(set(arguments["with_payload"]),
-            {"upload_id", "course_id", "execution_token", "chunk_id", "page_number"})
+            {"upload_id", "document_id", "execution_token", "chunk_id", "page_number"})
         self.assertEqual(arguments["scroll_filter"].must[0].match.value, "upload")
 
     async def test_known_stale_is_excluded_but_unknown_and_untagged_cannot_claim_cleanup_coverage(self):
@@ -98,7 +109,7 @@ class VectorRolloutAuditTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(missing["read_coverage_ok"])
 
     async def test_duplicates_foreign_scope_malformed_chunk_and_non_integer_page_fail_coverage(self):
-        for points in ([point(), point()], [point(course_id="other")], [point(upload_id="other")],
+        for points in ([point(), point()], [point(document_id="other")], [point(upload_id="other")],
             [point(chunk_id="")], [point(page_number=True)], [point(page_number=1.)]):
             r = await self.audit(client([(points, None)]))
             self.assertFalse(r["read_coverage_ok"])

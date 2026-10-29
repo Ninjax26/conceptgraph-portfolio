@@ -6,9 +6,52 @@ import unittest
 
 from app.core.config import Settings
 from scripts.worker_lifecycle_checks import lifecycle_config, OfflineReranker, OfflineSynthesis, ShutdownReceipt
+from scripts.worker_lifecycle_checks import observe_stop
+import asyncio
 
 
 class WorkerLifecycleFixtureTests(unittest.IsolatedAsyncioTestCase):
+    def test_explicit_private_legacy_cohort_preserves_default_configuration(self):
+        base = Settings(_env_file=None, GRAPH_PROJECTION_FENCING_ENABLED=True)
+        self.assertFalse(lifecycle_config(base, "worker", scoped=False).graph_projection_fencing_enabled)
+        self.assertTrue(lifecycle_config(base, "api").graph_projection_fencing_enabled)
+        self.assertTrue(base.graph_projection_fencing_enabled)
+        for value in (0, None, "false"):
+            with self.assertRaises(ValueError):
+                lifecycle_config(base, "worker", scoped=value)
+
+    async def test_stop_receipt_observes_the_actual_awaited_operation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            started, completed = Path(directory)/"started", Path(directory)/"completed"
+            release = asyncio.Event()
+            task = asyncio.create_task(observe_stop(release.wait, started, completed))
+            await asyncio.sleep(0)
+            self.assertEqual(started.read_text(), "stop.entered")
+            self.assertFalse(completed.exists())
+            self.assertFalse(task.done())
+            release.set()
+            await task
+            self.assertEqual(completed.read_text(), "stop.completed")
+
+    async def test_stop_observation_errors_never_skip_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            absent = Path(directory)/"absent"/"receipt"
+            calls = []
+            async def stop():
+                calls.append("actual stop")
+            await observe_stop(stop, absent, absent)
+            self.assertEqual(calls, ["actual stop"])
+
+    async def test_failed_stop_does_not_write_a_completion_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            started, completed = Path(directory)/"started", Path(directory)/"completed"
+            async def stop():
+                raise RuntimeError("controlled failure")
+            with self.assertRaises(RuntimeError):
+                await observe_stop(stop, started, completed)
+            self.assertTrue(started.exists())
+            self.assertFalse(completed.exists())
+
     async def test_shutdown_receipt_requires_actual_asgi_shutdown_completion(self):
         with tempfile.TemporaryDirectory() as directory:
             receipt = Path(directory)/"closed"

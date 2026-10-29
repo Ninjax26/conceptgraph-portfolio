@@ -12,6 +12,24 @@ from app.services.upload_service import UploadService
 from app.services.vector_cleanup_service import VectorCleanupScope
 
 
+def legacy_read_snapshot_compatible(audit):
+    """Clean bounded metadata only; this never verifies drain or authorizes rollout."""
+    if (not isinstance(audit, Mapping)
+        or any(audit.get(key) is not True for key in
+               ("scan_completed", "read_coverage_ok", "cleanup_payloads_trackable"))
+        or audit.get("error_type", "missing") is not None):
+        return False
+    counts = audit.get("counts")
+    current = {"scanned", "current_points", "current_unique_chunks"}
+    unsafe = {"known_stale_points", "unknown_task_points", "untagged_points",
+              "foreign_points", "malformed_current_points", "duplicate_current_chunks"}
+    return (isinstance(counts, Mapping) and set(counts) == current | unsafe
+        and all(type(value) is int and value >= 0 for value in counts.values())
+        and counts["scanned"] > 0
+        and counts["scanned"] == counts["current_points"] == counts["current_unique_chunks"]
+        and not any(counts[key] for key in unsafe))
+
+
 @dataclass(frozen=True)
 class VectorReadContract:
     collection_name: str
@@ -100,7 +118,7 @@ async def audit_ready_vectors(client, contract: VectorReadContract, identity: Re
                 collection_name=contract.collection_name,
                 scroll_filter=Filter(must=[FieldCondition(key="upload_id", match=MatchValue(value=identity.upload_id))]),
                 offset=offset, limit=limit, with_vectors=False,
-                with_payload=["upload_id", "course_id", "execution_token", "chunk_id", "page_number"])
+                with_payload=["upload_id", "document_id", "execution_token", "chunk_id", "page_number"])
             if (len(points) > limit or (next_offset is not None and
                 (not points or type(next_offset) not in (int, str) or next_offset in offsets))):
                 result["error_type"] = "InvalidPagination"
@@ -108,7 +126,8 @@ async def audit_ready_vectors(client, contract: VectorReadContract, identity: Re
             for point in points:
                 counts["scanned"] += 1
                 payload = point.payload if isinstance(point.payload, Mapping) else {}
-                if payload.get("upload_id") != identity.upload_id or payload.get("course_id") != identity.course_id:
+                # ParserService's existing payload calls the canonical course UUID document_id.
+                if payload.get("upload_id") != identity.upload_id or payload.get("document_id") != identity.course_id:
                     counts["foreign_points"] += 1
                 elif not isinstance(payload.get("execution_token"), str) or not payload["execution_token"].strip():
                     counts["untagged_points"] += 1

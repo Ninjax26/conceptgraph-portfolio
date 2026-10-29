@@ -1,6 +1,8 @@
 """Full local entry points, real stores/timer, explicitly offline AI adapters."""
 import argparse
 import asyncio
+import contextlib
+import functools
 import hashlib
 from contextlib import ExitStack
 import json
@@ -38,14 +40,16 @@ from scripts.evaluate_provider_admission import engine_for
 from scripts.processor_crash_checks import AuthoredIngestion
 
 
-def lifecycle_config(base, role):
-    if role not in {"api", "worker"} or not base.graph_projection_fencing_enabled:
+def lifecycle_config(base, role, *, scoped=True):
+    if (role not in {"api", "worker"} or not base.graph_projection_fencing_enabled
+        or type(scoped) is not bool):
         raise ValueError("Use an opted-in private fixture with an explicit split-process role.")
     return base.model_copy(update={"processing_role": role, "shared_provider_limits_enabled": True,
         "embedding_provider": "local", "embedding_dimension": 3, "processing_concurrency": 1,
         "processing_queue_capacity": 2, "processing_dispatch_interval_seconds": .25,
         "processing_lease_seconds": 60, "processing_heartbeat_seconds": 5,
-        "demo_cleanup_interval_seconds": 60, "graph_continuation_snapshots_enabled": False})
+        "demo_cleanup_interval_seconds": 60, "graph_continuation_snapshots_enabled": False,
+        "graph_projection_fencing_enabled": scoped})
 
 
 def inventory_fixture_config(config, context):
@@ -66,6 +70,15 @@ class OfflineSynthesis:
             raise ValueError("An offline excerpt requires accepted evidence.")
         return SimpleNamespace(answer="Offline fixture excerpt: "+sources[0]["supporting_passage"]+" [Source 1]",
             provider_used="evidence_fallback", failover_used=False, failover_reason=None)
+
+
+async def observe_stop(operation, started, completed):
+    """Private observer: always await the actual stop, even if a receipt write fails."""
+    with contextlib.suppress(OSError):
+        started.write_text("stop.entered")
+    await operation()
+    with contextlib.suppress(OSError):
+        completed.write_text("stop.completed")
 
 
 class ShutdownReceipt:
@@ -91,9 +104,10 @@ async def child(args):
     driver, vector, storage = clients(context)
     if context.get("vector_transport"):
         vector.close()
-        vector = QdrantClient(url=local_url(context["vector_transport"], "http"), timeout=5,
+        vector = QdrantClient(url=local_url(context["vector_transport"], "http"),
+            timeout=30 if context.get("drain_rehearsal") else 5,
             check_compatibility=False, cloud_inference=False)
-    cfg = lifecycle_config(storage.config, args.role)
+    cfg = lifecycle_config(storage.config, args.role, scoped=context.get("cohort_scoped", True))
     if context.get("fleet_inventory"):
         cfg = inventory_fixture_config(cfg, context)
     sessions = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
@@ -101,6 +115,10 @@ async def child(args):
     processor = processing.DocumentProcessingService(config=cfg, ingestion_service=ingestion,
         parser_service=ParserService(ocr_enabled=False))
     coordinator = coordination.ProcessingCoordinator(config=cfg, processing_service=processor)
+    if context.get("drain_rehearsal"):
+        coordinator.stop = functools.partial(observe_stop, coordinator.stop,
+            args.context.with_suffix(f".{args.role}.stop-started"),
+            args.context.with_suffix(f".{args.role}.stop-completed"))
     retention = DemoRetentionService(config=cfg, storage=storage)
     retention.ingestion_service = ingestion
     limiter = RateLimitService()
