@@ -181,6 +181,8 @@ async def run(args):
     worker_result = {"checks": {}, "observations": {}, "activation_safe": True}
     vector_cleanup_checks = {}
     lifecycle_result = {"checks": {}, "observations": {}}
+    rollout_result = {"checks": {}, "observations": {}}
+    schema_startup_checks = {}
     context = {"socket_dir":str(args.socket_dir), "port":args.port, "schema":schema,
                "collection":"deletion_"+token, "bucket":"deletion-"+token,
                "projection_fencing": args.projection_fencing}
@@ -230,6 +232,9 @@ async def run(args):
         service = InjectedIngestion(driver,vector,context)
         processor_checks = {}
         if args.projection_fencing:
+            if args.vector_rollout_audit:
+                from scripts.schema_startup_checks import verify_current_schema_startup
+                schema_startup_checks = await verify_current_schema_startup(engine, sessions)
             if args.worker_crashes:
                 from scripts.vector_cleanup_checks import verify_vector_cleanup
                 vector_cleanup_checks = await verify_vector_cleanup(
@@ -239,6 +244,9 @@ async def run(args):
                 return await request(sessions, storage, service, upload_id)
             processor_checks = await verify_processor(sessions, driver, vector, storage,
                 context["collection"], remove_processor_fixture)
+            if args.vector_rollout_audit:
+                from scripts.vector_rollout_checks import verify_vector_rollout
+                rollout_result = await verify_vector_rollout(sessions, vector, storage.config, context["collection"])
             if args.worker_crashes:
                 from scripts.processor_crash_checks import verify_worker_crashes
                 worker_result = await verify_worker_crashes(context, sessions, driver, vector, storage,
@@ -484,12 +492,15 @@ async def run(args):
         "generated_at_utc":datetime.now(timezone.utc).isoformat(),
         "passed":all(checks.values()) and all(processor_checks.values())
             and all(vector_cleanup_checks.values()) and all(worker_result["checks"].values())
-            and worker_result["activation_safe"] and all(lifecycle_result["checks"].values()),
+            and worker_result["activation_safe"] and all(lifecycle_result["checks"].values())
+            and all(rollout_result["checks"].values()) and all(schema_startup_checks.values()),
         "checks":checks, "crash_observations":observations, "elapsed_seconds":round(time.perf_counter()-started,3),
         "projection_fencing_enabled_in_fixture": args.projection_fencing,
         "processor_checks": processor_checks,
         "vector_cleanup_checks": vector_cleanup_checks,
         "full_lifecycle": lifecycle_result if args.full_lifecycle else None,
+        "vector_rollout_audit": rollout_result if args.vector_rollout_audit else None,
+        "schema_startup_checks": schema_startup_checks,
         "worker_crash_qualification": worker_result if args.worker_crashes else None,
         "hosted_provider_calls":0, "production_test_data_mutations":0,
         "temporary_schema_containers_network_removed":True, "container_images":images,
@@ -513,6 +524,9 @@ async def run(args):
             "app/worker.py","app/main.py","app/services/worker_presence_service.py",
             "app/core/security.py","app/services/security_service.py","app/core/database.py",
             "app/api/endpoints/query.py",
+            "app/services/vector_rollout_audit.py","tests/test_vector_rollout_audit.py",
+            "scripts/vector_rollout_checks.py",
+            "scripts/schema_startup_checks.py","tests/test_schema_startup_columns.py",
             "app/services/rag_service.py","app/services/citation_service.py",
             "app/services/retrieval_candidates.py","tests/test_vector_attempt_scope.py")},
         "limits":[
@@ -530,13 +544,16 @@ async def run(args):
             "Projection fencing is enabled only in the private fixture configuration; no production environment or automatic continuation is activated.",
             ("Full-lifecycle mode runs real local HTTP and worker entry points with an actual 60-second retention timer; embedding/graph/reranking/synthesis are authored adapters, not semantic or provider-capacity measurements. Fixture lease/presence/due timestamps are advanced, but lifecycle and timer methods are not mocked."
              if args.full_lifecycle else "Full API/worker entry points and automatic retention timer are not exercised by this mode."),
+            "Vector rollout audits inspect caller-supplied configuration and bounded metadata snapshots. They do not prove historical embedding origin, physical endpoint identity, PostgreSQL/Neo4j/R2 fleet compatibility, concurrent snapshot stability or legacy-writer drain; they never authorize activation or repair payloads.",
         ]}
-    output = ROOT/("evaluation/worker-lifecycle-current" if args.full_lifecycle else
+    output = ROOT/("evaluation/vector-rollout-audit-current" if args.vector_rollout_audit else
+        "evaluation/worker-lifecycle-current" if args.full_lifecycle else
         "evaluation/vector-deletion-recovery-current" if args.worker_crashes else
         "evaluation/processor-fencing-current" if args.projection_fencing else "evaluation/upload-deletion-current")
     output.with_suffix(".json").write_text(json.dumps(report,indent=2)+"\n")
     output.with_suffix(".md").write_text(
-        ("# Separate API, full worker lifecycle and automatic cleanup\n\n" if args.full_lifecycle else
+        ("# Read-only vector rollout preflight — isolated metadata\n\n" if args.vector_rollout_audit else
+         "# Separate API, full worker lifecycle and automatic cleanup\n\n" if args.full_lifecycle else
          "# Durable vector cleanup and killed-worker recovery\n\n" if args.worker_crashes else
          "# Opt-in processor and deletion fencing — isolated stores\n\n" if args.projection_fencing
          else "# Isolated document deletion recovery\n\n") +
@@ -545,6 +562,7 @@ async def run(args):
         + (" --projection-fencing" if args.projection_fencing else "")
         + (" --worker-crashes" if args.worker_crashes else "")
         + (" --full-lifecycle" if args.full_lifecycle else "") + "`.\n\n"
+        + ("Audit option: `--vector-rollout-audit` (read-only auditor; fixture setup/teardown writes only owned synthetic data).\n\n" if args.vector_rollout_audit else "")
         +f"Overall qualification: **{'PASS' if report['passed'] else 'FAIL — keep disabled'}**.\n\n"
         +f"{len(checks)}/{len(checks)} deletion regression checks passed. Zero hosted provider calls or production mutations. "
         "Temporary resources were removed.\n\n"
@@ -557,12 +575,18 @@ async def run(args):
           +"\n\n```json\n"+json.dumps(worker_result["observations"], indent=2)+"\n```\n" if args.worker_crashes else "")
         +("\n\n## Full entry points and timer\n\n"+"\n".join(f"- {name}: pass" for name in lifecycle_result["checks"])
           +"\n\n```json\n"+json.dumps(lifecycle_result["observations"], indent=2)+"\n```\n" if args.full_lifecycle else "")
+        +("\n\n## Read-only vector audit\n\n"+"\n".join(f"- {name}: pass" for name in rollout_result["checks"])
+          +"\n\n```json\n"+json.dumps(rollout_result["observations"], indent=2)+"\n```\n" if args.vector_rollout_audit else "")
+        +("\n\n## Current-schema startup\n\n"+"\n".join(f"- {name}: pass" for name in schema_startup_checks)
+          if schema_startup_checks else "")
         +"\n\n## Limits\n\n"+"\n".join(f"- {limit}" for limit in report["limits"])
         +"\n\nThe adjacent JSON records exact crash observations, image IDs and source hashes.\n")
     print(json.dumps({"checks_passed":len(checks),"processor_checks":len(processor_checks),
         "worker_checks": len(worker_result["checks"]), "qualification_passed": report["passed"],
         "vector_cleanup_checks": len(vector_cleanup_checks),
         "lifecycle_checks": len(lifecycle_result["checks"]),
+        "rollout_checks": len(rollout_result["checks"]),
+        "schema_startup_checks": len(schema_startup_checks),
         "hosted_provider_calls":0,"temporary_resources_removed":True}))
     if not report["passed"]:
         raise SystemExit(1)
@@ -580,9 +604,12 @@ if __name__ == "__main__":
     parser.add_argument("--projection-fencing", action="store_true")
     parser.add_argument("--worker-crashes", action="store_true")
     parser.add_argument("--full-lifecycle", action="store_true")
+    parser.add_argument("--vector-rollout-audit", action="store_true")
     args = parser.parse_args()
     if args.worker_crashes and not args.projection_fencing:
         parser.error("--worker-crashes requires --projection-fencing; production defaults must stay unchanged")
     if args.full_lifecycle and not args.worker_crashes:
         parser.error("--full-lifecycle requires the scoped crash/deletion qualification")
+    if args.vector_rollout_audit and not args.projection_fencing:
+        parser.error("--vector-rollout-audit requires the explicitly opted-in private fixture")
     asyncio.run(child(args) if args.child or args.recover_child else run(args))
