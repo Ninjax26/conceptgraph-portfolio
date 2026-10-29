@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app.core.config import settings
 from app.models.document_upload import Base
@@ -72,35 +72,43 @@ async def initialize_database_schema() -> None:
         await conn.execute(text("SELECT pg_advisory_xact_lock(hashtext('conceptgraph:schema'))"))
         await conn.run_sync(Base.metadata.create_all)
         await migrate_provider_budget_schema(conn)
-        migrations = [
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS course_uuid VARCHAR(64)",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64)",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS stage VARCHAR(32) NOT NULL DEFAULT 'UPLOADED'",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS failure_category VARCHAR(32)",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS retryable BOOLEAN NOT NULL DEFAULT FALSE",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS last_attempted_at TIMESTAMPTZ",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS lease_owner VARCHAR(128)",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS processed_chunk_count INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS source_bytes BIGINT",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS page_count INTEGER",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS reserved_chunk_count INTEGER",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_node_count INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_edge_count INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS graph_status VARCHAR(32)",
+        await _add_missing_columns(conn, "document_uploads", {
+            "course_uuid": "VARCHAR(64)",
+            "content_hash": "VARCHAR(64)",
+            "stage": "VARCHAR(32) NOT NULL DEFAULT 'UPLOADED'",
+            "failure_category": "VARCHAR(32)",
+            "retryable": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "attempt_count": "INTEGER NOT NULL DEFAULT 1",
+            "last_attempted_at": "TIMESTAMPTZ",
+            "last_heartbeat_at": "TIMESTAMPTZ",
+            "lease_owner": "VARCHAR(128)",
+            "lease_expires_at": "TIMESTAMPTZ",
+            "processed_chunk_count": "INTEGER NOT NULL DEFAULT 0",
+            "source_bytes": "BIGINT",
+            "page_count": "INTEGER",
+            "reserved_chunk_count": "INTEGER",
+            "graph_node_count": "INTEGER NOT NULL DEFAULT 0",
+            "graph_edge_count": "INTEGER NOT NULL DEFAULT 0",
+            "graph_status": "VARCHAR(32)",
+        })
+        await _add_missing_columns(conn, "processing_attempts", {
+            "last_heartbeat_at": "TIMESTAMPTZ",
+        })
+        await _add_missing_columns(conn, "graph_publication_intents", {
+            "source_generation": "INTEGER",
+        })
+        await _add_missing_columns(conn, "graph_publication_receipts", {
+            "source_generation": "INTEGER",
+        })
+        indexes = [
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_course_uuid ON document_uploads (course_uuid)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_content_hash ON document_uploads (content_hash)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_stage ON document_uploads (stage)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_graph_status ON document_uploads (graph_status)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_lease_expires_at ON document_uploads (lease_expires_at)",
             "CREATE INDEX IF NOT EXISTS ix_document_uploads_created_upload ON document_uploads (created_at DESC, upload_id DESC)",
-            "ALTER TABLE processing_attempts ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ",
-            "ALTER TABLE graph_publication_intents ADD COLUMN IF NOT EXISTS source_generation INTEGER",
-            "ALTER TABLE graph_publication_receipts ADD COLUMN IF NOT EXISTS source_generation INTEGER",
         ]
-        for statement in migrations:
+        for statement in indexes:
             await conn.execute(text(statement))
         await _migrate_legacy_uploads(conn)
         await conn.execute(
@@ -127,8 +135,20 @@ async def migrate_provider_budget_schema(conn) -> None:
     Older releases ignore these columns and retain their request-count contract.
     Rollback means running the older release, not dropping recorded usage.
     """
-    for column in ("minute_estimated_tokens", "day_estimated_tokens"):
-        await conn.execute(text(f"ALTER TABLE provider_budgets ADD COLUMN IF NOT EXISTS {column} BIGINT NOT NULL DEFAULT 0"))
+    await _add_missing_columns(conn, "provider_budgets", {
+        "minute_estimated_tokens": "BIGINT NOT NULL DEFAULT 0",
+        "day_estimated_tokens": "BIGINT NOT NULL DEFAULT 0",
+    })
+
+
+async def _add_missing_columns(conn, table: str, definitions: dict[str, str]) -> None:
+    # No-op ALTER still takes ACCESS EXCLUSIVE locks. Inspect under the existing
+    # schema advisory lock so ordinary readers need not compete with such DDL.
+    # Identifiers/definitions here are static application migration constants.
+    existing = await conn.run_sync(lambda sync: {column["name"] for column in inspect(sync).get_columns(table)})
+    for column, definition in definitions.items():
+        if column not in existing:
+            await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition}"))
 
 
 async def _migrate_legacy_uploads(conn) -> None:
