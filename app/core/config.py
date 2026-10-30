@@ -231,6 +231,11 @@ class Settings(BaseSettings):
     graph_continuation_snapshots_enabled: bool = Field(default=False, alias="GRAPH_CONTINUATION_SNAPSHOTS_ENABLED")
     # Independent opt-in; idle workers only, with shared interactive headroom.
     graph_continuation_dispatch_enabled: bool = Field(default=False, alias="GRAPH_CONTINUATION_DISPATCH_ENABLED")
+    # Recovery/retention is independently gated; deploying never activates it.
+    graph_continuation_maintenance_enabled: bool = Field(default=False, alias="GRAPH_CONTINUATION_MAINTENANCE_ENABLED")
+    graph_maintenance_interval_seconds: int = Field(default=60, ge=60, le=3600, alias="GRAPH_MAINTENANCE_INTERVAL_SECONDS")
+    graph_maintenance_batch_size: int = Field(default=10, ge=1, le=100, alias="GRAPH_MAINTENANCE_BATCH_SIZE")
+    graph_terminal_retention_days: int = Field(default=7, ge=1, le=365, alias="GRAPH_TERMINAL_RETENTION_DAYS")
     # Qualified locally before activation; independent of automatic continuation.
     graph_projection_fencing_enabled: bool = Field(default=False, alias="GRAPH_PROJECTION_FENCING_ENABLED")
     # Zero disables this optional installation-wide logical snapshot budget.

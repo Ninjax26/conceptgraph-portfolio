@@ -210,7 +210,7 @@ async def run(args):
             completed(await inspect(claim))
             checks['real_marked_publication_and_postgresql_completion'] = True
 
-            if args.graph_only_processor or args.idle_graph_dispatch:
+            if args.graph_only_processor or args.idle_graph_dispatch or args.graph_maintenance:
                 from app.core.config import Settings
                 from app.services.graph_only_processor import GraphOnlyProcessor
                 from app.services.graph_job_extraction import GraphJobDeferred
@@ -274,9 +274,13 @@ async def run(args):
                     'parser_embedding_vector_and_source_interfaces_not_supplied':True}
                 checks['processor_quota_defers_durably_without_draft_or_projection_changes'] = True
 
-            if args.idle_graph_dispatch:
+            if args.idle_graph_dispatch or args.graph_maintenance:
                 from scripts.idle_graph_dispatch_checks import qualify_idle_dispatch
                 await qualify_idle_dispatch(sessions, service, authored, prepared, inspect, completed, checks, observations)
+
+            if args.graph_maintenance:
+                from scripts.graph_maintenance_checks import qualify_graph_maintenance
+                await qualify_graph_maintenance(sessions, service, ingestion, prepared, inspect, completed, checks, observations)
 
             boundaries = ('before_intent_commit', 'after_intent_commit', 'during_remote_transaction',
                 'after_remote_commit', 'after_result_commit')
@@ -465,22 +469,26 @@ async def run(args):
             'app/services/resource_budget_service.py','app/core/config.py',
             'tests/test_graph_only_processor.py','scripts/evaluate_graph_continuation_jobs.py',
             'app/core/processing_coordinator.py','scripts/idle_graph_dispatch_checks.py',
-            'tests/test_idle_graph_dispatch.py')},
+            'tests/test_idle_graph_dispatch.py',
+            'app/services/graph_job_maintenance.py','scripts/graph_maintenance_checks.py',
+            'tests/test_graph_job_maintenance.py')},
         'limits':['Synthetic source/checkpoint/graph fixtures; no model, embedding, Qdrant, R2 or live API ingestion.',
             'Crash recovery explicitly expires the isolated fixture lease before a fresh claim; no natural lease-duration or full worker benchmark.',
             'Source removal in the intent gap uses PostgreSQL and Neo4j only; full API/Qdrant/R2 deletion is covered separately.',
             'Hard kills cover five instrumented boundaries, not every network timing or delayed server commit.',
-            'Existing unmarked ingestion/retry writes, superseded source generations, exhausted recovery, retention and combined dispatch still require verification before activation.',
+            'Existing unmarked ingestion/retry writes, superseded source generations and combined/separate OS graph-worker recovery still require verification before activation.',
             'Production dispatch defaults off. Optional idle-coordinator checks share one event loop, not separate OS workers or a hard-kill worker benchmark. Test elapsed time is not throughput or capacity.']}
-    output = ROOT/('evaluation/idle-graph-dispatch-current' if args.idle_graph_dispatch
+    output = ROOT/('evaluation/graph-job-maintenance-current' if args.graph_maintenance
+                   else 'evaluation/idle-graph-dispatch-current' if args.idle_graph_dispatch
                    else 'evaluation/graph-only-processor-current' if args.graph_only_processor
                    else 'evaluation/graph-publication-recovery-current')
     output.with_suffix('.json').write_text(json.dumps(report, indent=2)+'\n')
-    output.with_suffix('.md').write_text(('# Idle graph dispatch — local PostgreSQL and Neo4j\n\n' if args.idle_graph_dispatch
+    output.with_suffix('.md').write_text(('# Graph job maintenance — local PostgreSQL and Neo4j\n\n' if args.graph_maintenance
+        else '# Idle graph dispatch — local PostgreSQL and Neo4j\n\n' if args.idle_graph_dispatch
         else '# Graph-only processor — local PostgreSQL and Neo4j\n\n'
         if args.graph_only_processor else '# Graph publication recovery — local PostgreSQL and Neo4j\n\n') +
         'Command: `.venv/bin/python scripts/evaluate_graph_publication_recovery.py --socket-dir <private-test-socket>'
-        + (' --idle-graph-dispatch' if args.idle_graph_dispatch else ' --graph-only-processor' if args.graph_only_processor else '') + '`.\n\n'
+        + (' --graph-maintenance' if args.graph_maintenance else ' --idle-graph-dispatch' if args.idle_graph_dispatch else ' --graph-only-processor' if args.graph_only_processor else '') + '`.\n\n'
         + '\n'.join(f'- {name}: passed' for name in checks)+'\n\nLimits:\n\n'
         + '\n'.join(f'- {item}' for item in report['limits'])+'\n')
     print(json.dumps({'checks_passed':len(checks),'hosted_provider_calls':0,'temporary_resources_removed':True}))
@@ -493,6 +501,7 @@ if __name__ == '__main__':
     parser.add_argument('--child', action='store_true')
     parser.add_argument('--graph-only-processor', action='store_true')
     parser.add_argument('--idle-graph-dispatch', action='store_true')
+    parser.add_argument('--graph-maintenance', action='store_true')
     parser.add_argument('--schema', default='')
     parser.add_argument('--neo4j-uri', default='')
     parser.add_argument('--upload-id', default='')

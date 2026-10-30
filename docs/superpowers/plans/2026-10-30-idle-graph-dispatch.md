@@ -37,4 +37,9 @@ PATH and stopped Docker attempts failed; corrected/reran, no success invented.
 Owned resources removed; no hosted calls/production fixtures/paid resources.
 The one fresh read-only final review found no important findings. No fix pass,
 rulings or deferred minors. Final suite 668 tests (4.989s) and diff checks pass.
-Release checks pending; keep all production gates disabled.
+Release verified: origin/main 1d37749026cf5ee3d9aa0f2857c7ac1e4eece3f2;
+GitHub Verify 41088598995 success; free API exact SHA, ready/combined, queue zero,
+no degraded services. Public sample API 200 and saved frontend 3-node/2-edge
+illustration renders without captured console errors. Frontend SHA not exposed.
+No production activation/hosted inference/paid service. Keep this post-release
+note local until a substantive later commit; Phase 3 remains partial.

@@ -16,6 +16,7 @@ from app.services.document_processing_service import (
 )
 from app.services.upload_service import UploadService
 from app.services.graph_only_processor import GraphOnlyProcessor
+from app.services.graph_job_maintenance import GraphJobMaintenance
 from app.services.graph_job_extraction import GraphJobDeferred, GraphJobAuthorityLost
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class ProcessingCoordinator:
         self.upload_service = upload_service or UploadService()
         self.processing_service = processing_service or document_processing_service
         self._graph_processor = graph_processor
+        self._graph_maintenance: GraphJobMaintenance | None = None
         self.instance_id = f"api-{uuid4()}"
         self.queue: asyncio.Queue[QueuedDocument] = asyncio.Queue(
             maxsize=config.processing_queue_capacity
@@ -196,6 +198,13 @@ class ProcessingCoordinator:
             self._graph_processor = GraphOnlyProcessor(AsyncSessionLocal,
                 self.processing_service.ingestion_service, config=self.config)
         processor = self._graph_processor
+        if self.config.graph_continuation_maintenance_enabled is True:
+            if self._graph_maintenance is None:
+                self._graph_maintenance = GraphJobMaintenance(AsyncSessionLocal,
+                    self.processing_service.ingestion_service, config=self.config, jobs=processor.jobs)
+            await self._graph_maintenance.run_if_due()
+            if self._stop.is_set() or not self.queue.empty():
+                return False
 
         async def claim_due():
             async with AsyncSessionLocal() as session:

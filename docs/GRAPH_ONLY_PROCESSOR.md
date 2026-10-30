@@ -26,8 +26,8 @@ vector cleanup/writes. It preserves the original READY evidence task and source
 eligibility. It processes exactly one existing claim and does not claim, poll,
 reschedule errors immediately, create workers or activate any production path.
 Other failures leave existing bounded lease/attempt recovery in place. Exhausted
-publication recovery and terminal retention still need runtime integration;
-idle dispatch is implemented behind a separate default-false gate.
+publication recovery and terminal retention now have independently gated
+[idle maintenance](GRAPH_JOB_MAINTENANCE.md); production defaults remain off.
 
 Verification: 13 new offline contracts; 657 total backend tests; nine frontend
 tests; TypeScript/Vite build. An owned PostgreSQL/Neo4j run passes 15 checks: the
@@ -54,7 +54,7 @@ initially stopped; that failed attempt produced no success report. Verification
 was rerun after starting the existing local engine. No hosted calls or production
 test-data mutations occurred. One fresh read-only review found no important gaps.
 
-Next: exhausted-publication recovery, terminal retention and combined worker
-recovery checks. Idle dispatch now reuses the existing worker slots behind an
-independent default-false gate. Keep all production flags disabled. Phase 3 remains
+Next: combined/separate OS graph-worker crash and consistency qualification.
+Idle dispatch and recovery/retention reuse existing worker slots behind separate
+default-false gates. Keep all production flags disabled. Phase 3 remains
 partial; provider-cost completeness and cross-upload cache are also unfinished.

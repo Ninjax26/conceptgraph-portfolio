@@ -1,7 +1,6 @@
 """Durable graph-job claims, checkpoints and internal marked publication.
 
-The live API/coordinator/worker does not call the marked publisher or completion
-path. Opt-in READY staging can persist snapshots atomically. Model extraction
+Idle coordinator publication and maintenance require separate default-off gates. Opt-in READY staging can persist snapshots atomically. Model extraction
 is separate; the internal publisher only consumes a validated saved draft.
 Deleted-source reconciliation may tombstone a committed-deleted upload in Neo4j.
 """
@@ -11,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
 import json
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -184,11 +183,25 @@ class GraphContinuationService:
         return (not max_jobs or usage.jobs + 1 <= max_jobs) and (
             not max_bytes or usage.bytes + candidate_bytes <= max_bytes)
 
+    @staticmethod
+    def _unresolved_publication():
+        # Correlated to the candidate job. A cascading draft is never a receipt;
+        # retain recovery bodies until the durable intent has a completion receipt.
+        return select(GraphPublicationIntent.id).outerjoin(GraphPublicationReceipt,
+            GraphPublicationReceipt.intent_id == GraphPublicationIntent.id).where(
+            GraphPublicationIntent.job_id == GraphContinuationJob.id,
+            GraphPublicationReceipt.intent_id.is_(None)).exists()
+
+    async def _has_unresolved_publication(self, session: AsyncSession, job_id: str) -> bool:
+        return (await session.execute(select(self._unresolved_publication()).select_from(
+            GraphContinuationJob).where(GraphContinuationJob.id == job_id))).scalar_one()
+
     async def prune_terminal_snapshots(self, session: AsyncSession, *, older_than_days: int, limit: int = 50) -> int:
         """Drop only old terminal snapshot bodies; caller owns commit/rollback.
 
         Preserve job identity/digests/attempts as a tombstone against automatic
-        re-admission. This internal method is not scheduled in production.
+        re-admission. Unreceipted intents protect recovery bodies indefinitely;
+        idle maintenance is independently gated and production defaults off.
         """
         if type(older_than_days) is not int or not 1 <= older_than_days <= 365:
             raise ValueError("Invalid snapshot retention period.")
@@ -200,13 +213,15 @@ class GraphContinuationService:
             GraphContinuationJob, GraphContinuationJob.upload_id == DocumentUpload.upload_id).where(
                 GraphContinuationJob.status.in_(("stopped", "completed")),
                 GraphContinuationJob.updated_at < cutoff,
+                ~self._unresolved_publication(),
                 text("graph_continuation_jobs.snapshot_json::jsonb <> '{}'::jsonb"))
             .order_by(GraphContinuationJob.updated_at, DocumentUpload.upload_id).limit(limit)
             .with_for_update(of=DocumentUpload, skip_locked=True))).scalars().all()
         pruned = 0
         for upload_id in candidates:
             job = await self._job(session, upload_id)
-            if job is not None and job.status in {"stopped", "completed"} and job.updated_at < cutoff and job.snapshot_json:
+            if (job is not None and job.status in {"stopped", "completed"} and job.updated_at < cutoff
+                and job.snapshot_json and not await self._has_unresolved_publication(session, job.id)):
                 job.snapshot_json = {}
                 pruned += 1
         return pruned
@@ -454,10 +469,10 @@ class GraphContinuationService:
             not max_bytes or usage.bytes + len(candidate.payload_json.encode("utf-8")) <= max_bytes)
 
     async def prune_terminal_drafts(self, session: AsyncSession, *, older_than_days: int, limit: int = 50) -> int:
-        """Remove old unpublished drafts only; caller owns transaction, no scheduler.
+        """Remove old terminal drafts only; caller owns transaction.
 
         Preserve job tombstones/attempts, snapshots, READY results and checkpoints.
-        These cascading drafts must never serve as remote-write receipts.
+        Unreceipted intents protect drafts, which never serve as remote-write receipts.
         """
         if type(older_than_days) is not int or not 1 <= older_than_days <= 365:
             raise ValueError("Invalid draft retention period.")
@@ -468,13 +483,15 @@ class GraphContinuationService:
         uploads = (await session.execute(select(DocumentUpload.upload_id).join(
             GraphContinuationJob, GraphContinuationJob.upload_id == DocumentUpload.upload_id).join(
                 GraphPublicationDraft, GraphPublicationDraft.job_id == GraphContinuationJob.id).where(
-                    GraphContinuationJob.status.in_(("stopped", "completed")), GraphContinuationJob.updated_at < cutoff)
+                    GraphContinuationJob.status.in_(("stopped", "completed")), GraphContinuationJob.updated_at < cutoff,
+                    ~self._unresolved_publication())
             .order_by(GraphContinuationJob.updated_at, DocumentUpload.upload_id).limit(limit)
             .with_for_update(of=DocumentUpload, skip_locked=True))).scalars().all()
         pruned = 0
         for upload_id in uploads:
             job = await self._job(session, upload_id)
-            if job is None or job.status not in {"stopped", "completed"} or job.updated_at >= cutoff:
+            if (job is None or job.status not in {"stopped", "completed"} or job.updated_at >= cutoff
+                or await self._has_unresolved_publication(session, job.id)):
                 continue
             draft = (await session.execute(select(GraphPublicationDraft).where(
                 GraphPublicationDraft.job_id == job.id).with_for_update()
@@ -768,6 +785,41 @@ class GraphContinuationService:
         record.graph_status = result["graph_status"]
         job.status, job.failure_category = "completed", None
         job.claim_token = job.lease_owner = job.lease_expires_at = None
+
+    @staticmethod
+    async def list_exhausted_publications(
+        session: AsyncSession, *, limit: int = 10, after_intent_id: str | None = None,
+    ) -> list[str]:
+        """Bounded, read-only candidates; reconciliation owns authority/locks.
+
+        UUID keyset pagination permits callers to rotate past missing/conflicting
+        markers without making them terminal or dropping their recovery evidence.
+        """
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("Invalid exhausted-publication batch size.")
+        if after_intent_id is not None:
+            try:
+                valid = isinstance(after_intent_id, str) and str(UUID(after_intent_id)) == after_intent_id
+            except (ValueError, AttributeError):
+                valid = False
+            if not valid:
+                raise ValueError("Invalid exhausted-publication cursor.")
+        query = select(GraphPublicationIntent.id).join(GraphContinuationJob,
+            GraphContinuationJob.id == GraphPublicationIntent.job_id).join(DocumentUpload,
+            DocumentUpload.upload_id == GraphContinuationJob.upload_id).outerjoin(GraphPublicationReceipt,
+            GraphPublicationReceipt.intent_id == GraphPublicationIntent.id).where(
+                GraphPublicationReceipt.intent_id.is_(None),
+                DocumentUpload.status == "ready", DocumentUpload.stage == "READY",
+                DocumentUpload.task_id == GraphContinuationJob.document_task_id,
+                DocumentUpload.task_id == GraphPublicationIntent.document_task_id,
+                GraphContinuationJob.attempt_count >= GraphContinuationJob.max_attempts,
+                or_(and_(GraphContinuationJob.status == "stopped",
+                         GraphContinuationJob.failure_category == "attempt_limit"),
+                    and_(GraphContinuationJob.status == "running",
+                         GraphContinuationJob.lease_expires_at <= func.clock_timestamp())))
+        if after_intent_id is not None:
+            query = query.where(GraphPublicationIntent.id > after_intent_id)
+        return list((await session.execute(query.order_by(GraphPublicationIntent.id).limit(limit))).scalars())
 
     async def reconcile_exhausted_publication(
         self, sessions: async_sessionmaker[AsyncSession], intent_id: str,

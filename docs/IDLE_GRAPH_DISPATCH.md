@@ -56,8 +56,8 @@ Command:
 [Report](../evaluation/idle-graph-dispatch-current.md) and
 [source hashes/observations](../evaluation/idle-graph-dispatch-current.json).
 
-Next gates: bounded exhausted-publication discovery/reconciliation and safe
-terminal snapshot/draft retention in runtime; combined/separate-worker crash
-recovery and consistency qualification before any activation. Provider usage
+Bounded exhausted-publication recovery and safe terminal retention are now wired
+through separately gated [maintenance](GRAPH_JOB_MAINTENANCE.md). Next gates:
+combined/separate-worker crash recovery and consistency before activation. Provider usage
 completeness and versioned cross-upload caching also remain unfinished.
 Phase 3 is partial. Keep all production scheduling/projection flags disabled.
