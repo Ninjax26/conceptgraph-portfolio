@@ -1,4 +1,4 @@
-"""Disconnected one-claim orchestration; no runtime dispatch or production activation."""
+"""One-claim orchestration for explicitly gated idle workers; production defaults off."""
 from app.core.blocking import run_async_safely
 from app.core.config import settings
 from app.services.graph_continuation_service import GraphContinuationService, GraphJobClaim
@@ -26,7 +26,7 @@ class GraphOnlyProcessor:
         extraction; other failures leave bounded lease recovery, never a hot loop.
         Saved validated drafts resume through marker/receipt recovery without new
         provider work. The existing publisher drains its entire fenced completion
-        unit on cancellation. No coordinator/worker calls this processor yet.
+        unit on cancellation. The coordinator may call it in a gated idle worker slot.
         """
         if (self.config.graph_projection_fencing_enabled is not True
             or self.config.graph_continuation_snapshots_enabled is not True

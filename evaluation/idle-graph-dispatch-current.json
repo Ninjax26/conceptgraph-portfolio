@@ -1,0 +1,167 @@
+{
+  "generated_at_utc": "2026-10-30T16:15:11.883446+00:00",
+  "postgres_version": "18.4 (Homebrew)",
+  "neo4j_image_id": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
+  "checks": {
+    "real_marked_publication_and_postgresql_completion": true,
+    "processor_saved_draft_replay_skips_extraction_and_preserves_ready_identity": true,
+    "processor_fresh_authoritative_snapshot_stages_and_publishes_under_real_locks": true,
+    "processor_quota_defers_durably_without_draft_or_projection_changes": true,
+    "idle_competing_coordinators_claim_saved_draft_once_without_extraction": true,
+    "idle_worker_extracts_authoritative_snapshot_and_completes_real_projection": true,
+    "idle_worker_respects_durable_quota_deadline_across_multiple_polls": true,
+    "idle_worker_shutdown_drains_remote_receipt_unit_before_releasing_source_lock": true,
+    "sigkill_before_intent_commit_recovers_without_duplicate_remote_write": true,
+    "sigkill_after_intent_commit_recovers_without_duplicate_remote_write": true,
+    "sigkill_during_remote_transaction_recovers_without_duplicate_remote_write": true,
+    "sigkill_after_remote_commit_recovers_without_duplicate_remote_write": true,
+    "sigkill_after_result_commit_recovers_without_duplicate_remote_write": true,
+    "lost_remote_acknowledgement_reuses_exact_marker": true,
+    "repeated_cancellation_drains_full_unit_before_releasing_source_lock": true,
+    "competing_publishers_commit_one_projection_and_one_receipt": true,
+    "committed_source_removal_in_intent_gap_blocks_remote_publication": true,
+    "conflicting_remote_marker_fails_closed_without_replacement": true,
+    "provider_limited_candidate_never_writes_remote_projection": true
+  },
+  "checks_passed": 19,
+  "crash_observations": {
+    "graph_only_processor": {
+      "saved_draft_extraction_calls": 0,
+      "fresh_authored_extraction_calls": 1,
+      "quota_authored_extraction_calls": 1,
+      "ready_document_task_preserved": true,
+      "quota_deadline_persisted": true,
+      "automatic_dispatch_exercised": false,
+      "actual_provider_calls": 0,
+      "parser_embedding_vector_and_source_interfaces_not_supplied": true
+    },
+    "idle_graph_dispatch": {
+      "actual_coordinators_same_event_loop": true,
+      "separate_os_workers": false,
+      "competing_coordinators": 2,
+      "per_coordinator_concurrency": 1,
+      "saved_draft_extraction_calls": 0,
+      "fresh_authored_extraction_calls": 1,
+      "quota_authored_extraction_calls": 1,
+      "quota_observation_seconds": 0.8,
+      "quota_reclaims_before_reset": 0,
+      "shutdown_held_document_lock": true,
+      "authored_extraction_no_provider_admission_or_inference": true,
+      "document_queue_capacity_tests": "offline unit suite; no four-store ingestion in this fixture",
+      "exhausted_recovery_and_terminal_retention_scheduled": false,
+      "production_flags_activated": false
+    },
+    "before_intent_commit": {
+      "job": "running",
+      "intents": 0,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "Old DNS",
+        "Old IP address"
+      ],
+      "markers": 0,
+      "write_epochs": 0
+    },
+    "after_intent_commit": {
+      "job": "running",
+      "intents": 1,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "Old DNS",
+        "Old IP address"
+      ],
+      "markers": 0,
+      "write_epochs": 0
+    },
+    "during_remote_transaction": {
+      "job": "running",
+      "intents": 1,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "Old DNS",
+        "Old IP address"
+      ],
+      "markers": 0,
+      "write_epochs": 0
+    },
+    "after_remote_commit": {
+      "job": "running",
+      "intents": 1,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "DNS",
+        "IP address"
+      ],
+      "markers": 1,
+      "write_epochs": 1
+    },
+    "after_result_commit": {
+      "job": "completed",
+      "intents": 1,
+      "receipts": 1,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_READY",
+      "checkpoints": 1,
+      "names": [
+        "DNS",
+        "IP address"
+      ],
+      "markers": 1,
+      "write_epochs": 1
+    }
+  },
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "temporary_resources_removed": true,
+  "elapsed_seconds": 38.655,
+  "source_sha256": {
+    "app/services/graph_continuation_service.py": "eec3302df59e4bffe46a4b8aadba95974f4473c7016b6071069ba8e8de7f2a32",
+    "app/services/ingestion_service.py": "331907c0f2453d18a29d763dfe95b6cb7268b394c2f17b35008a9f8cd9a4819c",
+    "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
+    "app/models/document_upload.py": "b92c34979dac95f04384d1d5883b216014c8da1bbc18075e426421caeb1261cc",
+    "app/services/upload_service.py": "720729e897da93cc533c14ae4058271e68b0dceca6899e4b0f2e98a2cb1939de",
+    "app/services/graph_result_metadata.py": "6c169517745f11ffbb95a9d0ab07b93f98f12f8c5f32814d9fcf39be2f3be00a",
+    "app/services/graph_publication_candidate.py": "7641202bc00c47dc6f6d068f7facab19febdc5cdbfa1d8098432d1d76fa0eb5f",
+    "tests/test_graph_publication_coordinator.py": "3615eed71dd44ea8a6ba5c9b6f24e42b78e74267eafc24208a4b1e5de13221db",
+    "scripts/evaluate_graph_publication_recovery.py": "8cdd2559c01ff45905a48d9ecd18abf89c9aec99844c1aec4c4a813336f45128",
+    "app/services/graph_only_processor.py": "24e4c685316932ac0510ee27ec3d4acaa4f8cf30865a55ed30bcd874d125269a",
+    "app/services/graph_job_extraction.py": "732d0108699b6daa2fcf59d215095b654a1b4081ef11e010c65922376941d758",
+    "app/services/resource_budget_service.py": "63b2add5b6a24e4f1e2614c40789ae9f429caa4829db884d579a6af67e67024a",
+    "app/core/config.py": "495ea4af6639531825d7cb753ebfee4bcda8c1db18ad29c0c7310323ac19fdc7",
+    "tests/test_graph_only_processor.py": "ebca55d758928edeacd339da4da360230ab7515b6ea33c08ad72d73356381477",
+    "scripts/evaluate_graph_continuation_jobs.py": "4e583a177e93015a5f715f3ed84baf307cab4975a28a6c298e0b3f3522764488",
+    "app/core/processing_coordinator.py": "becc692bcb144aceab4f2baa0d4bc6da45752b33a2452095e0414e2c05704bdf",
+    "scripts/idle_graph_dispatch_checks.py": "0ae44489bf0d74facf2be6d6830fa00fec4aeb36a6105d30caf725792ca901b7",
+    "tests/test_idle_graph_dispatch.py": "afe7dec9d53e1d3196add81f262ede1585e70c1a347467e1b763bbedf84257ae"
+  },
+  "limits": [
+    "Synthetic source/checkpoint/graph fixtures; no model, embedding, Qdrant, R2 or live API ingestion.",
+    "Crash recovery explicitly expires the isolated fixture lease before a fresh claim; no natural lease-duration or full worker benchmark.",
+    "Source removal in the intent gap uses PostgreSQL and Neo4j only; full API/Qdrant/R2 deletion is covered separately.",
+    "Hard kills cover five instrumented boundaries, not every network timing or delayed server commit.",
+    "Existing unmarked ingestion/retry writes, superseded source generations, exhausted recovery, retention and combined dispatch still require verification before activation.",
+    "Production dispatch defaults off. Optional idle-coordinator checks share one event loop, not separate OS workers or a hard-kill worker benchmark. Test elapsed time is not throughput or capacity."
+  ]
+}

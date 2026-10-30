@@ -38,4 +38,4 @@ recovery. Owned resources and compile temporaries removed; zero hosted calls.
 The one fresh read-only reviewer found no important gaps. No rulings/deferred
 minors. Scope remains the disconnected one-claim processor, not runtime dispatch.
 
-Release: pending exact commit/CI/deployed revision/readiness/public-preview checks.
+Release verified: `a9f01ebc69f2359e12d713d6987e1e62479b55ff` pushed only to origin/main; GitHub Verify `41036324664` passed. Free API reports the exact SHA, ready/combined role, queue zero and no degraded services. Public API sample is GRAPH_READY (one document/50 bounded concepts); frontend saved 3-node/2-edge preview renders without captured console errors. Independent frontend SHA is not exposed. No activation, paid resource, production fixture or hosted inference. Keep this post-release completion local until a substantive later commit.

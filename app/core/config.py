@@ -229,6 +229,8 @@ class Settings(BaseSettings):
     graph_json_repair_enabled: bool = Field(default=True, alias="GRAPH_JSON_REPAIR_ENABLED")
     # Snapshot staging only; no automatic graph dispatcher is enabled by this.
     graph_continuation_snapshots_enabled: bool = Field(default=False, alias="GRAPH_CONTINUATION_SNAPSHOTS_ENABLED")
+    # Independent opt-in; idle workers only, with shared interactive headroom.
+    graph_continuation_dispatch_enabled: bool = Field(default=False, alias="GRAPH_CONTINUATION_DISPATCH_ENABLED")
     # Qualified locally before activation; independent of automatic continuation.
     graph_projection_fencing_enabled: bool = Field(default=False, alias="GRAPH_PROJECTION_FENCING_ENABLED")
     # Zero disables this optional installation-wide logical snapshot budget.

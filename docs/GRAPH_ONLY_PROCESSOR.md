@@ -1,7 +1,7 @@
 # One-claim graph-only processor
 
-`GraphOnlyProcessor` is an internal, disconnected orchestration layer. Neither
-the coordinator nor the worker calls it. Both existing projection/snapshot flags
+`GraphOnlyProcessor` is an internal one-claim orchestration layer. The coordinator
+may call it through separately gated [idle dispatch](IDLE_GRAPH_DISPATCH.md). Both existing projection/snapshot flags
 must be exactly true and the role must be worker/combined before any I/O. Existing
 production defaults, free combined deployment, endpoints and schemas are unchanged.
 
@@ -26,7 +26,8 @@ vector cleanup/writes. It preserves the original READY evidence task and source
 eligibility. It processes exactly one existing claim and does not claim, poll,
 reschedule errors immediately, create workers or activate any production path.
 Other failures leave existing bounded lease/attempt recovery in place. Exhausted
-publication recovery and due dispatch still need their runtime integration.
+publication recovery and terminal retention still need runtime integration;
+idle dispatch is implemented behind a separate default-false gate.
 
 Verification: 13 new offline contracts; 657 total backend tests; nine frontend
 tests; TypeScript/Vite build. An owned PostgreSQL/Neo4j run passes 15 checks: the
@@ -53,7 +54,7 @@ initially stopped; that failed attempt produced no success report. Verification
 was rerun after starting the existing local engine. No hosted calls or production
 test-data mutations occurred. One fresh read-only review found no important gaps.
 
-Next: bounded runtime due-job dispatch with the existing claims/fencing, role and
-flag gates, queue capacity and interactive-provider priority, plus retention and
-combined recovery checks. Keep both production flags disabled. Phase 3 remains
+Next: exhausted-publication recovery, terminal retention and combined worker
+recovery checks. Idle dispatch now reuses the existing worker slots behind an
+independent default-false gate. Keep all production flags disabled. Phase 3 remains
 partial; provider-cost completeness and cross-upload cache are also unfinished.

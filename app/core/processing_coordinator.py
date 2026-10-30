@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from uuid import uuid4
 
+from app.core.blocking import run_async_safely
 from app.core.config import Settings, settings
 from app.core.database import AsyncSessionLocal
 from app.services.document_processing_service import (
@@ -14,6 +15,8 @@ from app.services.document_processing_service import (
     document_processing_service,
 )
 from app.services.upload_service import UploadService
+from app.services.graph_only_processor import GraphOnlyProcessor
+from app.services.graph_job_extraction import GraphJobDeferred, GraphJobAuthorityLost
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +46,12 @@ class ProcessingCoordinator:
         config: Settings = settings,
         upload_service: UploadService | None = None,
         processing_service: DocumentProcessingService | None = None,
+        graph_processor: GraphOnlyProcessor | None = None,
     ) -> None:
         self.config = config
         self.upload_service = upload_service or UploadService()
         self.processing_service = processing_service or document_processing_service
+        self._graph_processor = graph_processor
         self.instance_id = f"api-{uuid4()}"
         self.queue: asyncio.Queue[QueuedDocument] = asyncio.Queue(
             maxsize=config.processing_queue_capacity
@@ -162,9 +167,70 @@ class ProcessingCoordinator:
             if disposition == EnqueueDisposition.DEFERRED:
                 break
 
+    def _graph_dispatch_enabled(self) -> bool:
+        config = self.config
+        return (
+            config.graph_continuation_dispatch_enabled is True
+            and config.graph_continuation_snapshots_enabled is True
+            and config.graph_projection_fencing_enabled is True
+            and config.shared_provider_limits_enabled is True
+            and config.processing_role in {"combined", "worker"}
+            and all(
+                getattr(config, f"provider_interactive_request_reserve_per_{period}") > 0
+                and (not getattr(config, f"provider_estimated_tokens_per_{period}")
+                     or getattr(config, f"provider_interactive_token_reserve_per_{period}") > 0)
+                for period in ("minute", "day")
+            )
+        )
+
+    async def _process_due_graph_job(self) -> bool:
+        """Use one idle worker slot; never queue a claimed lease or retry inline.
+
+        Headroom protects provider admission, not preemption of an in-flight
+        graph request. A document arriving after claiming waits for that slot.
+        Other failures retain the bounded job lease for later recovery.
+        """
+        if self._stop.is_set() or not self.queue.empty() or not self._graph_dispatch_enabled():
+            return False
+        if self._graph_processor is None:
+            self._graph_processor = GraphOnlyProcessor(AsyncSessionLocal,
+                self.processing_service.ingestion_service, config=self.config)
+        processor = self._graph_processor
+
+        async def claim_due():
+            async with AsyncSessionLocal() as session:
+                return await processor.jobs.claim_next(session, lease_owner=self.instance_id,
+                    lease_seconds=self.config.processing_lease_seconds)
+
+        # A cancelled claim commit must settle before this worker can stop.
+        # If it committed, an unstarted claim recovers by its existing lease.
+        claim = await run_async_safely(claim_due())
+        if claim is None:
+            return False
+        try:
+            return await processor.process(claim, lease_seconds=self.config.processing_lease_seconds)
+        except GraphJobDeferred:
+            logger.info("Graph job postponed until its persisted provider deadline")
+        except GraphJobAuthorityLost:
+            logger.info("Graph job authority changed before completion")
+        return False
+
     async def _worker_loop(self, worker_index: int) -> None:
         while True:
-            job = await self.queue.get()
+            if self._graph_dispatch_enabled():
+                try:
+                    job = await asyncio.wait_for(self.queue.get(),
+                        timeout=self.config.processing_dispatch_interval_seconds)
+                except TimeoutError:
+                    try:
+                        await self._process_due_graph_job()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        logger.exception("Idle graph processing failed; retained lease recovery applies")
+                    continue
+            else:
+                job = await self.queue.get()
             try:
                 async with AsyncSessionLocal() as session:
                     claimed = await self.upload_service.claim_for_processing(
