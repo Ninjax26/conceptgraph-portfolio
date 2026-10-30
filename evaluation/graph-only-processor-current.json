@@ -1,0 +1,144 @@
+{
+  "generated_at_utc": "2026-10-30T09:43:27.520992+00:00",
+  "postgres_version": "18.4 (Homebrew)",
+  "neo4j_image_id": "sha256:0b5d3ab6ec1b866890dbfb53bf4fe1cf039f9e03c96165599a403005b7e7bcc3",
+  "checks": {
+    "real_marked_publication_and_postgresql_completion": true,
+    "processor_saved_draft_replay_skips_extraction_and_preserves_ready_identity": true,
+    "processor_fresh_authoritative_snapshot_stages_and_publishes_under_real_locks": true,
+    "processor_quota_defers_durably_without_draft_or_projection_changes": true,
+    "sigkill_before_intent_commit_recovers_without_duplicate_remote_write": true,
+    "sigkill_after_intent_commit_recovers_without_duplicate_remote_write": true,
+    "sigkill_during_remote_transaction_recovers_without_duplicate_remote_write": true,
+    "sigkill_after_remote_commit_recovers_without_duplicate_remote_write": true,
+    "sigkill_after_result_commit_recovers_without_duplicate_remote_write": true,
+    "lost_remote_acknowledgement_reuses_exact_marker": true,
+    "repeated_cancellation_drains_full_unit_before_releasing_source_lock": true,
+    "competing_publishers_commit_one_projection_and_one_receipt": true,
+    "committed_source_removal_in_intent_gap_blocks_remote_publication": true,
+    "conflicting_remote_marker_fails_closed_without_replacement": true,
+    "provider_limited_candidate_never_writes_remote_projection": true
+  },
+  "checks_passed": 15,
+  "crash_observations": {
+    "graph_only_processor": {
+      "saved_draft_extraction_calls": 0,
+      "fresh_authored_extraction_calls": 1,
+      "quota_authored_extraction_calls": 1,
+      "ready_document_task_preserved": true,
+      "quota_deadline_persisted": true,
+      "automatic_dispatch_exercised": false,
+      "actual_provider_calls": 0,
+      "parser_embedding_vector_and_source_interfaces_not_supplied": true
+    },
+    "before_intent_commit": {
+      "job": "running",
+      "intents": 0,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "Old DNS",
+        "Old IP address"
+      ],
+      "markers": 0,
+      "write_epochs": 0
+    },
+    "after_intent_commit": {
+      "job": "running",
+      "intents": 1,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "Old DNS",
+        "Old IP address"
+      ],
+      "markers": 0,
+      "write_epochs": 0
+    },
+    "during_remote_transaction": {
+      "job": "running",
+      "intents": 1,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "Old DNS",
+        "Old IP address"
+      ],
+      "markers": 0,
+      "write_epochs": 0
+    },
+    "after_remote_commit": {
+      "job": "running",
+      "intents": 1,
+      "receipts": 0,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_PARTIAL",
+      "checkpoints": 1,
+      "names": [
+        "DNS",
+        "IP address"
+      ],
+      "markers": 1,
+      "write_epochs": 1
+    },
+    "after_result_commit": {
+      "job": "completed",
+      "intents": 1,
+      "receipts": 1,
+      "source_status": "ready",
+      "source_task_unchanged": true,
+      "chunks": 3,
+      "graph_status": "GRAPH_READY",
+      "checkpoints": 1,
+      "names": [
+        "DNS",
+        "IP address"
+      ],
+      "markers": 1,
+      "write_epochs": 1
+    }
+  },
+  "hosted_provider_calls": 0,
+  "production_test_data_mutations": 0,
+  "temporary_resources_removed": true,
+  "elapsed_seconds": 60.152,
+  "source_sha256": {
+    "app/services/graph_continuation_service.py": "eec3302df59e4bffe46a4b8aadba95974f4473c7016b6071069ba8e8de7f2a32",
+    "app/services/ingestion_service.py": "331907c0f2453d18a29d763dfe95b6cb7268b394c2f17b35008a9f8cd9a4819c",
+    "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
+    "app/models/document_upload.py": "b92c34979dac95f04384d1d5883b216014c8da1bbc18075e426421caeb1261cc",
+    "app/services/upload_service.py": "720729e897da93cc533c14ae4058271e68b0dceca6899e4b0f2e98a2cb1939de",
+    "app/services/graph_result_metadata.py": "6c169517745f11ffbb95a9d0ab07b93f98f12f8c5f32814d9fcf39be2f3be00a",
+    "app/services/graph_publication_candidate.py": "7641202bc00c47dc6f6d068f7facab19febdc5cdbfa1d8098432d1d76fa0eb5f",
+    "tests/test_graph_publication_coordinator.py": "3615eed71dd44ea8a6ba5c9b6f24e42b78e74267eafc24208a4b1e5de13221db",
+    "scripts/evaluate_graph_publication_recovery.py": "d26014ef1e6ae3e5ffcbe17c7ee54d3a8377eb3f3111fb026b2669b4d194b247",
+    "app/services/graph_only_processor.py": "44772939ff386365f4b86316cb3049e8751c6b3c1ae7592f2e7247e4b8ef91a0",
+    "app/services/graph_job_extraction.py": "732d0108699b6daa2fcf59d215095b654a1b4081ef11e010c65922376941d758",
+    "app/services/resource_budget_service.py": "63b2add5b6a24e4f1e2614c40789ae9f429caa4829db884d579a6af67e67024a",
+    "app/core/config.py": "8e442fd1ff8f8fa38a4e2837a599b3e84764e4c9a117d28e2a0490afbb7da012",
+    "tests/test_graph_only_processor.py": "ebca55d758928edeacd339da4da360230ab7515b6ea33c08ad72d73356381477",
+    "scripts/evaluate_graph_continuation_jobs.py": "4e583a177e93015a5f715f3ed84baf307cab4975a28a6c298e0b3f3522764488"
+  },
+  "limits": [
+    "Synthetic source/checkpoint/graph fixtures; no model, embedding, Qdrant, R2 or live API ingestion.",
+    "Crash recovery explicitly expires the isolated fixture lease before a fresh claim; no natural lease-duration or full worker benchmark.",
+    "Source removal in the intent gap uses PostgreSQL and Neo4j only; full API/Qdrant/R2 deletion is covered separately.",
+    "Hard kills cover five instrumented boundaries, not every network timing or delayed server commit.",
+    "Existing unmarked ingestion/retry writes, superseded source generations and bounded dispatch still require combined verification before activation.",
+    "Automatic graph continuation remains disconnected. Test elapsed time is not a throughput or capacity metric."
+  ]
+}

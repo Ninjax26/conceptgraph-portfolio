@@ -142,7 +142,7 @@ async def run(args):
                 session.add(course)
                 await session.commit()
 
-            async def prepared(*, limited=False):
+            async def prepared(*, limited=False, save_draft=True):
                 upload_id, task, _ = await fixture(sessions, course, delay=1)
                 async with sessions() as session:
                     record = await session.get(DocumentUpload, upload_id)
@@ -166,9 +166,10 @@ async def run(args):
                         source_node_id='dns', target_node_id='ip', relation_type='RELATED_TO')],
                         sections_total=1, sections_succeeded=1, sections_processed=1,
                         batches_total=1, batches_succeeded=1, provider_limited=limited)
-                    candidate = await service.prepare_publication(session, claim, graph)
-                    assert await service.save_publication_draft(session, claim, candidate)
-                    await session.commit()
+                    if save_draft:
+                        candidate = await service.prepare_publication(session, claim, graph)
+                        assert await service.save_publication_draft(session, claim, candidate)
+                        await session.commit()
                     old = GraphExtractionResponse(nodes=[ConceptNode(id='old-' + node.id, name='Old ' + node.name,
                         type='concept', upload_id=upload_id, document_name=record.original_filename,
                         source_chunk_id=node.source_chunk_id, page_number=1, section_heading='DNS') for node in nodes])
@@ -208,6 +209,70 @@ async def run(args):
             assert await service.publish_publication(sessions, claim, ingestion)
             completed(await inspect(claim))
             checks['real_marked_publication_and_postgresql_completion'] = True
+
+            if args.graph_only_processor:
+                from app.core.config import Settings
+                from app.services.graph_only_processor import GraphOnlyProcessor
+                from app.services.graph_job_extraction import GraphJobDeferred
+                from app.models.document_upload import GraphPublicationDraft
+                cfg = Settings(_env_file=None, GRAPH_PROJECTION_FENCING_ENABLED=True,
+                    GRAPH_CONTINUATION_SNAPSHOTS_ENABLED=True, PROCESSING_ROLE='worker')
+
+                class AuthoredGraph(IngestionService):
+                    calls = 0
+                    limited = False
+                    async def extract_graph_from_chunks(self, chunks, **kwargs):
+                        self.calls += 1
+                        assert isinstance(kwargs['completed_batches'], dict)
+                        nodes = [ConceptNode(id=key, name=label, type='concept',
+                            upload_id=chunks[0].metadata['upload_id'],
+                            document_name=chunks[0].metadata['document_name'],
+                            source_chunk_id=chunks[i].id, page_number=1, section_heading='DNS')
+                            for i,(key,label) in enumerate((('dns','DNS'),('ip','IP address')))]
+                        return GraphExtractionResponse(nodes=nodes, relationships=[ConceptRelationship(
+                            source_node_id='dns',target_node_id='ip',relation_type='RELATED_TO')],
+                            sections_total=1, sections_succeeded=1, sections_processed=1,
+                            batches_total=1, batches_succeeded=1, provider_limited=self.limited,
+                            provider_retry_after_seconds=30 if self.limited else None)
+
+                authored = AuthoredGraph(graph_driver=driver, vector_client=SimpleNamespace())
+                processor = GraphOnlyProcessor(sessions, authored, config=cfg, jobs=service)
+                claim = await prepared()
+                assert await processor.process(claim)
+                assert authored.calls == 0
+                completed(await inspect(claim))
+                checks['processor_saved_draft_replay_skips_extraction_and_preserves_ready_identity'] = True
+
+                claim = await prepared(save_draft=False)
+                assert await processor.process(claim)
+                assert authored.calls == 1
+                completed(await inspect(claim))
+                checks['processor_fresh_authoritative_snapshot_stages_and_publishes_under_real_locks'] = True
+
+                claim = await prepared(save_draft=False)
+                before = await inspect(claim)
+                authored.limited = True
+                try:
+                    await processor.process(claim)
+                    raise AssertionError('Quota-limited work must not complete or publish')
+                except GraphJobDeferred:
+                    pass
+                after = await inspect(claim)
+                assert after['job'] == 'pending' and after['source_status'] == 'ready'
+                assert after['source_task_unchanged'] and after['names'] == before['names']
+                assert after['markers'] == after['intents'] == after['receipts'] == 0
+                assert authored.calls == 2
+                async with sessions() as session:
+                    job = await session.get(GraphContinuationJob, claim.job_id)
+                    now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
+                    assert job.next_attempt_at > now and job.lease_owner is None and job.claim_token is None
+                    assert await session.get(GraphPublicationDraft, claim.job_id) is None
+                observations['graph_only_processor'] = {'saved_draft_extraction_calls':0,
+                    'fresh_authored_extraction_calls':1, 'quota_authored_extraction_calls':1,
+                    'ready_document_task_preserved':True, 'quota_deadline_persisted':True,
+                    'automatic_dispatch_exercised':False, 'actual_provider_calls':0,
+                    'parser_embedding_vector_and_source_interfaces_not_supplied':True}
+                checks['processor_quota_defers_durably_without_draft_or_projection_changes'] = True
 
             boundaries = ('before_intent_commit', 'after_intent_commit', 'during_remote_transaction',
                 'after_remote_commit', 'after_result_commit')
@@ -391,17 +456,23 @@ async def run(args):
             'app/services/graph_continuation_service.py','app/services/ingestion_service.py',
             'app/core/blocking.py','app/models/document_upload.py','app/services/upload_service.py',
             'app/services/graph_result_metadata.py','app/services/graph_publication_candidate.py',
-            'tests/test_graph_publication_coordinator.py','scripts/evaluate_graph_publication_recovery.py')},
+            'tests/test_graph_publication_coordinator.py','scripts/evaluate_graph_publication_recovery.py',
+            'app/services/graph_only_processor.py','app/services/graph_job_extraction.py',
+            'app/services/resource_budget_service.py','app/core/config.py',
+            'tests/test_graph_only_processor.py','scripts/evaluate_graph_continuation_jobs.py')},
         'limits':['Synthetic source/checkpoint/graph fixtures; no model, embedding, Qdrant, R2 or live API ingestion.',
             'Crash recovery explicitly expires the isolated fixture lease before a fresh claim; no natural lease-duration or full worker benchmark.',
             'Source removal in the intent gap uses PostgreSQL and Neo4j only; full API/Qdrant/R2 deletion is covered separately.',
             'Hard kills cover five instrumented boundaries, not every network timing or delayed server commit.',
             'Existing unmarked ingestion/retry writes, superseded source generations and bounded dispatch still require combined verification before activation.',
             'Automatic graph continuation remains disconnected. Test elapsed time is not a throughput or capacity metric.']}
-    output = ROOT/'evaluation/graph-publication-recovery-current'
+    output = ROOT/('evaluation/graph-only-processor-current' if args.graph_only_processor
+                   else 'evaluation/graph-publication-recovery-current')
     output.with_suffix('.json').write_text(json.dumps(report, indent=2)+'\n')
-    output.with_suffix('.md').write_text('# Graph publication recovery — local PostgreSQL and Neo4j\n\n'
-        'Command: `.venv/bin/python scripts/evaluate_graph_publication_recovery.py --socket-dir <private-test-socket>`.\n\n'
+    output.with_suffix('.md').write_text(('# Graph-only processor — local PostgreSQL and Neo4j\n\n'
+        if args.graph_only_processor else '# Graph publication recovery — local PostgreSQL and Neo4j\n\n') +
+        'Command: `.venv/bin/python scripts/evaluate_graph_publication_recovery.py --socket-dir <private-test-socket>'
+        + (' --graph-only-processor' if args.graph_only_processor else '') + '`.\n\n'
         + '\n'.join(f'- {name}: passed' for name in checks)+'\n\nLimits:\n\n'
         + '\n'.join(f'- {item}' for item in report['limits'])+'\n')
     print(json.dumps({'checks_passed':len(checks),'hosted_provider_calls':0,'temporary_resources_removed':True}))
@@ -412,6 +483,7 @@ if __name__ == '__main__':
     parser.add_argument('--socket-dir', type=Path, required=True)
     parser.add_argument('--port', type=int, default=55432)
     parser.add_argument('--child', action='store_true')
+    parser.add_argument('--graph-only-processor', action='store_true')
     parser.add_argument('--schema', default='')
     parser.add_argument('--neo4j-uri', default='')
     parser.add_argument('--upload-id', default='')

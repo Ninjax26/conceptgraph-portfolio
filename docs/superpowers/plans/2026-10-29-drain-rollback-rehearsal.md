@@ -35,7 +35,7 @@ inference, production fixtures, destructive migration or automatic activation.
 - [x] Contracts fail before implementation and pass after it.
 - [x] Actual cohort transitions and cross-store checks pass.
 - [x] Verification, review and exact source hashes recorded.
-- [ ] Scoped release verified; Phase 3's remaining work documented.
+- [x] Scoped release verified; Phase 3's remaining work documented.
 
 Confirmed additional defect: the first two integration attempts stopped at the
 rollback audit because its synthetic payload fixture used `course_id`, whereas
