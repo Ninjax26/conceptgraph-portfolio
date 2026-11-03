@@ -39,4 +39,9 @@ report hashes match/compile, legacy hashes match; resources removed, zero hosted
 calls. Terminal fixture ages/lease expiry advances disclosed, no capacity or
 separate OS graph-worker crash claim. One fresh read-only final review found no important findings, no rulings/deferred
 minors or second review. Final suite675 (14.050s), diff checks and all21+18
-report source hashes match/compile. Release verification pending.
+report source hashes match/compile. Release ec63da23924582f4c15058414174836e771865b8 pushed only to origin/main.
+Free API exact SHA/ready/combined/queue zero/no degraded services and public sample
+API200/GRAPH_READY verified; saved frontend3-node/2-edge illustration rendered
+without captured console errors. Independent frontend SHA not exposed. GitHub
+Verify41122190603 completed successfully at the exact release SHA. Keep
+post-release notes local until substantive work; production gates remain off.

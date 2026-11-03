@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-29T16:17:36.129196+00:00",
+  "generated_at_utc": "2026-11-03T17:38:10.749272+00:00",
   "passed": true,
   "checks": {
     "unauthenticated_delete_preserves_all_stores": true,
@@ -79,7 +79,7 @@
       "source": false
     }
   },
-  "elapsed_seconds": 220.181,
+  "elapsed_seconds": 224.076,
   "projection_fencing_enabled_in_fixture": true,
   "processor_checks": {
     "native_pdf_full_processor_reaches_ready_with_real_stores_and_authored_ai": true,
@@ -151,8 +151,8 @@
         "source_head_does_not_create_buckets": true,
         "hosted_model_calls": 0
       },
-      "empty_timer_wait_seconds": 59.137,
-      "late_cleanup_timer_wait_seconds": 59.986,
+      "empty_timer_wait_seconds": 58.757,
+      "late_cleanup_timer_wait_seconds": 59.878,
       "configured_cleanup_interval_seconds": 60,
       "original_worker_exit_code": -9,
       "replacement_worker_exit_code": 0,
@@ -270,7 +270,7 @@
       },
       "drained_request": {
         "point_count": 1,
-        "body_sha256": "24fc5877d15757c5e0d9d65ca985348678fd8e058e07b8122d083beac5ee96f5",
+        "body_sha256": "d4ef876f3fcb81bc8c059aa8444e094db68e884aec7aa6d68c75dd762b462379",
         "http_status": 200,
         "completed": true
       },
@@ -388,7 +388,7 @@
         "captured_points": 1,
         "delivery": {
           "point_count": 1,
-          "body_sha256": "e5a7c2bfed726599734644c9c92e3612ef230b53ad341e425c4377ae031d037e",
+          "body_sha256": "269de5de2cbb9b5d7933da79a654558efc59b332e861c4ad9f2c8854e16d0f8c",
           "http_status": 200,
           "completed": true
         },
@@ -413,7 +413,7 @@
         },
         "delivery": {
           "point_count": 1,
-          "body_sha256": "09848934a5179e295e51dacbf1443552a8bef5e03d7d9b84db67b8071b21c2be",
+          "body_sha256": "fda4bf9094298edcd9bbd4fafffd133d2f0da32491152fa5a3784bcb28dc6d67",
           "http_status": 200,
           "completed": true
         },
@@ -475,11 +475,11 @@
     "app/services/upload_service.py": "720729e897da93cc533c14ae4058271e68b0dceca6899e4b0f2e98a2cb1939de",
     "app/services/course_service.py": "1801419984e9c0a757f774ad3c46be9d180a0dc862d9b577d61ee6c7a4b01dcf",
     "app/services/demo_retention_service.py": "5c9ca498ee85e05575aa7c767bbef64871d31e4a03c025524f38804143a4bc7a",
-    "app/services/graph_continuation_service.py": "eec3302df59e4bffe46a4b8aadba95974f4473c7016b6071069ba8e8de7f2a32",
+    "app/services/graph_continuation_service.py": "d8034d8ca8b2cac2df8515733c17f91118fb9522f36d075deacf30a5dddafb38",
     "app/services/ingestion_service.py": "331907c0f2453d18a29d763dfe95b6cb7268b394c2f17b35008a9f8cd9a4819c",
     "app/services/storage_service.py": "f90c423eccd36e76d672f24c59aeff80c95634423fd0e4f5801582dc2fb9a29a",
     "scripts/evaluate_upload_deletion.py": "e58d68193f684b33380284ed7af4e8ebba82adcb37f9f9c0da81348a73fed0a1",
-    "app/core/config.py": "8e442fd1ff8f8fa38a4e2837a599b3e84764e4c9a117d28e2a0490afbb7da012",
+    "app/core/config.py": "51841fde66f23e9096bc998d08261dee45ef8753466c0a271b6822e37dd5a253",
     "app/services/document_processing_service.py": "682f45420f3d61c64b4f49e78343e82bdba54167762b43abf7cdc07f5f6e89a5",
     "app/services/parser_service.py": "a8fed91a103c2e7ad1ec710c07cdc0187c9ca5621f830b802e3ab53dbba11a19",
     "app/core/blocking.py": "b78b4ae7a4d1d818d7e99ddb720fd47470a9f9382bc8a06c039950c118cb175b",
@@ -488,7 +488,7 @@
     "scripts/processor_crash_checks.py": "23277aebd40ec3a072b06bbea731a63b7f50ab70ff3671b4fe7ab6e7b9f42275",
     "scripts/deferred_vector_proxy.py": "9999c6e605a8a2c53d0aae4f6e1da4b4f6aaf620ce923c618fced3cd5caae7f4",
     "tests/test_deferred_vector_proxy.py": "a0b268a52a1649c9482aadb3ba771f012c78991218c920fb06a55989fd859d11",
-    "app/core/processing_coordinator.py": "66ab584a51030354d306e6c2fd06414acc1ee9d4a8659025ca51e0993e8dde7a",
+    "app/core/processing_coordinator.py": "99424705b9016ca5da8682a4cdd583844ed334ab4d900a95ddd5bdf245cd8d38",
     "app/models/document_upload.py": "b92c34979dac95f04384d1d5883b216014c8da1bbc18075e426421caeb1261cc",
     "app/services/resource_budget_service.py": "63b2add5b6a24e4f1e2614c40789ae9f429caa4829db884d579a6af67e67024a",
     "app/services/vector_cleanup_service.py": "e76d9c4d5c224b4691bd8a0f4d89f32f9f8c69ca8e0ff3f36933cf5c7f2532ee",

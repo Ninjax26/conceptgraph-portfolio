@@ -1,6 +1,6 @@
 # Current-binary known-cohort drain and rollback — isolated stores
 
-Generated: 2026-10-29T16:17:36.129196+00:00.
+Generated: 2026-11-03T17:38:10.749272+00:00.
 
 Command: `.venv/bin/python scripts/evaluate_upload_deletion.py --socket-dir <private-test-socket> --projection-fencing --worker-crashes --full-lifecycle --vector-rollout-audit --fleet-inventory --drain-rollback`.
 
@@ -77,7 +77,7 @@ Processor checks: 10 passed.
     "captured_points": 1,
     "delivery": {
       "point_count": 1,
-      "body_sha256": "e5a7c2bfed726599734644c9c92e3612ef230b53ad341e425c4377ae031d037e",
+      "body_sha256": "269de5de2cbb9b5d7933da79a654558efc59b332e861c4ad9f2c8854e16d0f8c",
       "http_status": 200,
       "completed": true
     },
@@ -102,7 +102,7 @@ Processor checks: 10 passed.
     },
     "delivery": {
       "point_count": 1,
-      "body_sha256": "09848934a5179e295e51dacbf1443552a8bef5e03d7d9b84db67b8071b21c2be",
+      "body_sha256": "fda4bf9094298edcd9bbd4fafffd133d2f0da32491152fa5a3784bcb28dc6d67",
       "http_status": 200,
       "completed": true
     },
@@ -195,8 +195,8 @@ Processor checks: 10 passed.
     "source_head_does_not_create_buckets": true,
     "hosted_model_calls": 0
   },
-  "empty_timer_wait_seconds": 59.137,
-  "late_cleanup_timer_wait_seconds": 59.986,
+  "empty_timer_wait_seconds": 58.757,
+  "late_cleanup_timer_wait_seconds": 59.878,
   "configured_cleanup_interval_seconds": 60,
   "original_worker_exit_code": -9,
   "replacement_worker_exit_code": 0,
@@ -321,7 +321,7 @@ Processor checks: 10 passed.
   },
   "drained_request": {
     "point_count": 1,
-    "body_sha256": "24fc5877d15757c5e0d9d65ca985348678fd8e058e07b8122d083beac5ee96f5",
+    "body_sha256": "d4ef876f3fcb81bc8c059aa8444e094db68e884aec7aa6d68c75dd762b462379",
     "http_status": 200,
     "completed": true
   },

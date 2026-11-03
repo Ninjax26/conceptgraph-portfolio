@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-30T20:17:06.078664+00:00",
+  "generated_at_utc": "2026-11-03T17:34:23.365654+00:00",
   "kind": "isolated PostgreSQL graph-job metadata contracts",
   "postgres_version": "18.4 (Homebrew)",
   "server_encoding": "UTF8",
@@ -57,7 +57,7 @@
   "hosted_provider_calls": 0,
   "production_test_data_mutations": 0,
   "test_schema_removed": true,
-  "duration_seconds": 6.66,
+  "duration_seconds": 8.9929,
   "code_sha256": {
     "app/models/document_upload.py": "b92c34979dac95f04384d1d5883b216014c8da1bbc18075e426421caeb1261cc",
     "app/services/graph_continuation_service.py": "d8034d8ca8b2cac2df8515733c17f91118fb9522f36d075deacf30a5dddafb38",
