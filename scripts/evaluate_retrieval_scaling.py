@@ -53,7 +53,7 @@ def percentile(values, fraction):
     return ordered[max(0, math.ceil(len(ordered) * fraction) - 1)] if ordered else 0
 
 
-def diagnose_source_losses(expected, candidates, ranked, accepted, sources):
+def diagnose_source_losses(expected, candidates, ranked, accepted, sources, *, trace_events=None):
     """Locate actual pipeline loss, separately from the top-five label metric."""
     def key(source):
         return source.get("document_name"), source.get("page_number")
@@ -62,12 +62,45 @@ def diagnose_source_losses(expected, candidates, ranked, accepted, sources):
     stages = [(stage, {key(chunk.get("metadata") or {}) for chunk in chunks})
               for stage, chunks in (("search", candidates), ("reranking", ranked),
                                     ("evidence_gate", accepted))]
-    return [dict(source, stage=next((stage for stage, present in stages
-                                    if key(source) not in present), "citation_selection"))
-            for source in expected if key(source) not in final]
+    losses = [dict(source, stage=next((stage for stage, present in stages
+                                     if key(source) not in present), "citation_selection"))
+              for source in expected if key(source) not in final]
+    if trace_events is not None:
+        from app.services.evidence_trace import fingerprint
+        final_decision = next((event for event in reversed(trace_events) if event["stage"] == "final"), None)
+        final_reason = (final_decision or {}).get("reason")
+        blocking = [event for event in trace_events
+                    if event["stage"] in ("identifier_coverage", "comparison_coverage")
+                    and event["reason"] != "verified"]
+        for loss in losses:
+            name_key = fingerprint(loss["document_name"])
+            documents = {event["document_key"] for event in trace_events
+                         if event.get("document_name_key") == name_key and "document_key" in event}
+            decisions = [event for event in trace_events
+                         if (event.get("document_name_key") == name_key or event.get("document_key") in documents)
+                         and event.get("page") == loss["page_number"]]
+            gates = [event for event in decisions if event["stage"] == "evidence_gate"]
+            if final_reason == "identifier_limit":
+                loss["stage"] = "identifier_guard"
+            elif loss["stage"] == "search":
+                if any(event["stage"] in ("dense_search", "identifier_lookup") for event in decisions):
+                    loss["stage"] = "candidate_fusion"
+            elif gates and not any(event["reason"] == "accepted" for event in gates):
+                loss["stage"] = "evidence_gate"
+            elif final_reason == "comparison_refused":
+                loss["stage"] = "comparison_coverage"
+            elif final_reason == "missing_cited_identifiers":
+                loss["stage"] = "citation_identifier_coverage"
+            elif any(event["reason"] == "missing_accepted_identifiers" for event in blocking):
+                loss["stage"] = "identifier_coverage"
+            loss.update(decisions=decisions, blocking_decisions=blocking, final_decision=final_decision)
+
+    return losses
 
 
 async def run(args):
+    if args.trace_evidence and args.baseline_revision:
+        raise ValueError("Evidence tracing requires current code, not an uninstrumented baseline revision.")
     import torch
     from sentence_transformers import SentenceTransformer, CrossEncoder
     from qdrant_client import QdrantClient
@@ -77,9 +110,11 @@ async def run(args):
     from app.services.ingestion_service import IngestionService
     from app.services.rag_service import RetrievalService
     from app.services.rerank_service import RerankService
-    from app.services.citation_service import assess_evidence, prepare_evidence
+    from app.services.citation_service import assess_evidence, prepare_evidence, _source_passage
     from app.services.retrieval_candidates import identifier_terms, passage_excerpt
-    from app.services.evidence_facets import comparison_facets
+    from app.services.evidence_facets import comparison_facets, supporting_query
+    from app.services.evidence_trace import EvidenceTrace, chunk_key, fingerprint
+    from scripts.evidence_selection_trace import TracingRerankService, TracingVectorClient
 
     comparison_sources = {}
     if args.baseline_revision:
@@ -133,7 +168,7 @@ async def run(args):
         raise ValueError(f"Each corpus must contain at least {len(base)} PDFs.")
     print("Loading cached models; no downloads or provider requests.", flush=True)
     embedding = SentenceTransformer(settings.embedding_model_name, device="cpu", local_files_only=True)
-    reranker = RerankService()
+    reranker = TracingRerankService(EvidenceTrace()) if args.trace_evidence else RerankService()
     reranker._model = CrossEncoder(settings.rerank_model_name, device="cpu", local_files_only=True)
     embedding.encode(["Warmup"])
     reranker.model.predict([("Warmup", "Warmup passage")])
@@ -172,6 +207,10 @@ async def run(args):
                         for name, limit, identifier_lookup, verify_identifiers in profiles[offset:] + profiles[:offset]:
                             settings.retrieval_identifier_lookup = identifier_lookup
                             settings.retrieval_verify_identifiers = verify_identifiers
+                            trace = EvidenceTrace() if args.trace_evidence else None
+                            if trace is not None:
+                                retrieval.vector_client = TracingVectorClient(vectors, trace)
+                                reranker.trace, reranker.group = trace, 0
                             timings = {}
                             candidates, ranked, sources, confidence, metadata = [], [], [], {}, {}
                             error = None
@@ -179,12 +218,16 @@ async def run(args):
                             try:
                                 found = await retrieval.retrieve(case["question"], context, top_k=limit, retrieval_mode="vector_only")
                                 candidates, metadata = found["chunks"], found["graph_metadata"]
+                                if trace is not None:
+                                    for rank, candidate in enumerate(candidates, 1):
+                                        trace.record("candidate_pool", "selected", candidate, rank=rank,
+                                                     vector_score=candidate.get("score"), fusion_score=candidate.get("fusion_score"))
                                 timings.update(metadata["timings"])
                                 rerank_started = time.perf_counter()
                                 ranked = await reranker.rerank(case["question"], candidates)
                                 timings["rerank_ms"] = (time.perf_counter() - rerank_started) * 1000
                                 evidence_started = time.perf_counter()
-                                sources, confidence = prepare_evidence(case["question"], ranked)
+                                sources, confidence = prepare_evidence(case["question"], ranked, **({"trace": trace} if trace is not None else {}))
                                 timings["evidence_ms"] = (time.perf_counter() - evidence_started) * 1000
                             except Exception as exc:
                                 error = type(exc).__name__
@@ -193,23 +236,48 @@ async def run(args):
                                 stage_timings=timings, error=error)
                             row.update({"id": case["id"], "split": case["split"], "repeat": repeat + 1})
                             parts = comparison_facets(case["question"]) if not args.baseline_revision else []
+                            queries = parts or [case["question"]]
+                            if any(chunk.get("supporting_evidence") is True for chunk in ranked):
+                                queries = [*queries, supporting_query(case["question"])]
                             row["rerank_window_count"] = (len(candidates) if args.baseline_revision else
-                                sum(len(reranker._windows(part, candidates)) for part in (parts or [case["question"]])))
-                            row["rerank_query_count"] = len(parts) or 1
+                                sum(len(reranker._windows(part, candidates)) for part in queries))
+                            row["rerank_query_count"] = len(queries)
                             # Local fixture diagnostics only; no prompts/documents are logged by the API.
                             required = identifier_terms(case["question"], limit=9, named_only=True) if verify_identifiers else []
                             accepted = []
-                            if parts:
+                            if trace is not None:
+                                passed = {(event["chunk_key"], event.get("facet"), event["passage_sha256"], event.get("role", "primary"))
+                                          for event in trace.events
+                                          if event["stage"] == "evidence_gate" and event["reason"] == "accepted"}
+                                accepted = [chunk for chunk in ranked if
+                                            (chunk_key(chunk), chunk.get("evidence_facet"), fingerprint(_source_passage(chunk)),
+                                             "supporting" if chunk.get("supporting_evidence") is True else "primary") in passed]
+                            elif parts:
                                 for index, part in enumerate(parts):
                                     group = [chunk for chunk in ranked if chunk.get("evidence_facet") == index]
                                     accepted += assess_evidence(group, required_identifiers=(
                                         identifier_terms(part, limit=8, named_only=True) if verify_identifiers else []))[0]
                             else:
                                 accepted = assess_evidence(ranked, required_identifiers=required)[0]
-                            accepted_keys = {(chunk["id"], chunk.get("evidence_facet"), chunk.get("rerank_passage")) for chunk in accepted}
+                            accepted_keys = {(chunk["id"], chunk.get("evidence_facet"), chunk.get("rerank_passage"),
+                                              chunk.get("supporting_evidence") is True) for chunk in accepted}
                             row["evidence_selection_reason"] = confidence.get("reason")
                             row["source_loss_diagnostics"] = diagnose_source_losses(
-                                row["expected_sources"], candidates, ranked, accepted, sources)
+                                row["expected_sources"], candidates, ranked, accepted, sources,
+                                trace_events=trace.events if trace is not None else None)
+                            if trace is not None:
+                                row["evidence_trace"] = trace.events
+                                row["trace_output_matches_untraced"] = prepare_evidence(case["question"], ranked) == (sources, confidence)
+                                if not row["trace_output_matches_untraced"]:
+                                    raise RuntimeError("Tracing changed selected sources or evidence assessment.")
+                                primary_sources, primary_confidence = prepare_evidence(case["question"],
+                                    [chunk for chunk in ranked if chunk.get("supporting_evidence") is not True])
+                                row["primary_citations_preserved"] = sources[:len(primary_sources)] == primary_sources
+                                row["primary_refusal_preserved"] = bool(primary_sources) or not sources
+                                row["primary_evidence_score_preserved"] = all(confidence.get(key) == primary_confidence.get(key)
+                                                                            for key in ("level", "score"))
+                                if not all(row[key] for key in ("primary_citations_preserved", "primary_refusal_preserved", "primary_evidence_score_preserved")):
+                                    raise RuntimeError("Supporting context changed primary evidence eligibility, citations or score.")
                             row["citation_count"] = len(sources)
                             row["citations_matching_scored_text"] = sum(any(
                                 source["document_id"] == chunk["metadata"].get("upload_id")
@@ -221,8 +289,10 @@ async def run(args):
                                 "page_number": chunk["metadata"].get("page_number"),
                                 "vector_score": chunk.get("score"),
                                 "rerank_score": chunk.get("rerank_score"),
-                                "passed_gate": (chunk["id"], chunk.get("evidence_facet"), chunk.get("rerank_passage")) in accepted_keys,
+                                "passed_gate": (chunk["id"], chunk.get("evidence_facet"), chunk.get("rerank_passage"),
+                                                chunk.get("supporting_evidence") is True) in accepted_keys,
                                 "evidence_facet": chunk.get("evidence_facet"),
+                                "evidence_role": "supporting" if chunk.get("supporting_evidence") is True else "primary",
                                 "excerpt": passage_excerpt(str(chunk.get("rerank_passage") or chunk["text"]), case["question"])
                                     if not row["should_refuse"] and not row["accepted_evidence"]["all_sources_hit"] else None,
                             } for chunk in ranked]
@@ -248,6 +318,10 @@ async def run(args):
               "repeats": args.repeats, "questions": len(questions), "corpora": corpora,
               "methodology": {"embedding": settings.embedding_model_name, "reranker": settings.rerank_model_name,
                 "baseline_revision": args.baseline_revision,
+                "evidence_trace": args.trace_evidence,
+                "trace_code_sha256": {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+                    for name in ("app/services/evidence_trace.py", "scripts/evidence_selection_trace.py",
+                                 "scripts/evaluate_retrieval_scaling.py")} if args.trace_evidence else {},
                 "splits": args.splits or ["development", "validation", "held_out"],
                 "comparison_code_sha256": comparison_sources,
                 "retrieval_candidates_sha256": hashlib.sha256((ROOT / "app/services/retrieval_candidates.py").read_bytes()).hexdigest(),
@@ -294,5 +368,6 @@ if __name__ == "__main__":
     parser.add_argument("--profiles", nargs="+", choices=("dense_10", "dense_20", "identifier_20", "identifier_10_verified"))
     parser.add_argument("--baseline-revision", help="Compare trusted local rerank/evidence code from a Git commit")
     parser.add_argument("--questions", help="Use a separate local question JSON with explicit dataset splits")
+    parser.add_argument("--trace-evidence", action="store_true", help="Record offline window/gate/citation decisions using hashed source positions")
     parser.add_argument("--output", default="evaluation/retrieval-scaling-current")
     asyncio.run(run(parser.parse_args()))

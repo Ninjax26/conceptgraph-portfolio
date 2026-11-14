@@ -1,16 +1,21 @@
 import asyncio
 from collections.abc import Iterable
 import math
+import logging
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
 from app.services.retrieval_candidates import rerank_passages
-from app.services.evidence_facets import comparison_facets
+from app.services.evidence_facets import comparison_facets, supporting_query
+from app.services.citation_service import prepare_evidence
 from app.services.provider_budget_policy import estimated_reservation
 from app.services.provider_metrics import provider_metrics, record_provider_search_units
 from app.services.shared_provider_service import reserve_provider_request
+
+
+logger = logging.getLogger(__name__)
 
 
 class RerankService:
@@ -36,7 +41,18 @@ class RerankService:
     ) -> list[dict[str, Any]]:
         facets = comparison_facets(query)
         if not facets:
-            return await self._score_with_cohere(query, chunks)
+            primary = await self._score_with_cohere(query, chunks)
+            focus = self._supporting_query(query, primary)
+            if focus:
+                try:
+                    extra = await self._score_with_cohere(focus, [dict(chunk, supporting_evidence=True) for chunk in chunks])
+                    return [*primary, *extra]
+                except Exception as exc:
+                    # Supporting context is optional. Cancellation is a
+                    # BaseException and still propagates; metrics retain the
+                    # provider's failure classification and owned clients close.
+                    logger.warning("Optional supporting rerank unavailable (%s)", type(exc).__name__)
+            return primary
         groups = [await self._score_with_cohere(facet, chunks) for facet in facets]
         return self._tag_facets(groups)
 
@@ -134,7 +150,27 @@ class RerankService:
         for windows in plans:
             groups.append(self._rank_windows(chunks, windows, scores[offset:offset + len(windows)]))
             offset += len(windows)
-        return self._tag_facets(groups) if facets else groups[0]
+        if facets:
+            return self._tag_facets(groups)
+        primary = groups[0]
+        focus = self._supporting_query(query, primary)
+        if focus:
+            try:
+                extra_chunks = [dict(chunk, supporting_evidence=True) for chunk in chunks]
+                windows = self._windows(focus, extra_chunks)
+                extra = self._rank_windows(extra_chunks, windows, self.model.predict([(focus, passage) for _, passage in windows]))
+                return [*primary, *extra]
+            except Exception as exc:
+                logger.warning("Optional supporting rerank unavailable (%s)", type(exc).__name__)
+        return primary
+
+    @staticmethod
+    def _supporting_query(query: str, primary: list[dict[str, Any]]) -> str | None:
+        focus = supporting_query(query)
+        if not focus:
+            return None
+        sources, _ = prepare_evidence(query, primary)
+        return focus if 0 < len(sources) < 5 else None
 
     @staticmethod
     def _tag_facets(groups: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:

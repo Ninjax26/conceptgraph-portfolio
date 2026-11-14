@@ -1,5 +1,12 @@
 # Answer quality: code audit and execution order
 
+4 November update: this audit records the pre-step-2 pipeline. Evidence tracing
+and guarded supporting context are now implemented locally; see the
+[current measurements](../evaluation/supporting-evidence-current.md). Original
+source completeness is 34/35 vs 31/35, with no unseen holdout gain demonstrated.
+Step 3 refusal/answerability and remaining supported misses are next. Existing
+APIs, READY/auth/store safety remain unchanged; live answer accuracy is unmeasured.
+
 Audited 3 November 2026. This is a source-grounded implementation plan, not a
 claim of improved answer accuracy. Existing backend qualification stays intact.
 

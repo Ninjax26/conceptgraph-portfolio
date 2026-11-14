@@ -1,5 +1,45 @@
 # ConceptGraph implementation and verification ledger
 
+4 November supporting-evidence checkpoint: **Step 2 implemented and verified
+locally.** Original benchmark source completeness 31/35→34/35; development plus
+known validation 23/27→26/27; original refusals 10/10 unchanged. New reserved holdout
+4/5 completeness and 2/3 refusals is unchanged; it was first run after the reviewed
+rule was frozen and is now consumed. No unseen-question gain is demonstrated.
+q06/q16/h10 recover their missing pages; q13 still loses transactions. as01 is a
+supported refusal, as06 an absent-voltage false admission; ec04 manufacturer
+false admission also remains. These are source-selection tests, not answer accuracy.
+
+A conservative focused rerank is optional only after primary evidence passes and
+citation slots remain. Original citations/score/level/refusal remain authoritative;
+extra literal passages use the same scoped candidates and score/identifier guards,
+with a five-citation cap. One extra hosted request may be needed for eligible
+questions; budgets/lifecycle reused. 701 backend tests, 9 frontend tests and TS/Vite
+build pass. 58 exact checks each preserve trace output, primary citations, refusal
+and level/score. One review found qualifier loss; six RED subcases fixed it in one
+pass. Deferred minor: failed optional rerank work is omitted from offline plan
+counters; provider reservations/runtime metrics are unchanged. No second review,
+hosted quota, production data, commit/push or deployment. Current branch remains
+`codex/evidence-selection-tracing`. Step 3 refusal/answerability is next; freeze a
+new holdout before tuning. [Report](../evaluation/supporting-evidence-current.md),
+[plan](superpowers/plans/2026-11-04-supporting-evidence.md).
+
+4 November answer-quality checkpoint: **Step 1 evidence-loss tracing complete
+locally.** Search/rerank/provider calls and evidence/refusal rules remain unchanged.
+Optional events capture actual search provenance, normalized literal windows,
+score components, identifier/coverage guards and citation losses. One fresh review
+found two attribution gaps; three RED→GREEN regressions fixed fusion loss and
+unprocessed early-refusal paths in one correction pass. Final backend 690,
+frontend 9 and TypeScript/Vite build pass; 50 exact traced/untraced source/confidence
+comparisons pass. Original 45-case outcomes remain 31/35 completeness and 10/10
+refusals. Existing development challenge is 3/3 completeness and 1/2 refusals:
+PMP-104 manufacturer-missing evidence is still admitted. Four known misses are
+below the unchanged 0.35 gate; frozen score replays preserve those observations.
+A new eight-case holdout remains unrun. No generated-answer/human accuracy,
+hosted-quality/capacity claim, deployment or production mutation. Changes remain
+local on `codex/evidence-selection-tracing`; next is evidence selection correction.
+[Report](../evaluation/evidence-selection-trace-current.md),
+[plan](superpowers/plans/2026-11-04-evidence-selection-tracing.md).
+
 Updated: 2026-11-03 (India). This is the current roadmap; older numbered scaling phases in the handbook describe earlier work.
 
 ## Operating boundaries

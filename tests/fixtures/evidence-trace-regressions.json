@@ -1,0 +1,82 @@
+{
+  "note": "Four known development/regression misses. Replay frozen local model scores through real window selection and the unchanged gate; this does not retest model quality.",
+  "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+  "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "threshold": 0.35,
+  "cases": [
+    {
+      "id": "q06",
+      "question": "What must I understand directly before HTTPS?",
+      "chunk": {
+        "id": "frozen-q06",
+        "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS.",
+        "score": 0.578570244681397,
+        "metadata": {
+          "upload_id": "frozen-source",
+          "document_name": "web-foundations.pdf",
+          "page_number": 2
+        }
+      },
+      "window_scores": {
+        "96dd8bc3ca1af0cac1edeb80baefffe52d8c865a8149f58839b7a2bc4ef602c5": -6.1039299964904785
+      },
+      "expected_evidence_score": 0.1751314368309015
+    },
+    {
+      "id": "q13",
+      "question": "Why cannot a PostgreSQL rollback remove partial Qdrant writes?",
+      "chunk": {
+        "id": "frozen-q13",
+        "text": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries.",
+        "score": 0.3240520890646806,
+        "metadata": {
+          "upload_id": "frozen-source",
+          "document_name": "data-reliability.pdf",
+          "page_number": 1
+        }
+      },
+      "window_scores": {
+        "10304e97cdc95ec1db95fe70b50bdb566cca73aa97d9f30cce8f536e22d69f11": -7.022309303283691
+      },
+      "expected_evidence_score": 0.09783930517769876
+    },
+    {
+      "id": "q16",
+      "question": "Why must vector retrieval use the same document scope as access control?",
+      "chunk": {
+        "id": "frozen-q16",
+        "text": "Vector search compares numeric embeddings to locate passages with similar meaning. Filter by the allowed upload identifiers before returning results. A similarity score does not prove that a passage supports the answer. Reranking can compare the question and each candidate more carefully; an evidence threshold can reject weak matches. Vector search complements a concept graph, which stores explicit typed relationships such as prerequisites.",
+        "score": 0.3928950769447939,
+        "metadata": {
+          "upload_id": "frozen-source",
+          "document_name": "data-reliability.pdf",
+          "page_number": 5
+        }
+      },
+      "window_scores": {
+        "716534f43c263231705bb367de001a349294347b78db23e60cb148aaeb2341cc": -6.760694980621338
+      },
+      "expected_evidence_score": 0.1186784814767353
+    },
+    {
+      "id": "h10",
+      "question": "Why does a signed login session still need authorization checks for each document?",
+      "chunk": {
+        "id": "frozen-h10",
+        "text": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks.",
+        "score": 0.4968178802760421,
+        "metadata": {
+          "upload_id": "frozen-source",
+          "document_name": "identity-security.pdf",
+          "page_number": 3
+        }
+      },
+      "window_scores": {
+        "ad0215567e63098b272a15b5aa7dcb52334c662cf90da4a7f7ca5f7c19247189": -2.85214900970459,
+        "50111053f7eb4464b3a4acb17ab074dc642f819446e8f524ee71a2c54a690a1c": -4.581652641296387,
+        "f8fcc97ca4c6eea2afa90790bd15be350214692f2ac337a206aa8f23c8c24d56": -6.714954853057861
+      },
+      "expected_evidence_score": 0.18724460097835038
+    }
+  ]
+}

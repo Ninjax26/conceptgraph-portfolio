@@ -1,0 +1,14 @@
+{
+  "name": "Answer selection untouched holdout v1",
+  "annotation_note": "Authored on 2026-11-04 after diagnosing q06/q13/q16/h10 and before changing any selection rule or threshold. Reserved for the final check of the next evidence-selection change; do not run or tune on these cases during development. Page/fragment labels refer to original repository fixtures, not independently reviewed customer questions. Missing-attribute refusals must be reported even when they fail.",
+  "questions": [
+    {"id": "as01", "split": "held_out", "question": "Which transport topic comes immediately before HTTPS, and which topic comes before that?", "category": "prerequisite", "expected_sources": [{"document_name": "web-foundations.pdf", "page_number": 3}], "expected_passage_fragments": ["study TLS first and HTTP before TLS"], "should_refuse": false},
+    {"id": "as02", "split": "held_out", "question": "If removing partial vector records also fails, what information should a failed workflow retain?", "category": "complementary_context", "expected_sources": [{"document_name": "data-reliability.pdf", "page_number": 4}], "expected_passage_fragments": ["preserve authoritative metadata", "record the failure"], "should_refuse": false},
+    {"id": "as03", "split": "held_out", "question": "Why should PDF preview permissions and vector-search permissions agree?", "category": "scope_reasoning", "expected_sources": [{"document_name": "identity-security.pdf", "page_number": 3}], "expected_passage_fragments": ["same document scope"], "should_refuse": false},
+    {"id": "as04", "split": "held_out", "question": "Compare session-cookie tamper detection with the server's PDF-owner permission check.", "category": "multi_page", "expected_sources": [{"document_name": "identity-security.pdf", "page_number": 4}, {"document_name": "identity-security.pdf", "page_number": 2}], "expected_passage_fragments": ["detect tampering", "document owner"], "should_refuse": false},
+    {"id": "as05", "split": "held_out", "question": "Compare the inspection schedule for PMP-103 with the pressure ceiling for PMP-105.", "category": "identifier_multisource", "expected_sources": [{"document_name": "equipment-PMP-103.pdf", "page_number": 2}, {"document_name": "equipment-PMP-105.pdf", "page_number": 1}], "expected_passage_fragments": ["15 days", "16.0 bar"], "should_refuse": false},
+    {"id": "as06", "split": "held_out", "question": "What electrical supply voltage is specified for PMP-102?", "category": "unsupported_attribute", "should_refuse": true},
+    {"id": "as07", "split": "held_out", "question": "Which exact certificate authority issued the certificate used by this course website?", "category": "unsupported_attribute", "should_refuse": true},
+    {"id": "as08", "split": "held_out", "question": "What is the allowed operating pressure for PMP-90909?", "category": "unsupported_identifier", "should_refuse": true}
+  ]
+}
