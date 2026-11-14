@@ -36,16 +36,18 @@ def equipment_pdf(record):
          "Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. "
          "Use the inspection interval for this exact equipment; another identifier can have a different interval."),
     ]
-    document = fitz.open()
-    for heading, text in page_texts:
-        page = document.new_page()
-        page.insert_text((48, 60), heading, fontsize=16)
-        if page.insert_textbox(fitz.Rect(48, 95, 550, 750), text, fontsize=12) < 0:
-            raise ValueError("Fixture text did not fit in its PDF page.")
-    # Suppress random PDF trailer IDs so baseline/current corpus hashes match.
-    content = document.tobytes(no_new_id=True)
-    document.close()
-    return f"equipment-{identifier}.pdf", content
+    return authored_pdf(f"equipment-{identifier}.pdf", page_texts)
+
+
+def authored_pdf(filename, page_texts):
+    with fitz.open() as document:
+        for heading, text in page_texts:
+            page = document.new_page()
+            page.insert_text((48, 60), heading, fontsize=16)
+            if page.insert_textbox(fitz.Rect(48, 95, 550, 750), text, fontsize=12) < 0:
+                raise ValueError("Fixture text did not fit in its PDF page.")
+        # Suppress random PDF trailer IDs so baseline/current corpus hashes match.
+        return filename, document.tobytes(no_new_id=True)
 
 
 def percentile(values, fraction):
@@ -70,7 +72,7 @@ def diagnose_source_losses(expected, candidates, ranked, accepted, sources, *, t
         final_decision = next((event for event in reversed(trace_events) if event["stage"] == "final"), None)
         final_reason = (final_decision or {}).get("reason")
         blocking = [event for event in trace_events
-                    if event["stage"] in ("identifier_coverage", "comparison_coverage")
+                    if event["stage"] in ("identifier_coverage", "comparison_coverage", "fact_coverage")
                     and event["reason"] != "verified"]
         for loss in losses:
             name_key = fingerprint(loss["document_name"])
@@ -80,13 +82,17 @@ def diagnose_source_losses(expected, candidates, ranked, accepted, sources, *, t
                          if (event.get("document_name_key") == name_key or event.get("document_key") in documents)
                          and event.get("page") == loss["page_number"]]
             gates = [event for event in decisions if event["stage"] == "evidence_gate"]
-            if final_reason == "identifier_limit":
+            if final_reason == "fact_limit":
+                loss["stage"] = "fact_guard"
+            elif final_reason == "identifier_limit":
                 loss["stage"] = "identifier_guard"
             elif loss["stage"] == "search":
                 if any(event["stage"] in ("dense_search", "identifier_lookup") for event in decisions):
                     loss["stage"] = "candidate_fusion"
             elif gates and not any(event["reason"] == "accepted" for event in gates):
                 loss["stage"] = "evidence_gate"
+            elif final_reason == "requested_fact_missing" and loss["stage"] != "reranking":
+                loss["stage"] = "fact_coverage"
             elif final_reason == "comparison_refused":
                 loss["stage"] = "comparison_coverage"
             elif final_reason == "missing_cited_identifiers":
@@ -96,6 +102,21 @@ def diagnose_source_losses(expected, candidates, ranked, accepted, sources, *, t
             loss.update(decisions=decisions, blocking_decisions=blocking, final_decision=final_decision)
 
     return losses
+
+
+def load_baseline_services(revision):
+    if not re.fullmatch(r"[0-9a-f]{7,40}", revision):
+        raise ValueError("The baseline must be a local hexadecimal Git commit ID.")
+    modules, hashes = {}, {}
+    for name in ("rerank_service", "citation_service"):
+        source = subprocess.check_output(["git", "show", f"{revision}:app/services/{name}.py"], cwd=ROOT, text=True)
+        hashes[f"app/services/{name}.py"] = hashlib.sha256(source.encode()).hexdigest()
+        module = ModuleType(f"baseline_{name}")
+        exec(compile(source, f"baseline:{name}", "exec"), module.__dict__)
+        modules[name] = module
+    if "prepare_evidence" in modules["rerank_service"].__dict__:
+        modules["rerank_service"].prepare_evidence = modules["citation_service"].prepare_evidence
+    return modules, hashes
 
 
 async def run(args):
@@ -118,19 +139,7 @@ async def run(args):
 
     comparison_sources = {}
     if args.baseline_revision:
-        if not re.fullmatch(r"[0-9a-f]{7,40}", args.baseline_revision):
-            raise ValueError("The baseline must be a local hexadecimal Git commit ID.")
-        # Load only the two trusted, versioned local modules under comparison.
-        # No checkout, environment changes, model downloads or remote Git access.
-        modules = {}
-        for name in ("rerank_service", "citation_service"):
-            source = subprocess.check_output([
-                "git", "show", f"{args.baseline_revision}:app/services/{name}.py"
-            ], cwd=ROOT, text=True)
-            comparison_sources[f"app/services/{name}.py"] = hashlib.sha256(source.encode()).hexdigest()
-            module = ModuleType(f"baseline_{name}")
-            exec(compile(source, f"baseline:{name}", "exec"), module.__dict__)
-            modules[name] = module
+        modules, comparison_sources = load_baseline_services(args.baseline_revision)
         RerankService = modules["rerank_service"].RerankService
         prepare_evidence = modules["citation_service"].prepare_evidence
         assess_evidence = modules["citation_service"].assess_evidence
@@ -164,6 +173,12 @@ async def run(args):
     base = [(document["filename"], (ROOT / "public/sample" / document["filename"]).read_bytes())
             for document in json.loads((ROOT / "evaluation/course.json").read_text())["documents"]]
     base += [equipment_pdf(record) for record in definitions["documents"]]
+    if args.fixture_corpus:
+        corpus_path = ROOT / args.fixture_corpus
+        authored = json.loads(corpus_path.read_text())
+        base += [authored_pdf(document["filename"], [(page["title"], page["text"]) for page in document["pages"]])
+                 for document in authored["documents"]]
+        dataset_files[args.fixture_corpus] = corpus_path
     if min(args.documents) < len(base):
         raise ValueError(f"Each corpus must contain at least {len(base)} PDFs.")
     print("Loading cached models; no downloads or provider requests.", flush=True)
@@ -325,6 +340,7 @@ async def run(args):
                 "splits": args.splits or ["development", "validation", "held_out"],
                 "comparison_code_sha256": comparison_sources,
                 "retrieval_candidates_sha256": hashlib.sha256((ROOT / "app/services/retrieval_candidates.py").read_bytes()).hexdigest(),
+                "fact_support_sha256": hashlib.sha256((ROOT / "app/services/fact_support.py").read_bytes()).hexdigest() if not args.baseline_revision else None,
                 "evidence_facets_sha256": hashlib.sha256((ROOT / "app/services/evidence_facets.py").read_bytes()).hexdigest(),
                 "evidence_min_score": settings.evidence_min_score,
                 "profiles": {name: {"candidate_limit": count, "identifier_lookup": lookup, "identifier_verification": verify}
@@ -369,5 +385,6 @@ if __name__ == "__main__":
     parser.add_argument("--baseline-revision", help="Compare trusted local rerank/evidence code from a Git commit")
     parser.add_argument("--questions", help="Use a separate local question JSON with explicit dataset splits")
     parser.add_argument("--trace-evidence", action="store_true", help="Record offline window/gate/citation decisions using hashed source positions")
+    parser.add_argument("--fixture-corpus", help="Additional authored PDF pages from a local corpus JSON; no remote data")
     parser.add_argument("--output", default="evaluation/retrieval-scaling-current")
     asyncio.run(run(parser.parse_args()))

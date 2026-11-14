@@ -1,0 +1,16 @@
+{
+  "name": "Authored equipment fact corpus v1",
+  "provenance": "Synthetic equipment names, identifiers and values written for offline evidence checks. No production documents or human accuracy annotations.",
+  "documents": [
+    {"filename": "equipment-facts-a.pdf", "pages": [
+      {"title": "EQ-201 specification", "text": "Equipment identifier EQ-201. Manufacturer: Atlas Systems. Input voltage: 230 V AC. Serial number: AT-901."},
+      {"title": "EQ-202 specification", "text": "Equipment identifier EQ-202. Manufacturer: Beacon Works. Input voltage: 24 V DC. Serial number: BW-902."},
+      {"title": "EQ-203 specification", "text": "Equipment identifier EQ-203. Manufacturer is not specified. Input voltage is not recorded. Pressure limit: 12 bar."}
+    ]},
+    {"filename": "equipment-facts-b.pdf", "pages": [
+      {"title": "EQ-204 specification", "text": "Equipment identifier EQ-204. Manufactured by Cedar Instruments. Rated output voltage: 5 V DC. Serial number: CI-903."},
+      {"title": "EQ-205 specification", "text": "Equipment identifier EQ-205. Manufacturer: Delta Devices. Supply voltage: 110-120 V AC. Serial number: DD-904."},
+      {"title": "EQ-206 specification", "text": "Equipment identifier EQ-206. Brand: Ember. Output voltage: 12 V DC. This document does not identify the manufacturer or the input voltage."}
+    ]}
+  ]
+}

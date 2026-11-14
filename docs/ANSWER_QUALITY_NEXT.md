@@ -1,5 +1,25 @@
 # Next: recover useful evidence before changing answer generation
 
+**14 November: the scoped Step 3 fact guard is implemented locally.** For explicit
+digit-bearing equipment IDs, manufacturer/voltage/serial evidence must contain
+the requested positive fact in the final citation text. New frozen fact holdout
+retains 5/5 supported cases and improves missing/wrong-property refusals 0/5→5/5;
+development retains 5/5 and improves 0/4→4/4. Original 34/35 and 10/10 are unchanged.
+726 backend tests, nine frontend tests and TS/Vite build pass. The new holdout is
+now consumed. [Report](../evaluation/fact-availability-current.md).
+
+**Next is Step 4: answer completeness and citation discipline.** Mechanically
+validate generated citation indices/format, partial-evidence disclosures and
+fallback coverage; then use separately approved provider captures and actual
+human review to measure claim support and correctness. No hosted quota is
+currently approved. Wider fact entailment, generic paraphrase recovery and
+q13/as01 remain separate work. Do not treat this rule-based explicit-slot check
+as an answer-accuracy model. One minor comparison witness-attribution issue and
+failed-optional-work counters remain documented. The threshold remains 0.35,
+five-citation cap and auth/READY/store behavior unchanged. Work is local only.
+
+The dated material below records the earlier baseline and execution history.
+
 **4 November: step 2 is implemented locally.** Original source completeness
 improves 31/35→34/35; development/known-validation 23/27→26/27. Original refusals
 stay 10/10. The new heldout remains 4/5 completeness and 2/3 refusals: no unseen gain

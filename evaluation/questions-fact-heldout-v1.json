@@ -1,0 +1,16 @@
+{
+  "name": "Equipment fact availability heldout v1",
+  "annotation_note": "Frozen before implementation or measurement on 14 November 2026. Run baseline and candidate only after the rule/review are frozen; never tune against measured results. Authored synthetic facts and labels, not independent human annotations.",
+  "questions": [
+    {"id":"fh01","split":"held_out","question":"Which manufacturer is listed for EQ-205?","category":"manufacturer","expected_sources":[{"document_name":"equipment-facts-b.pdf","page_number":2}],"expected_passage_fragments":["Delta Devices"],"should_refuse":false},
+    {"id":"fh02","split":"held_out","question":"Give the supply voltage stated for EQ-205.","category":"supply_voltage","expected_sources":[{"document_name":"equipment-facts-b.pdf","page_number":2}],"expected_passage_fragments":["110-120 V AC"],"should_refuse":false},
+    {"id":"fh03","split":"held_out","question":"Who manufactured EQ-204?","category":"manufacturer_passive","expected_sources":[{"document_name":"equipment-facts-b.pdf","page_number":1}],"expected_passage_fragments":["Cedar Instruments"],"should_refuse":false},
+    {"id":"fh04","split":"held_out","question":"What is the serial number of EQ-205?","category":"serial_number","expected_sources":[{"document_name":"equipment-facts-b.pdf","page_number":2}],"expected_passage_fragments":["DD-904"],"should_refuse":false},
+    {"id":"fh05","split":"held_out","question":"What is the input voltage for EQ-206?","category":"wrong_voltage_role","should_refuse":true},
+    {"id":"fh06","split":"held_out","question":"Who is the manufacturer of EQ-206?","category":"brand_is_not_manufacturer","should_refuse":true},
+    {"id":"fh07","split":"held_out","question":"What is the serial number of EQ-202?","category":"serial_number","expected_sources":[{"document_name":"equipment-facts-a.pdf","page_number":2}],"expected_passage_fragments":["BW-902"],"should_refuse":false},
+    {"id":"fh08","split":"held_out","question":"Who makes PMP-106?","category":"absent_manufacturer","should_refuse":true},
+    {"id":"fh09","split":"held_out","question":"What is the output voltage of EQ-201?","category":"wrong_voltage_role","should_refuse":true},
+    {"id":"fh10","split":"held_out","question":"Compare the manufacturer of EQ-205 with the input voltage of EQ-206.","category":"missing_comparison_attribute","should_refuse":true}
+  ]
+}

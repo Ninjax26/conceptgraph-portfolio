@@ -1,5 +1,31 @@
 # ConceptGraph implementation and verification ledger
 
+14 November fact-availability checkpoint: **Step 3 explicit equipment fact guard
+implemented and verified locally**, on `codex/fact-availability` above deployed
+baseline `d871ad1`. Recognized named-equipment manufacturer/voltage/serial requests
+must have a positive fact for the correct subject/property in final literal
+citations. Brand, output voltage, missing/uncertain/example values and foreign
+subjects do not establish manufacturer/input/serial facts. Generic or ambiguous
+question forms retain existing policy; this is not universal semantic entailment.
+
+Fresh frozen fact holdout: supported source completeness 5/5→5/5, unsupported
+refusals 0/5→5/5. Development: 5/5→5/5 and 0/4→4/4. Original benchmark remains
+34/35 and 10/10; consumed context regressions retain 5/6 with refusals 2/4→4/4;
+consumed answer-selection regressions retain 4/5 with refusals 2/3→3/3.
+q13/as01 and the existing idempotency-versus-HTTPS comparison miss remain.
+
+726 backend tests, nine frontend tests and TS/Vite build pass; 82 exact checks
+each preserve trace output and new-primary citations/refusal/score under optional
+support. One fresh review, 13 failing subcases and one correction pass fixed
+three important gaps; minor facet-to-witness attribution remains documented.
+The new fact holdout is now consumed; no rule tuning followed its first run.
+No hosted inference, human answer-quality claim, environment/data mutation,
+commit, push, deployment or automatic-continuation activation. Previous dated
+entries below are historical. Next: answer completeness, citation-index validation
+and fallback coverage, followed by separately budgeted human-reviewed generation.
+[Measured report](../evaluation/fact-availability-current.md),
+[plan](superpowers/plans/2026-11-14-fact-availability.md).
+
 4 November supporting-evidence checkpoint: **Step 2 implemented and verified
 locally.** Original benchmark source completeness 31/35→34/35; development plus
 known validation 23/27→26/27; original refusals 10/10 unchanged. New reserved holdout

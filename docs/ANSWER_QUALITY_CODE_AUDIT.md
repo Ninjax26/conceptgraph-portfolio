@@ -1,5 +1,18 @@
 # Answer quality: code audit and execution order
 
+14 November update: the explicit named-equipment manufacturer/voltage/serial
+fact gate now runs on final literal citations before synthesis. Missing facts
+cannot be replaced by topical relevance, brand labels or the wrong voltage role.
+Bounded fact witness selection reuses the existing five-source selector and
+1,024-state constraint; no model call, API, provider or store change. New heldout
+5/5 supported and 5/5 refusals vs baseline 5/5 and 0/5; original source coverage
+remains 34/35 and refusals 10/10. 726 backend tests pass. This is narrow mechanical
+fact availability, not universal entailment or generated-answer correctness.
+[Results and limits](../evaluation/fact-availability-current.md). Next is Step 4;
+remaining q13/as01 recovery and broader scoring calibration are still unverified.
+All changes for this increment remain local, uncommitted and undeployed. Earlier
+dated audit text below describes its own prior pipeline state.
+
 4 November update: this audit records the pre-step-2 pipeline. Evidence tracing
 and guarded supporting context are now implemented locally; see the
 [current measurements](../evaluation/supporting-evidence-current.md). Original

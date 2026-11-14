@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.services.evidence_trace import EvidenceTrace, fingerprint
 from app.services.retrieval_candidates import identifier_supported, identifier_terms, passage_excerpt
 from app.services.evidence_facets import comparison_facets
+from app.services.fact_support import FactRequest, requested_facts, supports_fact
 
 
 def _source_passage(chunk: dict[str, Any]) -> str:
@@ -91,20 +92,28 @@ def assess_evidence(
 
 def _select_sources(
     sources: list[dict[str, Any]], limit: int, required: list[str], facets: int = 0,
+    facts: tuple[FactRequest, ...] = (),
 ) -> list[dict[str, Any]]:
     """Reserve citation slots for verified IDs, then fill by original rank.
 
-    At most eight requested IDs plus two facets gives 1,024 coverage states. Find the
+    At most eight independent ID/fact constraints plus two facets gives 1,024 coverage states. Find the
     smallest covering set (rank breaks ties); greedy choices can waste slots
     when one passage covers several IDs. Never admit rejected evidence.
     """
-    if (not required and not facets) or len(required) > 8 or facets > 2:
+    # A fact witness already proves its subject identifier in the cited text.
+    # Avoid spending a second coverage bit for the same identifier.
+    required = [term for term in required if term not in {fact.identifier for fact in facts}]
+    if facts and len(required) + len(facts) > 8:
+        return []
+    if (not required and not facets and not facts) or len(required) > 8 or facets > 2:
         return sources[:limit]
     masks = [sum(1 << bit for bit, term in enumerate(required)
                  if identifier_supported(term, source["supporting_passage"]))
-             | sum(1 << (len(required) + facet) for facet in source.get("_evidence_facets", []))
+             | sum(1 << (len(required) + bit) for bit, fact in enumerate(facts)
+                   if supports_fact(fact, source["supporting_passage"]))
+             | sum(1 << (len(required) + len(facts) + facet) for facet in source.get("_evidence_facets", []))
              for source in sources]
-    target = (1 << (len(required) + facets)) - 1
+    target = (1 << (len(required) + len(facts) + facets)) - 1
     covered = 0
     for mask in masks[:limit]:
         covered |= mask
@@ -128,7 +137,7 @@ def _select_sources(
 
 def _comparison_evidence(
     parts: list[str], chunks: list[dict[str, Any]], required: list[str],
-    *, trace: EvidenceTrace | None = None,
+    *, trace: EvidenceTrace | None = None, facts: tuple[FactRequest, ...] = (),
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     candidates: dict[tuple[str, int | None, str], dict[str, Any]] = {}
     confidences = []
@@ -139,7 +148,9 @@ def _comparison_evidence(
                  and chunk["evidence_facet"] == index and chunk.get("evidence_facet_count") == len(parts)]
         identifiers = identifier_terms(part, limit=8, named_only=True) if settings.retrieval_verify_identifiers else []
         accepted, confidence = assess_evidence(group, required_identifiers=identifiers, trace=trace)
-        sources = build_sources(accepted, limit=len(accepted), question=part, required_identifiers=identifiers, trace=trace)
+        sources = build_sources(accepted, limit=len(accepted), question=part, required_identifiers=identifiers, trace=trace, facts=requested_facts(part, fragment=True))
+        if not _facts_verified(requested_facts(part, fragment=True), sources, trace):
+            return [], missing
         if not sources or not all(any(identifier_supported(term, source["supporting_passage"])
                                      for source in sources) for term in identifiers):
             if trace is not None:
@@ -154,7 +165,9 @@ def _comparison_evidence(
                 candidates[key] = source
             candidates[key]["_evidence_facets"] = memberships
     ranked = sorted(candidates.values(), key=lambda source: source["metadata"]["evidence_score"], reverse=True)
-    sources = _select_sources(ranked, 5, required, len(parts))
+    sources = _select_sources(ranked, 5, required, len(parts), facts)
+    if not _facts_verified(facts, sources, trace):
+        return [], missing
     if trace is not None:
         selected_ids = {id(source) for source in sources}
         for source in ranked:
@@ -182,6 +195,7 @@ def build_sources(
     chunks: list[dict[str, Any]], limit: int = 5, *, question: str | None = None,
     required_identifiers: list[str] | None = None,
     trace: EvidenceTrace | None = None,
+    facts: tuple[FactRequest, ...] = (),
 ) -> list[dict[str, Any]]:
     sources: list[dict[str, Any]] = []
     seen: set[tuple[str, int | None, str]] = set()
@@ -223,12 +237,12 @@ def build_sources(
         )
         if trace is not None:
             source_chunks.append(chunk)
-        if len(sources) >= limit and not required_identifiers:
+        if len(sources) >= limit and not required_identifiers and not facts:
             if trace is not None:
                 for remaining in chunks[position + 1:]:
                     trace.record("citation_selection", "citation_limit", remaining)
             break
-    selected = _select_sources(sources, limit, required_identifiers or [])
+    selected = _select_sources(sources, limit, required_identifiers or [], facts=facts)
     if trace is not None:
         selected_ids = {id(source) for source in selected}
         for chunk, source in zip(source_chunks, sources, strict=True):
@@ -237,6 +251,17 @@ def build_sources(
     for index, source in enumerate(selected, 1):
         source["source_id"] = f"source-{index}"
     return selected
+
+
+def _facts_verified(facts: tuple[FactRequest, ...], sources: list[dict[str, Any]], trace: EvidenceTrace | None) -> bool:
+    verified = True
+    for fact in facts:
+        present = any(supports_fact(fact, source["supporting_passage"]) for source in sources)
+        if trace is not None:
+            trace.record("fact_coverage", "verified" if present else "missing_requested_fact",
+                         attribute=fact.attribute, subject_key=fingerprint(fact.identifier), qualifier=fact.qualifier)
+        verified = verified and present
+    return verified
 
 
 def _prepare_primary_evidence(question: str, chunks: list[dict[str, Any]], *, trace: EvidenceTrace | None = None) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
@@ -248,12 +273,20 @@ def _prepare_primary_evidence(question: str, chunks: list[dict[str, Any]], *, tr
     if len(required) > 8:
         return finish([], {"level": "insufficient", "score": 0.0, "evidence_count": 0,
                     "reason": "This question names too many identifiers to verify in one answer. Ask about a smaller set."}, "identifier_limit")
+    facts = requested_facts(question)
+    remaining_ids = set(required) - {fact.identifier for fact in facts}
+    if facts and len(facts) + len(remaining_ids) > 8:
+        return finish([], {"level": "insufficient", "score": 0.0, "evidence_count": 0,
+                           "reason": "This question requests too many explicit facts. Ask about a smaller set."}, "fact_limit")
     parts = comparison_facets(question)
     if parts and any("evidence_facet" in chunk for chunk in chunks):
-        sources, confidence = _comparison_evidence(parts, chunks, required, trace=trace)
+        sources, confidence = _comparison_evidence(parts, chunks, required, trace=trace, facts=facts)
         return finish(sources, confidence, "sources_selected" if sources else "comparison_refused")
     evidence, confidence = assess_evidence(chunks, required_identifiers=required, trace=trace)
-    sources = build_sources(evidence, question=question, required_identifiers=required, trace=trace)
+    sources = build_sources(evidence, question=question, required_identifiers=required, trace=trace, facts=facts)
+    if not _facts_verified(facts, sources, trace):
+        return finish([], {"level": "insufficient", "score": 0.0, "evidence_count": 0,
+                           "reason": "The requested equipment fact is not explicitly supported by the cited passages."}, "requested_fact_missing")
     if required and not all(any(identifier_supported(term, source["supporting_passage"]) for source in sources) for term in required):
         return finish([], {"level": "insufficient", "score": 0.0, "evidence_count": 0,
                     "reason": "The requested identifiers could not be verified in the cited passages."}, "missing_cited_identifiers")
@@ -273,7 +306,7 @@ def prepare_evidence(question: str, chunks: list[dict[str, Any]], *, trace: Evid
         accepted, _ = assess_evidence([*primary, *supporting], required_identifiers=required, trace=trace)
         accepted_support = [chunk for chunk in accepted if chunk.get("supporting_evidence") is True]
         extra = build_sources(accepted_support, limit=len(accepted_support),
-                              question=question, required_identifiers=required, trace=trace)
+                              question=question, required_identifiers=required, trace=trace, facts=requested_facts(question))
         pages = {(source["document_id"], source["page_number"]) for source in sources}
         extra.sort(key=lambda source: (source["document_id"], source["page_number"]) in pages)
         primary_count = len(sources)

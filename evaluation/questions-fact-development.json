@@ -1,0 +1,15 @@
+{
+  "name": "Equipment fact availability development v1",
+  "annotation_note": "Authored development cases. Existing ec04/as06 failures are regression data, not unseen validation. Source labels and literal values are synthetic, not human answer review.",
+  "questions": [
+    {"id":"fa01","split":"development","question":"Who manufactured EQ-201?","category":"manufacturer","expected_sources":[{"document_name":"equipment-facts-a.pdf","page_number":1}],"expected_passage_fragments":["Atlas Systems"],"should_refuse":false},
+    {"id":"fa02","split":"development","question":"What is the input voltage of EQ-202?","category":"input_voltage","expected_sources":[{"document_name":"equipment-facts-a.pdf","page_number":2}],"expected_passage_fragments":["24 V DC"],"should_refuse":false},
+    {"id":"fa03","split":"development","question":"What serial number is listed for EQ-201?","category":"serial_number","expected_sources":[{"document_name":"equipment-facts-a.pdf","page_number":1}],"expected_passage_fragments":["AT-901"],"should_refuse":false},
+    {"id":"fa04","split":"development","question":"Who manufactured EQ-203?","category":"unstated_manufacturer","should_refuse":true},
+    {"id":"fa05","split":"development","question":"What is the input voltage of EQ-203?","category":"unstated_voltage","should_refuse":true},
+    {"id":"fa06","split":"development","question":"What is the input voltage of EQ-204?","category":"wrong_voltage_role","should_refuse":true},
+    {"id":"fa07","split":"development","question":"Who manufactured PMP-104?","category":"missing_manufacturer","should_refuse":true},
+    {"id":"fa08","split":"development","question":"Compare the manufacturer of EQ-201 with the manufacturer of EQ-202.","category":"manufacturer_comparison","expected_sources":[{"document_name":"equipment-facts-a.pdf","page_number":1},{"document_name":"equipment-facts-a.pdf","page_number":2}],"expected_passage_fragments":["Atlas Systems","Beacon Works"],"should_refuse":false},
+    {"id":"fa09","split":"development","question":"What pressure limit applies to EQ-203?","category":"supported_other_attribute","expected_sources":[{"document_name":"equipment-facts-a.pdf","page_number":3}],"expected_passage_fragments":["12 bar"],"should_refuse":false}
+  ]
+}

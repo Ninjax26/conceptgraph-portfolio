@@ -1,0 +1,4953 @@
+{
+  "date": "2026-11-14",
+  "status": "implemented and offline-verified locally; not committed or deployed",
+  "baseline_revision": "d871ad10fad275739dcc53444e87627224527f43",
+  "rule_freeze": {
+    "phase": "reviewed rule frozen before first heldout measurement",
+    "source_sha256": {
+      "app/services/fact_support.py": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+      "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+      "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+      "app/services/retrieval_candidates.py": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+      "scripts/evaluate_retrieval_scaling.py": "56186188e71a2e6aa4fd8b10c77b80e5f2e95b37933d987d063de7e1812ac02f",
+      "tests/test_fact_support.py": "74f2b7cf4649e51b949d52a48dac16931e52a79ae9e52d3eb9645e06dc7108ca",
+      "tests/test_fact_evaluation.py": "f2d90b3772958e606eae3bbca6d9a37f8eb3fb4114451802c8fcc8876baa9a04"
+    },
+    "datasets": {
+      "equipment-fact-corpus-v1.json": "19500cdb90d8f3d2cf54825b52f83742d775fea2ca6c00033d6bd0a3ac12ab0f",
+      "questions-fact-development.json": "44c583ae21390f5fd56b973a6bc46a34fc7595bf9412fcfe6d3f65256931bbd5",
+      "questions-fact-heldout-v1.json": "b23a228819c48b85c8bd0a855d58de9e37ca0054b42a9535e68d6a22c8ff682a"
+    }
+  },
+  "heldout_policy": "Authored and frozen before implementation; reviewed source frozen before first fact-heldout measurement; no rule tuning after results. Fact heldout v1 is now consumed. Existing context and answer-selection heldout labels describe historical, already-consumed regressions.",
+  "evaluation": [
+    {
+      "dataset": "Fact development",
+      "before": {
+        "documents": 20,
+        "chunks": 54,
+        "question_count": 9,
+        "supported_count": 5,
+        "all_required_sources_retained": 5,
+        "unsupported_count": 4,
+        "unsupported_refused": 0,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": "d871ad10fad275739dcc53444e87627224527f43",
+          "evidence_trace": false,
+          "trace_code_sha256": {},
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+            "app/services/citation_service.py": "b5ce52bbd41a0e9a7a602ab7ab7149bc5ddbba0c32873ef04a9ea3b2a835f647"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-fact-development.json": "44c583ae21390f5fd56b973a6bc46a34fc7595bf9412fcfe6d3f65256931bbd5",
+            "evaluation/equipment-fact-corpus-v1.json": "19500cdb90d8f3d2cf54825b52f83742d775fea2ca6c00033d6bd0a3ac12ab0f"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-facts-a.pdf": "208dbe5b62069b4bba62f8c1b459c2c22c7f148b57aa66330808f4ddfaffff26",
+          "equipment-facts-b.pdf": "e0619f891fccd7072fd15e64ce4dc027ae4773c729d246f35c489ae30acd7052",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54",
+          "equipment-PMP-201.pdf": "8e4ead3794330f003755f4b511042380c38cd8312e0e6fc6c953b8edc7139ab2",
+          "equipment-PMP-202.pdf": "09563aea33746e1afbc72d275b0d3abd653a7e9d004f17cd4b34a462c73e8e83",
+          "equipment-PMP-203.pdf": "ad9d4dea82207bbecb8848b8b9899c7d6c87ff3b32f0cc691fbb95303505f742",
+          "equipment-PMP-204.pdf": "e703ec50b84c20109e62761f9dc2c1ba8cf5b797d09a18a5de2caa979b8a9191",
+          "equipment-PMP-205.pdf": "ca96f906048c83a74185d8b4c9d1dbc638b592c0dabeb73d9d6bc21360285267",
+          "equipment-PMP-206.pdf": "67871eb8f27695e9310c79f4595ff70f262e735a0faf409f6df09d62ec13ce63",
+          "equipment-PMP-207.pdf": "45f9ce18951209334e091a6850ce3df77dad2059c4e20160e72094f00d374819",
+          "equipment-PMP-208.pdf": "6f7494b89e23805c4444a9083fb7b246d903f248e24cb0b595258cab536fd6ca"
+        },
+        "by_split": {
+          "development": {
+            "supported": 5,
+            "source_completeness": 5,
+            "unsupported": 4,
+            "refused": 0
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          }
+        },
+        "cases": [
+          {
+            "question": "Who manufactured EQ-201?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage of EQ-202?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What serial number is listed for EQ-201?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured EQ-203?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage of EQ-203?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage of EQ-204?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured PMP-104?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the manufacturer of EQ-201 with the manufacturer of EQ-202.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit applies to EQ-203?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ]
+      },
+      "after": {
+        "documents": 20,
+        "chunks": 54,
+        "question_count": 9,
+        "supported_count": 5,
+        "all_required_sources_retained": 5,
+        "unsupported_count": 4,
+        "unsupported_refused": 4,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": null,
+          "evidence_trace": true,
+          "trace_code_sha256": {
+            "app/services/evidence_trace.py": "1babe2ec5204472eb60302761f07e9ef20065e270b8d46ea931a8179c54fab46",
+            "scripts/evidence_selection_trace.py": "1cd503849b0ca405fd10f41e9c41bc3997a8e80fb2bc5fd3e4ab10a6cbe71118",
+            "scripts/evaluate_retrieval_scaling.py": "56186188e71a2e6aa4fd8b10c77b80e5f2e95b37933d987d063de7e1812ac02f"
+          },
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-fact-development.json": "44c583ae21390f5fd56b973a6bc46a34fc7595bf9412fcfe6d3f65256931bbd5",
+            "evaluation/equipment-fact-corpus-v1.json": "19500cdb90d8f3d2cf54825b52f83742d775fea2ca6c00033d6bd0a3ac12ab0f"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-facts-a.pdf": "208dbe5b62069b4bba62f8c1b459c2c22c7f148b57aa66330808f4ddfaffff26",
+          "equipment-facts-b.pdf": "e0619f891fccd7072fd15e64ce4dc027ae4773c729d246f35c489ae30acd7052",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54",
+          "equipment-PMP-201.pdf": "8e4ead3794330f003755f4b511042380c38cd8312e0e6fc6c953b8edc7139ab2",
+          "equipment-PMP-202.pdf": "09563aea33746e1afbc72d275b0d3abd653a7e9d004f17cd4b34a462c73e8e83",
+          "equipment-PMP-203.pdf": "ad9d4dea82207bbecb8848b8b9899c7d6c87ff3b32f0cc691fbb95303505f742",
+          "equipment-PMP-204.pdf": "e703ec50b84c20109e62761f9dc2c1ba8cf5b797d09a18a5de2caa979b8a9191",
+          "equipment-PMP-205.pdf": "ca96f906048c83a74185d8b4c9d1dbc638b592c0dabeb73d9d6bc21360285267",
+          "equipment-PMP-206.pdf": "67871eb8f27695e9310c79f4595ff70f262e735a0faf409f6df09d62ec13ce63",
+          "equipment-PMP-207.pdf": "45f9ce18951209334e091a6850ce3df77dad2059c4e20160e72094f00d374819",
+          "equipment-PMP-208.pdf": "6f7494b89e23805c4444a9083fb7b246d903f248e24cb0b595258cab536fd6ca"
+        },
+        "by_split": {
+          "development": {
+            "supported": 5,
+            "source_completeness": 5,
+            "unsupported": 4,
+            "refused": 4
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          }
+        },
+        "cases": [
+          {
+            "question": "Who manufactured EQ-201?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage of EQ-202?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What serial number is listed for EQ-201?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured EQ-203?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage of EQ-203?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage of EQ-204?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured PMP-104?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the manufacturer of EQ-201 with the manufacturer of EQ-202.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit applies to EQ-203?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ],
+        "invariant_pass_counts": {
+          "trace_output_matches_untraced": 9,
+          "primary_citations_preserved": 9,
+          "primary_refusal_preserved": 9,
+          "primary_evidence_score_preserved": 9
+        }
+      }
+    },
+    {
+      "dataset": "Fresh fact heldout v1",
+      "before": {
+        "documents": 20,
+        "chunks": 54,
+        "question_count": 10,
+        "supported_count": 5,
+        "all_required_sources_retained": 5,
+        "unsupported_count": 5,
+        "unsupported_refused": 0,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": "d871ad10fad275739dcc53444e87627224527f43",
+          "evidence_trace": false,
+          "trace_code_sha256": {},
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+            "app/services/citation_service.py": "b5ce52bbd41a0e9a7a602ab7ab7149bc5ddbba0c32873ef04a9ea3b2a835f647"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": null,
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-fact-heldout-v1.json": "b23a228819c48b85c8bd0a855d58de9e37ca0054b42a9535e68d6a22c8ff682a",
+            "evaluation/equipment-fact-corpus-v1.json": "19500cdb90d8f3d2cf54825b52f83742d775fea2ca6c00033d6bd0a3ac12ab0f"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-facts-a.pdf": "208dbe5b62069b4bba62f8c1b459c2c22c7f148b57aa66330808f4ddfaffff26",
+          "equipment-facts-b.pdf": "e0619f891fccd7072fd15e64ce4dc027ae4773c729d246f35c489ae30acd7052",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54",
+          "equipment-PMP-201.pdf": "8e4ead3794330f003755f4b511042380c38cd8312e0e6fc6c953b8edc7139ab2",
+          "equipment-PMP-202.pdf": "09563aea33746e1afbc72d275b0d3abd653a7e9d004f17cd4b34a462c73e8e83",
+          "equipment-PMP-203.pdf": "ad9d4dea82207bbecb8848b8b9899c7d6c87ff3b32f0cc691fbb95303505f742",
+          "equipment-PMP-204.pdf": "e703ec50b84c20109e62761f9dc2c1ba8cf5b797d09a18a5de2caa979b8a9191",
+          "equipment-PMP-205.pdf": "ca96f906048c83a74185d8b4c9d1dbc638b592c0dabeb73d9d6bc21360285267",
+          "equipment-PMP-206.pdf": "67871eb8f27695e9310c79f4595ff70f262e735a0faf409f6df09d62ec13ce63",
+          "equipment-PMP-207.pdf": "45f9ce18951209334e091a6850ce3df77dad2059c4e20160e72094f00d374819",
+          "equipment-PMP-208.pdf": "6f7494b89e23805c4444a9083fb7b246d903f248e24cb0b595258cab536fd6ca"
+        },
+        "by_split": {
+          "development": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 5,
+            "source_completeness": 5,
+            "unsupported": 5,
+            "refused": 0
+          }
+        },
+        "cases": [
+          {
+            "question": "Which manufacturer is listed for EQ-205?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Give the supply voltage stated for EQ-205.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured EQ-204?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the serial number of EQ-205?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage for EQ-206?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who is the manufacturer of EQ-206?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the serial number of EQ-202?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who makes PMP-106?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the output voltage of EQ-201?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the manufacturer of EQ-205 with the input voltage of EQ-206.",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ]
+      },
+      "after": {
+        "documents": 20,
+        "chunks": 54,
+        "question_count": 10,
+        "supported_count": 5,
+        "all_required_sources_retained": 5,
+        "unsupported_count": 5,
+        "unsupported_refused": 5,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": null,
+          "evidence_trace": true,
+          "trace_code_sha256": {
+            "app/services/evidence_trace.py": "1babe2ec5204472eb60302761f07e9ef20065e270b8d46ea931a8179c54fab46",
+            "scripts/evidence_selection_trace.py": "1cd503849b0ca405fd10f41e9c41bc3997a8e80fb2bc5fd3e4ab10a6cbe71118",
+            "scripts/evaluate_retrieval_scaling.py": "56186188e71a2e6aa4fd8b10c77b80e5f2e95b37933d987d063de7e1812ac02f"
+          },
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-fact-heldout-v1.json": "b23a228819c48b85c8bd0a855d58de9e37ca0054b42a9535e68d6a22c8ff682a",
+            "evaluation/equipment-fact-corpus-v1.json": "19500cdb90d8f3d2cf54825b52f83742d775fea2ca6c00033d6bd0a3ac12ab0f"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-facts-a.pdf": "208dbe5b62069b4bba62f8c1b459c2c22c7f148b57aa66330808f4ddfaffff26",
+          "equipment-facts-b.pdf": "e0619f891fccd7072fd15e64ce4dc027ae4773c729d246f35c489ae30acd7052",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54",
+          "equipment-PMP-201.pdf": "8e4ead3794330f003755f4b511042380c38cd8312e0e6fc6c953b8edc7139ab2",
+          "equipment-PMP-202.pdf": "09563aea33746e1afbc72d275b0d3abd653a7e9d004f17cd4b34a462c73e8e83",
+          "equipment-PMP-203.pdf": "ad9d4dea82207bbecb8848b8b9899c7d6c87ff3b32f0cc691fbb95303505f742",
+          "equipment-PMP-204.pdf": "e703ec50b84c20109e62761f9dc2c1ba8cf5b797d09a18a5de2caa979b8a9191",
+          "equipment-PMP-205.pdf": "ca96f906048c83a74185d8b4c9d1dbc638b592c0dabeb73d9d6bc21360285267",
+          "equipment-PMP-206.pdf": "67871eb8f27695e9310c79f4595ff70f262e735a0faf409f6df09d62ec13ce63",
+          "equipment-PMP-207.pdf": "45f9ce18951209334e091a6850ce3df77dad2059c4e20160e72094f00d374819",
+          "equipment-PMP-208.pdf": "6f7494b89e23805c4444a9083fb7b246d903f248e24cb0b595258cab536fd6ca"
+        },
+        "by_split": {
+          "development": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 5,
+            "source_completeness": 5,
+            "unsupported": 5,
+            "refused": 5
+          }
+        },
+        "cases": [
+          {
+            "question": "Which manufacturer is listed for EQ-205?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Give the supply voltage stated for EQ-205.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured EQ-204?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the serial number of EQ-205?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-b.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the input voltage for EQ-206?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who is the manufacturer of EQ-206?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the serial number of EQ-202?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-facts-a.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who makes PMP-106?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the output voltage of EQ-201?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the manufacturer of EQ-205 with the input voltage of EQ-206.",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ],
+        "invariant_pass_counts": {
+          "trace_output_matches_untraced": 10,
+          "primary_citations_preserved": 10,
+          "primary_refusal_preserved": 10,
+          "primary_evidence_score_preserved": 10
+        }
+      }
+    },
+    {
+      "dataset": "Original benchmark",
+      "before": {
+        "documents": 10,
+        "chunks": 32,
+        "question_count": 45,
+        "supported_count": 35,
+        "all_required_sources_retained": 34,
+        "unsupported_count": 10,
+        "unsupported_refused": 10,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": "d871ad10fad275739dcc53444e87627224527f43",
+          "evidence_trace": false,
+          "trace_code_sha256": {},
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+            "app/services/citation_service.py": "b5ce52bbd41a0e9a7a602ab7ab7149bc5ddbba0c32873ef04a9ea3b2a835f647"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": null,
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "questions-multidoc.json": "302419b8cba4b34bbfb9372f6a54e56b43f98e238be6d308b32ff0d5f51332da",
+            "questions-scaling-heldout.json": "49b32735e64bb42ca019a493165c33743f4c92a8277638dfdd74d84884866bac"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54"
+        },
+        "by_split": {
+          "development": {
+            "supported": 17,
+            "source_completeness": 16,
+            "unsupported": 5,
+            "refused": 5
+          },
+          "validation": {
+            "supported": 10,
+            "source_completeness": 10,
+            "unsupported": 3,
+            "refused": 3
+          },
+          "held_out": {
+            "supported": 8,
+            "source_completeness": 8,
+            "unsupported": 2,
+            "refused": 2
+          }
+        },
+        "cases": [
+          {
+            "question": "What fields make up an HTTP request and response?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 5
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What does a browser verify in a TLS certificate?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should I learn before HTTPS, including its foundational prerequisite?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do DNS caching and HTTP caching differ?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 5
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do HTTP 401 and HTTP 403 differ?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What must I understand directly before HTTPS?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How are authentication and authorization different?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should I learn before document access control, including its foundational prerequisite?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What do HttpOnly and Secure do for signed sessions?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Can HTTPS prevent phishing or prove a site is honest?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 5
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Does a rate limit establish identity or document ownership?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why is authorization needed even when HTTPS protects PDF traffic?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why cannot a PostgreSQL rollback remove partial Qdrant writes?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": false,
+              "source_recall": 0.5,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should I learn before safe retries, including its foundational prerequisite?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do deterministic chunk IDs help idempotency?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why must vector retrieval use the same document scope as access control?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 5
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How is readiness different from HTTP 429 rate limiting?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 0.5,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do I calculate the orbital period of Mars?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What antibiotic dose treats pneumonia?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which compression algorithm and block size does this course recommend for backups?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What exact JWT signing algorithm and key rotation interval does this course prescribe?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the optimal Qdrant HNSW ef_construct value for ten million vectors?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit applies to PMP-104?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the inspection interval for PMP-101?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the approved maximum pressure for PMP-102?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How often should PMP-103 be inspected?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Find the operating pressure limit of PMP-105.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Find the inspection frequency specified for PMP-106.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "For PMP-103, give both the pressure limit and the inspection interval.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do the inspection intervals of PMP-104 and PMP-106 compare?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How does an idempotent upload prevent duplicated data after a network failure?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why does a signed login session still need authorization checks for each document?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit applies to PMP-99999?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What inspection interval applies to PMP-88888?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which country won the football World Cup in 1990?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How many days can pass between required inspections of PMP-102?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Find the maximum operating pressure stated for PMP-106.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which pressure limit must an operator use for PMP-101?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How frequently does the procedure require inspection of PMP-105?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should an operator do if PMP-104 exceeds its approved pressure limit?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the approved pressure limits of PMP-101 and PMP-105.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why must a server check who owns a PDF before allowing it to be downloaded?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which parts of an HTTP response describe its status and metadata?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit is specified for PMP-77777?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How many moons does Jupiter currently have?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ]
+      },
+      "after": {
+        "documents": 10,
+        "chunks": 32,
+        "question_count": 45,
+        "supported_count": 35,
+        "all_required_sources_retained": 34,
+        "unsupported_count": 10,
+        "unsupported_refused": 10,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": null,
+          "evidence_trace": true,
+          "trace_code_sha256": {
+            "app/services/evidence_trace.py": "1babe2ec5204472eb60302761f07e9ef20065e270b8d46ea931a8179c54fab46",
+            "scripts/evidence_selection_trace.py": "1cd503849b0ca405fd10f41e9c41bc3997a8e80fb2bc5fd3e4ab10a6cbe71118",
+            "scripts/evaluate_retrieval_scaling.py": "56186188e71a2e6aa4fd8b10c77b80e5f2e95b37933d987d063de7e1812ac02f"
+          },
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "questions-multidoc.json": "302419b8cba4b34bbfb9372f6a54e56b43f98e238be6d308b32ff0d5f51332da",
+            "questions-scaling-heldout.json": "49b32735e64bb42ca019a493165c33743f4c92a8277638dfdd74d84884866bac"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54"
+        },
+        "by_split": {
+          "development": {
+            "supported": 17,
+            "source_completeness": 16,
+            "unsupported": 5,
+            "refused": 5
+          },
+          "validation": {
+            "supported": 10,
+            "source_completeness": 10,
+            "unsupported": 3,
+            "refused": 3
+          },
+          "held_out": {
+            "supported": 8,
+            "source_completeness": 8,
+            "unsupported": 2,
+            "refused": 2
+          }
+        },
+        "cases": [
+          {
+            "question": "What fields make up an HTTP request and response?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 5
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What does a browser verify in a TLS certificate?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should I learn before HTTPS, including its foundational prerequisite?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do DNS caching and HTTP caching differ?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 5
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do HTTP 401 and HTTP 403 differ?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What must I understand directly before HTTPS?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How are authentication and authorization different?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should I learn before document access control, including its foundational prerequisite?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What do HttpOnly and Secure do for signed sessions?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Can HTTPS prevent phishing or prove a site is honest?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 5
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Does a rate limit establish identity or document ownership?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why is authorization needed even when HTTPS protects PDF traffic?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why cannot a PostgreSQL rollback remove partial Qdrant writes?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": false,
+              "source_recall": 0.5,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should I learn before safe retries, including its foundational prerequisite?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do deterministic chunk IDs help idempotency?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why must vector retrieval use the same document scope as access control?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 5
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How is readiness different from HTTP 429 rate limiting?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 0.5,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do I calculate the orbital period of Mars?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What antibiotic dose treats pneumonia?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which compression algorithm and block size does this course recommend for backups?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What exact JWT signing algorithm and key rotation interval does this course prescribe?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the optimal Qdrant HNSW ef_construct value for ten million vectors?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit applies to PMP-104?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the inspection interval for PMP-101?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the approved maximum pressure for PMP-102?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How often should PMP-103 be inspected?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Find the operating pressure limit of PMP-105.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Find the inspection frequency specified for PMP-106.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "For PMP-103, give both the pressure limit and the inspection interval.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How do the inspection intervals of PMP-104 and PMP-106 compare?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How does an idempotent upload prevent duplicated data after a network failure?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 3
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why does a signed login session still need authorization checks for each document?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.6
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit applies to PMP-99999?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What inspection interval applies to PMP-88888?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which country won the football World Cup in 1990?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How many days can pass between required inspections of PMP-102?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Find the maximum operating pressure stated for PMP-106.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which pressure limit must an operator use for PMP-101?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How frequently does the procedure require inspection of PMP-105?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What should an operator do if PMP-104 exceeds its approved pressure limit?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the approved pressure limits of PMP-101 and PMP-105.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-101.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why must a server check who owns a PDF before allowing it to be downloaded?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which parts of an HTTP response describe its status and metadata?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What pressure limit is specified for PMP-77777?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "How many moons does Jupiter currently have?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ],
+        "invariant_pass_counts": {
+          "trace_output_matches_untraced": 45,
+          "primary_citations_preserved": 45,
+          "primary_refusal_preserved": 45,
+          "primary_evidence_score_preserved": 45
+        }
+      }
+    },
+    {
+      "dataset": "Existing context regressions",
+      "before": {
+        "documents": 10,
+        "chunks": 32,
+        "question_count": 10,
+        "supported_count": 6,
+        "all_required_sources_retained": 5,
+        "unsupported_count": 4,
+        "unsupported_refused": 2,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": "d871ad10fad275739dcc53444e87627224527f43",
+          "evidence_trace": false,
+          "trace_code_sha256": {},
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+            "app/services/citation_service.py": "b5ce52bbd41a0e9a7a602ab7ab7149bc5ddbba0c32873ef04a9ea3b2a835f647"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": null,
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-evidence-context.json": "6a0b39b926a44de0db78cc7c2532932bc3a2137abb5b633364c8a20f3788295d"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54"
+        },
+        "by_split": {
+          "development": {
+            "supported": 3,
+            "source_completeness": 3,
+            "unsupported": 2,
+            "refused": 1
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 3,
+            "source_completeness": 2,
+            "unsupported": 2,
+            "refused": 1
+          }
+        },
+        "cases": [
+          {
+            "question": "Contrast the identity checks in a TLS certificate with authorization checks on a private PDF.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare what SQL transactions roll back with how compensating cleanup removes partial Qdrant writes.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare DNS cache expiry with the no-store directive for HTTP responses.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 5
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured PMP-104?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-104.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What year was TLS invented?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare idempotent ingestion upserts with HTTPS: which prevents duplicate vectors and which protects traffic?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": false,
+              "source_recall": 0.5,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": false,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare authentication credentials with HTTP 429: which establishes identity and which limits consumption?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 0.5,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the maximum pressure limits and inspection intervals of PMP-102 and PMP-106.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.8
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the factory serial number of PMP-105?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the approved inspection interval for PMP-88888?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ]
+      },
+      "after": {
+        "documents": 10,
+        "chunks": 32,
+        "question_count": 10,
+        "supported_count": 6,
+        "all_required_sources_retained": 5,
+        "unsupported_count": 4,
+        "unsupported_refused": 4,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": null,
+          "evidence_trace": true,
+          "trace_code_sha256": {
+            "app/services/evidence_trace.py": "1babe2ec5204472eb60302761f07e9ef20065e270b8d46ea931a8179c54fab46",
+            "scripts/evidence_selection_trace.py": "1cd503849b0ca405fd10f41e9c41bc3997a8e80fb2bc5fd3e4ab10a6cbe71118",
+            "scripts/evaluate_retrieval_scaling.py": "56186188e71a2e6aa4fd8b10c77b80e5f2e95b37933d987d063de7e1812ac02f"
+          },
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-evidence-context.json": "6a0b39b926a44de0db78cc7c2532932bc3a2137abb5b633364c8a20f3788295d"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54"
+        },
+        "by_split": {
+          "development": {
+            "supported": 3,
+            "source_completeness": 3,
+            "unsupported": 2,
+            "refused": 2
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 3,
+            "source_completeness": 2,
+            "unsupported": 2,
+            "refused": 2
+          }
+        },
+        "cases": [
+          {
+            "question": "Contrast the identity checks in a TLS certificate with authorization checks on a private PDF.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare what SQL transactions roll back with how compensating cleanup removes partial Qdrant writes.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare DNS cache expiry with the no-store directive for HTTP responses.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 5
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Who manufactured PMP-104?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What year was TLS invented?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare idempotent ingestion upserts with HTTPS: which prevents duplicate vectors and which protects traffic?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": false,
+              "source_recall": 0.5,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": false,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare authentication credentials with HTTP 429: which establishes identity and which limits consumption?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 0.5,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "web-foundations.pdf",
+                "page_number": 6
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 1
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the maximum pressure limits and inspection intervals of PMP-102 and PMP-106.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.8
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-106.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the factory serial number of PMP-105?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the approved inspection interval for PMP-88888?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ],
+        "invariant_pass_counts": {
+          "trace_output_matches_untraced": 10,
+          "primary_citations_preserved": 10,
+          "primary_refusal_preserved": 10,
+          "primary_evidence_score_preserved": 10
+        }
+      }
+    },
+    {
+      "dataset": "Previously consumed answer-selection regressions",
+      "before": {
+        "documents": 10,
+        "chunks": 32,
+        "question_count": 8,
+        "supported_count": 5,
+        "all_required_sources_retained": 4,
+        "unsupported_count": 3,
+        "unsupported_refused": 2,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": "d871ad10fad275739dcc53444e87627224527f43",
+          "evidence_trace": false,
+          "trace_code_sha256": {},
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+            "app/services/citation_service.py": "b5ce52bbd41a0e9a7a602ab7ab7149bc5ddbba0c32873ef04a9ea3b2a835f647"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": null,
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-answer-selection-holdout-v1.json": "0329b1deef870276fa9190bc8902bfe43b7c2189e6e82d423b42654955d5142c"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54"
+        },
+        "by_split": {
+          "development": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 5,
+            "source_completeness": 4,
+            "unsupported": 3,
+            "refused": 2
+          }
+        },
+        "cases": [
+          {
+            "question": "Which transport topic comes immediately before HTTPS, and which topic comes before that?",
+            "should_refuse": false,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": 0.0,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": false,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "If removing partial vector records also fails, what information should a failed workflow retain?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why should PDF preview permissions and vector-search permissions agree?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare session-cookie tamper detection with the server's PDF-owner permission check.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the inspection schedule for PMP-103 with the pressure ceiling for PMP-105.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What electrical supply voltage is specified for PMP-102?",
+            "should_refuse": true,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-102.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which exact certificate authority issued the certificate used by this course website?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the allowed operating pressure for PMP-90909?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ]
+      },
+      "after": {
+        "documents": 10,
+        "chunks": 32,
+        "question_count": 8,
+        "supported_count": 5,
+        "all_required_sources_retained": 4,
+        "unsupported_count": 3,
+        "unsupported_refused": 3,
+        "request_errors": 0,
+        "methodology": {
+          "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+          "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "baseline_revision": null,
+          "evidence_trace": true,
+          "trace_code_sha256": {
+            "app/services/evidence_trace.py": "1babe2ec5204472eb60302761f07e9ef20065e270b8d46ea931a8179c54fab46",
+            "scripts/evidence_selection_trace.py": "1cd503849b0ca405fd10f41e9c41bc3997a8e80fb2bc5fd3e4ab10a6cbe71118",
+            "scripts/evaluate_retrieval_scaling.py": "56186188e71a2e6aa4fd8b10c77b80e5f2e95b37933d987d063de7e1812ac02f"
+          },
+          "splits": [
+            "development",
+            "validation",
+            "held_out"
+          ],
+          "comparison_code_sha256": {
+            "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+            "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432"
+          },
+          "retrieval_candidates_sha256": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+          "fact_support_sha256": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+          "evidence_facets_sha256": "12a055cf477286048c380e68451db275cf51596edf90c270cd7b0c1f811d7621",
+          "evidence_min_score": 0.35,
+          "profiles": {
+            "identifier_10_verified": {
+              "candidate_limit": 10,
+              "identifier_lookup": true,
+              "identifier_verification": true
+            }
+          },
+          "dataset_sha256": {
+            "questions-scaling.json": "c2fe68fb5eb43253f9bb0d09ffd3fd78a4747cc20ae80622bf12298d1e3bc489",
+            "evaluation/questions-answer-selection-holdout-v1.json": "0329b1deef870276fa9190bc8902bfe43b7c2189e6e82d423b42654955d5142c"
+          },
+          "scope": "Authored PDFs with synthetic distractors; warm local models and in-memory Qdrant brute-force search.",
+          "limitations": [
+            "No hosted ANN, HTTP, concurrency, PostgreSQL, or LLM generation benchmark.",
+            "Page-label precision is not human-verified passage relevance or generated-answer accuracy.",
+            "Source fragments are checked by exact text presence, not semantic correctness.",
+            "Validation cases were used to diagnose identifier failures; fresh held-out authored cases are separate and not independently annotated.",
+            "One warm sequential run per case; not a concurrency, uptime, or production-scale guarantee."
+          ]
+        },
+        "corpus_sha256": {
+          "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+          "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+          "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+          "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+          "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+          "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+          "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+          "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+          "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b",
+          "equipment-PMP-200.pdf": "a24998ba4ae71549ad46790835bc0043723f0a58d30352bb0a18eae185608b54"
+        },
+        "by_split": {
+          "development": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "validation": {
+            "supported": 0,
+            "source_completeness": 0,
+            "unsupported": 0,
+            "refused": 0
+          },
+          "held_out": {
+            "supported": 5,
+            "source_completeness": 4,
+            "unsupported": 3,
+            "refused": 3
+          }
+        },
+        "cases": [
+          {
+            "question": "Which transport topic comes immediately before HTTPS, and which topic comes before that?",
+            "should_refuse": false,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": 0.0,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": false,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "If removing partial vector records also fails, what information should a failed workflow retain?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "data-reliability.pdf",
+                "page_number": 4
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Why should PDF preview permissions and vector-search permissions agree?",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.2
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare session-cookie tamper detection with the server's PDF-owner permission check.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 4
+              },
+              {
+                "document_name": "identity-security.pdf",
+                "page_number": 3
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Compare the inspection schedule for PMP-103 with the pressure ceiling for PMP-105.",
+            "should_refuse": false,
+            "refused": false,
+            "accepted_evidence": {
+              "document_hit": true,
+              "page_hit": true,
+              "all_sources_hit": true,
+              "source_recall": 1.0,
+              "reciprocal_rank_at_5": 1.0,
+              "label_precision_at_5": 0.4
+            },
+            "expected_fragments_present": true,
+            "top_sources": [
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 2
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-103.pdf",
+                "page_number": 1
+              },
+              {
+                "document_name": "equipment-PMP-105.pdf",
+                "page_number": 2
+              }
+            ],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What electrical supply voltage is specified for PMP-102?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "Which exact certificate authority issued the certificate used by this course website?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          },
+          {
+            "question": "What is the allowed operating pressure for PMP-90909?",
+            "should_refuse": true,
+            "refused": true,
+            "accepted_evidence": {
+              "document_hit": false,
+              "page_hit": false,
+              "all_sources_hit": false,
+              "source_recall": null,
+              "reciprocal_rank_at_5": 0.0,
+              "label_precision_at_5": 0.0
+            },
+            "expected_fragments_present": null,
+            "top_sources": [],
+            "error": null,
+            "source_loss_stages": null
+          }
+        ],
+        "invariant_pass_counts": {
+          "trace_output_matches_untraced": 8,
+          "primary_citations_preserved": 8,
+          "primary_refusal_preserved": 8,
+          "primary_evidence_score_preserved": 8
+        }
+      }
+    }
+  ],
+  "raw_artifact_sha256": {
+    "cg-fact-development-baseline.json": "0cfd7d47a320fd930b3d047919358b1d969dcf46ace1d58f69be5c83403c9256",
+    "cg-fact-development-final.json": "55f2b7b79069fdda8a2d9e19e387e53b17db6fc9deb4748eccfacfa02e64ead0",
+    "cg-fact-heldout-baseline.json": "1acc7ec53efdf56ce7853e209eb1708fb2ec4f5ede70fbaca4cc52b695b907ab",
+    "cg-fact-heldout-current.json": "69198ebed8d2ca9754fd3a12def262e54a68953b7bda0b9b58a158b56247107a",
+    "cg-fact-original-baseline-final.json": "555ad7bef296e5917f97c25011a4efc6c807fb27427f18db90ba25293fc6d44a",
+    "cg-fact-original-final.json": "4b80ddf9991979b9795cfeb4899a7fdc83b45f44215ece12c9c08357794a7df9",
+    "cg-fact-context-baseline-final.json": "a6937c5abdae5a896fea39731976325eef1afb9f4878513e72751a5757509fff",
+    "cg-fact-context-final.json": "5f2f2bcb5b69276c6a25eb0823d16c5042f49c05c6f3087f08eee01cd600a59a",
+    "cg-fact-known-regressions-baseline-final.json": "7ddd79c0dbdc72804b459d5e563854bfc3dc6d8504e23a2c03709fa78be641d6",
+    "cg-fact-known-regressions-final.json": "bdf85cf722b68c634c33dfa17142cce3e426636a3d48f345d85e38724ba1cc23"
+  },
+  "verification": {
+    "backend_tests": 726,
+    "backend_seconds": 3.975,
+    "new_backend_test_methods": 25,
+    "frontend_tests": 9,
+    "typescript_vite_build": "passed",
+    "candidate_cases": 82,
+    "invariants": {
+      "trace_output_matches_untraced": 82,
+      "primary_citations_preserved": 82,
+      "primary_refusal_preserved": 82,
+      "primary_evidence_score_preserved": 82
+    },
+    "syntax_and_frozen_hashes": "passed"
+  },
+  "limits": [
+    "Explicit digit-bearing equipment identifier lookups for manufacturer, voltage and serial only; ambiguous or generic questions keep existing policy. Not a universal semantic fact checker.",
+    "Conservative handling may reject valid free prose, lowercase active manufacturer names, unusual tables or complex polarity.",
+    "One authored sequential local-model run per case using in-memory Qdrant brute-force search; no hosted ANN, provider synthesis, real-user concurrency or human semantic review. Some final regression jobs overlapped; latency is not compared.",
+    "Source completeness and exact expected fragments are mechanical evidence checks, not generated-answer correctness.",
+    "Global evidence threshold remains 0.35 and citation limit five. Auth, READY scope, providers, stores, lifecycle and deletion are unchanged.",
+    "Minor deferred: final comparison selection may choose a globally valid requested-fact witness from another facet; each facet separately passed and final literal facts are verified, but facet-to-witness attribution could be stricter.",
+    "Failed optional rerank attempts remain omitted from legacy offline work counters. No work/billing comparison is claimed.",
+    "q13 and as01 remain supported misses; existing context comparison about idempotent ingestion and HTTPS also remains missing a required source. No unsafe threshold adjustment.",
+    "No hosted inference, production mutations, environment/secret edits, commit, push, deployment or feature activation."
+  ],
+  "review": "One fresh read-only review; three important defects reproduced with 13 failing subcases, fixed in one pass. One minor deferred; no second review.",
+  "commands": {
+    "backend": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests",
+    "frontend": "npm run test:frontend",
+    "build": "npm run build",
+    "candidate": "HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python scripts/evaluate_retrieval_scaling.py --documents {10 or 20} --profiles identifier_10_verified [--questions evaluation/{dataset}] [--fixture-corpus evaluation/equipment-fact-corpus-v1.json] --trace-evidence --output /private/tmp/cg-fact-{name}",
+    "baseline": "Same candidate command without --trace-evidence, with --baseline-revision d871ad10fad275739dcc53444e87627224527f43. Original benchmark omits --questions; explicit --questions questions-scaling.json failed schema validation before measurement and was corrected.",
+    "dataset_mapping": {
+      "development": {
+        "documents": 20,
+        "questions": "questions-fact-development.json",
+        "supplemental_corpus": true
+      },
+      "heldout": {
+        "documents": 20,
+        "questions": "questions-fact-heldout-v1.json",
+        "supplemental_corpus": true
+      },
+      "original": {
+        "documents": 10,
+        "questions": null
+      },
+      "context": {
+        "documents": 10,
+        "questions": "questions-evidence-context.json"
+      },
+      "known-regressions": {
+        "documents": 10,
+        "questions": "questions-answer-selection-holdout-v1.json"
+      }
+    }
+  }
+}
