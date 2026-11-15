@@ -1,5 +1,16 @@
 # Next: recover useful evidence before changing answer generation
 
+**15 November: current-prompt comparison preparation.** Released runtime baseline
+is `d5626c2`. Added `scripts/prepare_answer_comparison.py`: a network-free builder
+with exact known-context preservation, literal source bounds, current request
+hashes, checklist/old-answer exclusion and exclusive output creation. The
+[prepared pack](../evaluation/answer-comparison-preflight-v1.md) proposes 11 known
+comparison requests plus 8 fresh candidate-only requests, each capped at 1,200
+completion tokens, zero retries/failover. No model requests, answers or semantic
+scores were produced. The earlier budget is exhausted; execution needs new
+explicit approval. Earlier local/uncommitted status entries are historical.
+
+
 **15 November: the offline source-faithful prompt correction is complete.**
 The prompt now explicitly restricts examples/background additions, preserves
 qualifiers and conditions, retains material requested details and discourages
