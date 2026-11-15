@@ -39,7 +39,7 @@ class ProviderQuotaTests(unittest.TestCase):
              patch("app.services.synthesis_service.settings.gemini_api_key", "test"), \
              patch.object(service, "_synthesize_with_groq", return_value="  "), \
              patch.object(service, "_synthesize_with_gemini", return_value="The plan covers quality standards. [Source 1]") as backup:
-            result = asyncio.run(service._synthesize_with_failover_metadata("What does the plan cover?", [], []))
+            result = asyncio.run(service._synthesize_with_failover_metadata("What does the plan cover?", [], [{"document_name": "fixture.pdf", "supporting_passage": "The plan covers quality standards."}]))
         self.assertEqual(result.provider_used, "gemini")
         self.assertEqual(result.failover_reason, "InvalidAnswerError")
         self.assertTrue(result.failover_used)
@@ -52,7 +52,7 @@ class ProviderQuotaTests(unittest.TestCase):
              patch.object(service, "_synthesize_with_groq", return_value=""), \
              patch.object(service, "_synthesize_with_gemini", return_value=""):
             result = asyncio.run(service._synthesize_with_failover_metadata("What does the plan cover?", [], [
-                {"supporting_passage": "The plan covers quality standards.", "page_number": 1}
+                {"document_name": "fixture.pdf", "supporting_passage": "The plan covers quality standards.", "page_number": 1}
             ]))
         self.assertEqual(result.provider_used, "evidence_fallback")
         self.assertIn("quality standards", result.answer)
@@ -64,7 +64,7 @@ class ProviderQuotaTests(unittest.TestCase):
              patch("app.services.synthesis_service.settings.gemini_api_key", "test"), \
              patch.object(service, "_synthesize_with_gemini", return_value=""):
             result = asyncio.run(service.synthesize_with_metadata("Question", [], [
-                {"supporting_passage": "Verified passage", "page_number": 1}
+                {"document_name": "fixture.pdf", "supporting_passage": "Verified passage", "page_number": 1}
             ]))
         self.assertEqual(result.provider_used, "evidence_fallback")
         self.assertIn("Verified passage", result.answer)
@@ -205,9 +205,9 @@ class ProviderQuotaTests(unittest.TestCase):
         with patch("app.services.synthesis_service.settings.groq_api_key", "test"), \
              patch("app.services.cerebras_service.settings.cerebras_api_key", SecretStr("test")), \
              patch.object(service, "_synthesize_with_groq", side_effect=error), \
-             patch.object(service, "_synthesize_with_cerebras", return_value="backup answer") as backup:
-            answer = asyncio.run(service._synthesize_with_failover("question", [], []))
-        self.assertEqual(answer, "backup answer")
+             patch.object(service, "_synthesize_with_cerebras", return_value="backup answer [Source 1]") as backup:
+            answer = asyncio.run(service._synthesize_with_failover("question", [], [{"document_name": "fixture.pdf", "supporting_passage": "backup answer"}]))
+        self.assertEqual(answer, "backup answer [Source 1]")
         backup.assert_called_once()
         self.assertFalse(provider_circuit_breaker.is_available("groq"))
 
@@ -218,9 +218,9 @@ class ProviderQuotaTests(unittest.TestCase):
         with patch("app.services.synthesis_service.settings.groq_api_key", "test"), \
              patch("app.services.synthesis_service.settings.gemini_api_key", "gemini-test"), \
              patch.object(service, "_synthesize_with_groq", side_effect=error), \
-             patch.object(service, "_synthesize_with_gemini", return_value="Gemini answer") as backup:
-            answer = asyncio.run(service._synthesize_with_failover("question", [], []))
-        self.assertEqual(answer, "Gemini answer")
+             patch.object(service, "_synthesize_with_gemini", return_value="Gemini answer [Source 1]") as backup:
+            answer = asyncio.run(service._synthesize_with_failover("question", [], [{"document_name": "fixture.pdf", "supporting_passage": "Gemini answer"}]))
+        self.assertEqual(answer, "Gemini answer [Source 1]")
         backup.assert_called_once()
 
     def test_gemini_failover_reports_provider_and_reason(self):
@@ -230,8 +230,8 @@ class ProviderQuotaTests(unittest.TestCase):
         with patch("app.services.synthesis_service.settings.groq_api_key", "test"), \
              patch("app.services.synthesis_service.settings.gemini_api_key", "gemini-test"), \
              patch.object(service, "_synthesize_with_groq", side_effect=error), \
-             patch.object(service, "_synthesize_with_gemini", return_value="Gemini answer"):
-            result = asyncio.run(service._synthesize_with_failover_metadata("question", [], []))
+             patch.object(service, "_synthesize_with_gemini", return_value="Gemini answer [Source 1]"):
+            result = asyncio.run(service._synthesize_with_failover_metadata("question", [], [{"document_name": "fixture.pdf", "supporting_passage": "Gemini answer"}]))
         self.assertEqual(result.provider_used, "gemini")
         self.assertTrue(result.failover_used)
         self.assertEqual(result.failover_reason, "RateLimitError")
@@ -290,5 +290,5 @@ class ProviderQuotaTests(unittest.TestCase):
         with patch("app.services.cerebras_service.settings.cerebras_api_key", SecretStr("test")), \
              patch.object(service, "_synthesize_with_cerebras", side_effect=LLMProviderRequestError("HTTP 400")):
             answer = asyncio.run(service._synthesize_with_failover("question", [], [
-                {"supporting_passage": "Verified passage", "page_number": 1}]))
+                {"document_name": "fixture.pdf", "supporting_passage": "Verified passage", "page_number": 1}]))
         self.assertIn("Verified passage", answer)

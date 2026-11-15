@@ -1479,7 +1479,7 @@ class ProcessingRulesTests(unittest.TestCase):
         service = SynthesisService()
         sources = [
             {
-                "supporting_passage": "Phishing is a social-engineering attack.",
+                "document_name": "fixture.pdf", "supporting_passage": "Phishing is a social-engineering attack.",
                 "page_number": 4,
             }
         ]
@@ -1521,7 +1521,7 @@ class ProcessingRulesTests(unittest.TestCase):
                 return_value="Cerebras grounded answer [Source 1]",
             ) as cerebras,
         ):
-            answer = asyncio.run(service.synthesize("Question?", [], []))
+            answer = asyncio.run(service.synthesize("Question?", [], [{"document_name": "fixture.pdf", "supporting_passage": "Cerebras grounded answer"}]))
 
         self.assertEqual(answer, "Cerebras grounded answer [Source 1]")
         cerebras.assert_called_once()

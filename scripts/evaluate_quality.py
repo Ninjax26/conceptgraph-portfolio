@@ -49,11 +49,43 @@ def keyed(records):
     return result
 
 
+def load_quality_dataset(path):
+    """Reject malformed review definitions before capture or scoring."""
+    dataset = json.loads(path.read_text())
+    text = lambda value: isinstance(value, str) and bool(value.strip())
+    if not isinstance(dataset, dict) or not text(dataset.get("name")):
+        raise ValueError("Quality dataset needs a nonempty name.")
+    cases = dataset.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("Quality dataset needs a nonempty cases list.")
+    for case in cases:
+        if (not isinstance(case, dict) or not text(case.get("id"))
+                or not text(case.get("question")) or type(case.get("expected_refusal")) is not bool):
+            raise ValueError("Quality cases need an ID, question and boolean expected_refusal.")
+        sources, claims = case.get("sources"), case.get("expected_claims")
+        if not isinstance(sources, list) or not isinstance(claims, list):
+            raise ValueError("Quality cases need sources and expected_claims lists.")
+        if any(not isinstance(source, list) or len(source) != 2 or not text(source[0])
+               or type(source[1]) is not int or source[1] < 1 for source in sources):
+            raise ValueError("Quality source references need a document name and positive integer page.")
+        claim_ids = set()
+        for claim in claims:
+            if not isinstance(claim, dict) or not text(claim.get("id")) or not text(claim.get("text")):
+                raise ValueError("Expected claims need nonempty IDs and text.")
+            if claim["id"] in claim_ids:
+                raise ValueError("Expected claim IDs must be unique within a case.")
+            claim_ids.add(claim["id"])
+    keyed(cases)
+    return dataset
+
+
 def run(args):
-    pages, hashes = fixture_pages()
-    dataset_path = ROOT / "evaluation/quality-cases.json"
+    dataset_path = Path(getattr(args, "cases", None) or ROOT / "evaluation/quality-cases.json")
+    if not dataset_path.is_absolute():
+        dataset_path = ROOT / dataset_path
     reference_path = ROOT / "evaluation/quality-graph-reference.json"
-    dataset = json.loads(dataset_path.read_text())
+    dataset = load_quality_dataset(dataset_path)
+    pages, hashes = fixture_pages()
     cases = keyed(dataset["cases"])
     references = json.loads(reference_path.read_text())["edges"]
     for case in cases.values():
@@ -201,6 +233,7 @@ if __name__ == "__main__":
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--fallback", action="store_true", help="Capture deterministic fallback only, without LLM calls")
     mode.add_argument("--responses", type=Path, help="Previously captured answer/source records")
+    parser.add_argument("--cases", type=Path, help="Optional authored quality-case JSON; defaults to evaluation/quality-cases.json")
     parser.add_argument("--reviews", type=Path, help="Explicit hash-bound human answer reviews")
     parser.add_argument("--graph-snapshot", type=Path, default=ROOT / "evaluation/fixture-graphs.json")
     parser.add_argument("--output", type=Path, default=ROOT / "evaluation/quality-offline-current")

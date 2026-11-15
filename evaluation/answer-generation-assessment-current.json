@@ -1,0 +1,653 @@
+{
+  "date": "2026-11-15",
+  "status": "Approved bounded capture completed; offline structural audit complete; human semantic review pending",
+  "authorization": "User explicitly approved bounded11-request Groq test,1200 completion tokens each,no retries or backup-provider calls",
+  "requested_provider": "groq",
+  "requested_model": "openai/gpt-oss-20b",
+  "manifest_sha256": "0148be28e3d2f74ef42c89c0c9c84ad7a0f7488f0ba233dac9a944c03721f2a8",
+  "source_sha256": {
+    "app/services/synthesis_service.py": "bdc8da2fa9a1caefbbb6c94fecbbcd4fb4e8e353f94a55a2f033b323b5cf7c8d",
+    "app/services/answer_contract.py": "b180a1785cece05a383f6212a7f4ac9dac674773d67540e1d76232d6244f2fb0",
+    "scripts/quality_metrics.py": "b1176a8b85abd29075721e818d279c5526f646f31fad86173aa76c68f8921bea",
+    "scripts/evaluate_quality.py": "dadaf6c22378df056399d74571c1debd82ce219a52e58751685ff8bc08d6f02e",
+    "evaluation/quality-cases.json": "a8b81079bf249493c41841aeb9d002dd45e0906a04c3327201d27daa51eb573b"
+  },
+  "corpus_sha256": {
+    "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+    "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+    "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+    "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+    "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+    "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+    "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+    "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+    "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b"
+  },
+  "budget_enforcement": {
+    "maximum_requests": 11,
+    "actual_attempts": 11,
+    "completed_model_outputs": 11,
+    "local_no_source_refusals": 1,
+    "max_completion_tokens_each": 1200,
+    "largest_reported_completion": 289,
+    "retries": 0,
+    "backup_calls": 0,
+    "reported_finish_reason_stop": 11,
+    "hosted_embedding_or_rerank_calls": 0,
+    "shared_admission_hook": "Existing observe_provider_call used without modification",
+    "local_shared_database_budget_enabled": false,
+    "note": "Local shared budgets were configured disabled; local attempt/output caps,zero SDK retries and20-second distinct-case spacing bounded this capture. No production budget setting was changed. This does not qualify cross-process/shared quota behavior."
+  },
+  "reported_usage": {
+    "prompt_tokens": 5201,
+    "completion_tokens": 2138,
+    "total_tokens": 7339
+  },
+  "sdk_latency_seconds": {
+    "p50": 0.691,
+    "p95_nearest_rank": 1.218,
+    "samples": 11,
+    "scope": "Single sequential sample per distinct case; excludes pacing/admission and is not full API/retrieval/production p95."
+  },
+  "mechanical_audit": {
+    "captured_answers": 12,
+    "expected_cases": 12,
+    "reviewed_answers": 0,
+    "citation_references": 17,
+    "invalid_citation_references": 0,
+    "wrong_cited_pages": 0,
+    "source_passages": 21,
+    "literal_source_passages": 21,
+    "human_reviewed_claims": 0,
+    "human_supported_claims": 0,
+    "human_correctly_cited_claims": 0,
+    "graph_nodes": 61,
+    "graph_edges": 44,
+    "known_reference_edges": 6,
+    "known_reference_edges_found": 6,
+    "unreviewed_graph_edges": 44,
+    "human_reviewed_graph_edges": 0,
+    "human_correct_graph_edges": 0,
+    "groundedness": null,
+    "citation_correctness": null,
+    "mean_answer_completeness": null,
+    "reviewed_supported_answers": 0,
+    "reviewed_unsupported_answers": 0,
+    "correct_reviewed_refusals": null
+  },
+  "mechanical_answer_contracts_valid": 12,
+  "human_reviewed_answers": 0,
+  "assistant_assessment": {
+    "review_kind": "assistant qualitative analysis, not human review or model-judge scores",
+    "cases": [
+      {
+        "id": "qa01",
+        "finding": "Core request/response fields appear in the supplied passage. The answer adds examples (GET/POST/PUT, URI, Host/User-Agent,200/404 and Content-Type/Content-Length) absent from that passage.",
+        "priority": "high",
+        "next_change": "Ask for source-only examples and omit examples not explicitly supported. No semantic score assigned."
+      },
+      {
+        "id": "qa02",
+        "finding": "The two expected certificate checks appear, with one source label. No specific source-support issue identified in this assistant pass.",
+        "priority": "review",
+        "next_change": "Have a human verify each claim and whether the final label supports the full list."
+      },
+      {
+        "id": "qa03",
+        "finding": "The expected HTTP→TLS→HTTPS learning sequence is stated and all three sources are labelled.",
+        "priority": "review",
+        "next_change": "Human-check prerequisite direction and paraphrased TLS details; this is oracle context, not a recovered retrieval miss."
+      },
+      {
+        "id": "qa04",
+        "finding": "Identity versus permissions and server-side scope are grounded in the supplied material. The answer repeats the distinction across several sections and turns a course prerequisite into an unconditional must-succeed-before statement.",
+        "priority": "medium",
+        "next_change": "Prefer a short distinction and preserve course-versus-runtime qualifiers; ask a human to judge the stronger ordering claim."
+      },
+      {
+        "id": "qa05",
+        "finding": "The main transport-versus-honesty/phishing distinction is covered. Why and Key points substantially repeat each other.",
+        "priority": "medium",
+        "next_change": "Remove repeated sections while retaining the transport limitation and phishing caveat."
+      },
+      {
+        "id": "qa06",
+        "finding": "Duplicate vectors, earlier successful writes and deterministic IDs/upserts are covered. The output adds overwrite/corruption consequences not explicitly stated and says idempotency itself requires transactions; the source gives a study prerequisite in this workflow.",
+        "priority": "high",
+        "next_change": "Preserve prerequisite qualifiers and avoid unsupported extra consequences."
+      },
+      {
+        "id": "qa07",
+        "finding": "The model explains external Qdrant writes and exact-upload cleanup when both oracle passages are supplied. It does not explicitly say compensating cleanup itself must remain idempotent, an expected checklist detail.",
+        "priority": "high",
+        "next_change": "Improve expected-detail coverage. Separately fix the existing q13 retrieval miss; this oracle answer does not prove retrieval recovery."
+      },
+      {
+        "id": "qa08",
+        "finding": "The answer includes external quota among functioning readiness dependencies. That is not established by the source, which cautions that a healthy process does not prove AI-provider quota; the caveat is lost.",
+        "priority": "high",
+        "next_change": "Preserve the explicit readiness/quota distinction and avoid generalizing beyond the source."
+      },
+      {
+        "id": "qa09",
+        "finding": "Pressure11.0 bar and inspection60 days match the two supplied excerpts.",
+        "priority": "review",
+        "next_change": "Human-check the added operation/inspection wording against its cited passage; no machine semantic score."
+      },
+      {
+        "id": "qa10",
+        "finding": "Actual Groq output is the canonical refusal for the absent manufacturer.",
+        "priority": "review",
+        "next_change": "Count as an observed refusal on this known diagnostic example, not general refusal accuracy."
+      },
+      {
+        "id": "qa11",
+        "finding": "Actual Groq output is the canonical refusal for the absent factory serial number.",
+        "priority": "review",
+        "next_change": "Same limit as qa10; production fact gating is bypassed in this oracle synthesis test."
+      },
+      {
+        "id": "qa12",
+        "finding": "No-source canonical refusal was created locally without a provider call.",
+        "priority": "scope",
+        "next_change": "Do not count this as a model refusal or hosted answer."
+      }
+    ],
+    "semantic_metrics": null
+  },
+  "attempt_metadata": [
+    {
+      "id": "qa01",
+      "attempt": 1,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:01:07.868588+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 410,
+        "completion_tokens": 225,
+        "total_tokens": 635
+      },
+      "latency_seconds": 0.99,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "988",
+        "x-ratelimit-remaining-tokens": "7170",
+        "x-ratelimit-reset-requests": "17m16.8s",
+        "x-ratelimit-reset-tokens": "6.225s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa02",
+      "attempt": 2,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:01:28.862412+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 399,
+        "completion_tokens": 114,
+        "total_tokens": 513
+      },
+      "latency_seconds": 0.434,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "987",
+        "x-ratelimit-remaining-tokens": "7376",
+        "x-ratelimit-reset-requests": "18m43.2s",
+        "x-ratelimit-reset-tokens": "4.68s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa03",
+      "attempt": 3,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:01:49.300452+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 591,
+        "completion_tokens": 157,
+        "total_tokens": 748
+      },
+      "latency_seconds": 0.444,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "986",
+        "x-ratelimit-remaining-tokens": "7184",
+        "x-ratelimit-reset-requests": "20m9.6s",
+        "x-ratelimit-reset-tokens": "6.119s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa04",
+      "attempt": 4,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:02:09.748586+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 478,
+        "completion_tokens": 280,
+        "total_tokens": 758
+      },
+      "latency_seconds": 1.218,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "985",
+        "x-ratelimit-remaining-tokens": "7297",
+        "x-ratelimit-reset-requests": "21m36s",
+        "x-ratelimit-reset-tokens": "5.272s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa05",
+      "attempt": 5,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:02:30.973356+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 483,
+        "completion_tokens": 269,
+        "total_tokens": 752
+      },
+      "latency_seconds": 0.797,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "984",
+        "x-ratelimit-remaining-tokens": "6996",
+        "x-ratelimit-reset-requests": "23m2.4s",
+        "x-ratelimit-reset-tokens": "7.53s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa06",
+      "attempt": 6,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:02:51.775830+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 500,
+        "completion_tokens": 242,
+        "total_tokens": 742
+      },
+      "latency_seconds": 0.605,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "983",
+        "x-ratelimit-remaining-tokens": "7231",
+        "x-ratelimit-reset-requests": "24m28.8s",
+        "x-ratelimit-reset-tokens": "5.767s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa07",
+      "attempt": 7,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:03:12.385902+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 489,
+        "completion_tokens": 213,
+        "total_tokens": 702
+      },
+      "latency_seconds": 0.741,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "982",
+        "x-ratelimit-remaining-tokens": "6998",
+        "x-ratelimit-reset-requests": "25m55.199s",
+        "x-ratelimit-reset-tokens": "7.515s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa08",
+      "attempt": 8,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:03:33.133896+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 484,
+        "completion_tokens": 289,
+        "total_tokens": 773
+      },
+      "latency_seconds": 0.853,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "981",
+        "x-ratelimit-remaining-tokens": "7236",
+        "x-ratelimit-reset-requests": "27m21.6s",
+        "x-ratelimit-reset-tokens": "5.73s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa09",
+      "attempt": 9,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:03:53.993467+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 459,
+        "completion_tokens": 152,
+        "total_tokens": 611
+      },
+      "latency_seconds": 0.604,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "980",
+        "x-ratelimit-remaining-tokens": "7252",
+        "x-ratelimit-reset-requests": "28m48s",
+        "x-ratelimit-reset-tokens": "5.61s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa10",
+      "attempt": 10,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:04:14.604031+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 452,
+        "completion_tokens": 94,
+        "total_tokens": 546
+      },
+      "latency_seconds": 0.676,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "979",
+        "x-ratelimit-remaining-tokens": "7335",
+        "x-ratelimit-reset-requests": "30m14.4s",
+        "x-ratelimit-reset-tokens": "4.987s"
+      },
+      "answer_contract_error": null
+    },
+    {
+      "id": "qa11",
+      "attempt": 11,
+      "status": "completed",
+      "started_utc": "2026-11-14T20:04:35.286565+00:00",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 456,
+        "completion_tokens": 103,
+        "total_tokens": 559
+      },
+      "latency_seconds": 0.691,
+      "rate_limit_headers": {
+        "x-ratelimit-remaining-requests": "978",
+        "x-ratelimit-remaining-tokens": "7275",
+        "x-ratelimit-reset-requests": "31m40.8s",
+        "x-ratelimit-reset-tokens": "5.437s"
+      },
+      "answer_contract_error": null
+    }
+  ],
+  "process_local_metrics": {
+    "scope": "current_api_process",
+    "started_at": "2026-11-14T20:01:07.843011+00:00",
+    "generated_at": "2026-11-14T20:04:35.982496+00:00",
+    "retained_event_limit": 2000,
+    "totals": {
+      "provider_attempts": 11,
+      "successful_attempts": 11,
+      "failed_attempts": 0,
+      "failover_attempts": 0,
+      "repair_attempts": 0,
+      "rate_limit_errors": 0,
+      "evidence_fallbacks": 0,
+      "estimated_input_tokens": 5521,
+      "estimated_output_tokens": 1599,
+      "reported_usage_attempts": 11,
+      "unreported_usage_attempts": 0,
+      "reported_input_tokens": 5201,
+      "reported_output_tokens": 2138,
+      "reported_total_tokens": 7339,
+      "reported_search_unit_attempts": 0,
+      "reported_search_units": 0,
+      "average_latency_ms": 736,
+      "p95_latency_ms": 1223
+    },
+    "by_provider": [
+      {
+        "name": "groq",
+        "attempts": 11,
+        "successful_attempts": 11,
+        "failed_attempts": 0,
+        "failover_attempts": 0,
+        "rate_limit_errors": 0,
+        "estimated_input_tokens": 5521,
+        "estimated_output_tokens": 1599,
+        "reported_usage_attempts": 11,
+        "reported_input_tokens": 5201,
+        "reported_output_tokens": 2138,
+        "reported_total_tokens": 7339,
+        "reported_search_unit_attempts": 0,
+        "reported_search_units": 0,
+        "average_latency_ms": 736
+      }
+    ],
+    "by_operation": [
+      {
+        "name": "answer_synthesis",
+        "attempts": 11,
+        "successful_attempts": 11,
+        "failed_attempts": 0,
+        "failover_attempts": 0,
+        "rate_limit_errors": 0,
+        "estimated_input_tokens": 5521,
+        "estimated_output_tokens": 1599,
+        "reported_usage_attempts": 11,
+        "reported_input_tokens": 5201,
+        "reported_output_tokens": 2138,
+        "reported_total_tokens": 7339,
+        "reported_search_unit_attempts": 0,
+        "reported_search_units": 0,
+        "average_latency_ms": 736
+      }
+    ],
+    "recent_events": [
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 992,
+        "failover": false,
+        "estimated_input_tokens": 411,
+        "estimated_output_tokens": 139,
+        "recorded_at": "2026-11-14T20:01:08.860804+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 410,
+        "reported_output_tokens": 225,
+        "reported_total_tokens": 635,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 436,
+        "failover": false,
+        "estimated_input_tokens": 409,
+        "estimated_output_tokens": 54,
+        "recorded_at": "2026-11-14T20:01:29.298810+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 399,
+        "reported_output_tokens": 114,
+        "reported_total_tokens": 513,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 446,
+        "failover": false,
+        "estimated_input_tokens": 654,
+        "estimated_output_tokens": 94,
+        "recorded_at": "2026-11-14T20:01:49.746369+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 591,
+        "reported_output_tokens": 157,
+        "reported_total_tokens": 748,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 1223,
+        "failover": false,
+        "estimated_input_tokens": 533,
+        "estimated_output_tokens": 281,
+        "recorded_at": "2026-11-14T20:02:10.971532+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 478,
+        "reported_output_tokens": 280,
+        "reported_total_tokens": 758,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 800,
+        "failover": false,
+        "estimated_input_tokens": 533,
+        "estimated_output_tokens": 228,
+        "recorded_at": "2026-11-14T20:02:31.773226+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 483,
+        "reported_output_tokens": 269,
+        "reported_total_tokens": 752,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 609,
+        "failover": false,
+        "estimated_input_tokens": 534,
+        "estimated_output_tokens": 250,
+        "recorded_at": "2026-11-14T20:02:52.385076+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 500,
+        "reported_output_tokens": 242,
+        "reported_total_tokens": 742,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 744,
+        "failover": false,
+        "estimated_input_tokens": 522,
+        "estimated_output_tokens": 228,
+        "recorded_at": "2026-11-14T20:03:13.130295+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 489,
+        "reported_output_tokens": 213,
+        "reported_total_tokens": 702,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 858,
+        "failover": false,
+        "estimated_input_tokens": 519,
+        "estimated_output_tokens": 203,
+        "recorded_at": "2026-11-14T20:03:33.991447+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 484,
+        "reported_output_tokens": 289,
+        "reported_total_tokens": 773,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 608,
+        "failover": false,
+        "estimated_input_tokens": 474,
+        "estimated_output_tokens": 84,
+        "recorded_at": "2026-11-14T20:03:54.601829+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 459,
+        "reported_output_tokens": 152,
+        "reported_total_tokens": 611,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 680,
+        "failover": false,
+        "estimated_input_tokens": 464,
+        "estimated_output_tokens": 19,
+        "recorded_at": "2026-11-14T20:04:15.284064+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 452,
+        "reported_output_tokens": 94,
+        "reported_total_tokens": 546,
+        "reported_search_units": null
+      },
+      {
+        "provider": "groq",
+        "operation": "answer_synthesis",
+        "outcome": "success",
+        "latency_ms": 695,
+        "failover": false,
+        "estimated_input_tokens": 468,
+        "estimated_output_tokens": 19,
+        "recorded_at": "2026-11-14T20:04:35.981761+00:00",
+        "failure_reason": null,
+        "repair": false,
+        "reported_input_tokens": 456,
+        "reported_output_tokens": 103,
+        "reported_total_tokens": 559,
+        "reported_search_units": null
+      }
+    ],
+    "privacy_note": "Only aggregate call metadata is retained in memory. Prompts, answers, document identifiers, and credentials are never stored in these metrics.",
+    "accuracy_note": "estimated_* token counts are character-based estimates. reported_* counts cover only responses whose adapters capture usage (Groq/Gemini); missing usage is unknown, not zero. No cost or complete provider-quota accounting is implied. Provider billing dashboards remain authoritative. Gemini reported output counts response candidates; its reported total can additionally include thinking/tool-use tokens. Cohere rerank search units are reported separately and are not token counts or cost. Metrics reset whenever the API process restarts."
+  },
+  "verification": {
+    "capture_mock_check": "Passed hard attempt/output cap,reported usage,one SDK attempt on mocked429 and durable failure status",
+    "exact_frozen_preflight_source_hashes": "unchanged",
+    "manifest_payloads": "exact approved payload hashes verified before execution",
+    "response_integrity": "11 unique SDK outputs plus1 labelled local refusal; no response rewriting",
+    "citation_references": 17,
+    "invalid_reference_indices": 0,
+    "wrong_explicit_pages": 0,
+    "literal_supplied_passages": 21,
+    "human_worksheet": "Created with reviewer empty and all_claims_reviewed false; no judgments fabricated"
+  },
+  "artifact_sha256": {
+    "evaluation/answer-generation-preflight.json": "0148be28e3d2f74ef42c89c0c9c84ad7a0f7488f0ba233dac9a944c03721f2a8",
+    "evaluation/answer-generation-current.responses.json": "2e473052cead3c9e463fbb80ff3c973963497885ab5a4892a33f47353c381937",
+    "evaluation/answer-generation-current.json": "c653402a1893afdfa408972d96f7e11a71dd41643e61d44cf0d26c2a64bb2181",
+    "evaluation/answer-generation-current.review.json": "49beb73f2d9e2ec0a51e2a47f387539da69a75be19591c286477fb3e523c8871"
+  },
+  "capture_runner_sha256": "5a280019b17e7f542f342f78cbbf439ffa00a79571cac73afdf6b6f6c14e5b1b",
+  "limits": [
+    "Known authored oracle-source cases, not heldout generalization, live user PDFs or end-to-end retrieval.",
+    "Single requested model alias and one output per case; no baseline-model/prompt comparison or measured answer-quality improvement.",
+    "The1200-token capture cap can differ from production Groq defaults; all11 outputs ended normally,none hit the cap.",
+    "Automated reference/literal checks and assistant findings do not establish human correctness,claim support or semantic completeness. All human semantic scores remain null.",
+    "The audit program itself is offline. Its generic no-live-generation limitation describes auditing,not the separately approved prior capture. The11 Groq generations here were live.",
+    "The appended graph snapshot audit is historical/unreviewed and is not a new graph extraction or graph-quality result for this capture.",
+    "SDK latency includes one request per distinct case; not concurrent traffic or app p95. Reported usage is not a monetary cost or independently verified bill.",
+    "No application/runtime/prompt change,tuning,environment/secret edit,production document mutation,commit,push or deployment during this capture.",
+    "No extra hosted test budget remains under this approval; further comparisons need separate authorization."
+  ]
+}

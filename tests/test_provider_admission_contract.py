@@ -90,7 +90,7 @@ class ProviderAdmissionContractTests(unittest.IsolatedAsyncioTestCase):
                 await graph._extract_with_failover("fixture text")
             extract.assert_not_called()
             self.assertTrue(provider_circuit_breaker.is_available("groq"))
-            result = await answer._synthesize_with_failover_metadata("Fixture question?", [], [])
+            result = await answer._synthesize_with_failover_metadata("Fixture question?", [], [{"document_name": "fixture.pdf", "supporting_passage": "Supported fixture answer."}])
         self.assertEqual(result.provider_used, "groq")
         self.assertFalse(result.failover_used)
         generate.assert_called_once()

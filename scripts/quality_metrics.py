@@ -1,10 +1,10 @@
 """Offline structural checks plus explicitly human-reviewed semantic metrics."""
 import hashlib
 import json
-import re
 
 from app.schemas.extraction import ALLOWED_RELATIONSHIP_TYPES, normalize_concept_name, relationship_key
 from scripts.run_evaluation import REFUSAL_TEXT
+from app.services.answer_contract import answer_contract_error, citation_references
 
 
 def normalized(text):
@@ -27,13 +27,7 @@ def review_context_hash(case, response, pages):
 
 def audit_answer(case, response, pages, review=None):
     answer, sources = str(response.get("answer") or ""), response.get("sources") or []
-    refs = []
-    for tag in re.findall(r"\[Source[^\]\n]*\]", answer, re.IGNORECASE):
-        match = re.fullmatch(r"\[Source\s+(\d+)(?:,\s*p\.\s*(\d+))?\]", tag, re.IGNORECASE)
-        index, page = (int(match[1]), int(match[2]) if match[2] else None) if match else (None, None)
-        in_range = index is not None and 1 <= index <= len(sources)
-        page_ok = in_range and (page is None or page == sources[index - 1].get("page_number"))
-        refs.append({"label": tag, "index": index, "index_valid": in_range, "page_valid": page_ok})
+    refs = citation_references(answer, sources)
     literal = []
     for source in sources:
         page = source.get("page_number")
@@ -43,6 +37,7 @@ def audit_answer(case, response, pages, review=None):
     result = {"id": case["id"], "answer_present": bool(answer.strip()), "content_sha256": content_hash(response),
               "review_context_sha256": review_context_hash(case, response, pages),
               "expected_refusal": case["expected_refusal"], "canonical_refusal": normalized(answer).casefold() == REFUSAL_TEXT.casefold(),
+              "answer_contract_valid": answer_contract_error(answer, str(case.get("question") or ""), sources) is None,
               "citation_references": refs, "citation_count": len(refs),
               "invalid_citation_count": sum(not ref["index_valid"] for ref in refs),
               "wrong_cited_page_count": sum(ref["index_valid"] and not ref["page_valid"] for ref in refs),

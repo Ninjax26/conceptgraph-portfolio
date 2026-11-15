@@ -1,0 +1,394 @@
+{
+  "date": "2026-11-15",
+  "status": "Offline prompt/accounting/evaluation safeguards implemented; candidate generation quality unmeasured; local and uncommitted",
+  "baseline_commit": "8de7bebaebd1cecef48b2a3789cb98b3dde11f60",
+  "comparison_baseline": "Local Step4 prompt used for the approved11-request capture,not an implied new model run",
+  "source_before_sha256": {
+    "app/services/synthesis_service.py": "bdc8da2fa9a1caefbbb6c94fecbbcd4fb4e8e353f94a55a2f033b323b5cf7c8d",
+    "scripts/evaluate_quality.py": "dadaf6c22378df056399d74571c1debd82ce219a52e58751685ff8bc08d6f02e"
+  },
+  "final_source_sha256": {
+    "app/services/synthesis_service.py": "afd6bd54ebf0d7813bd183f1ac38f9442ece051264b7280cb71081d250bc1509",
+    "scripts/evaluate_quality.py": "365ddad882f4b6bcce2d5ca49d6cb386a96501d724595dcceb3ffb81025fab8e",
+    "tests/test_source_faithful_synthesis.py": "2fae9e060565474e01e111758ba503bdbdcf747bdc454643dbb3ad1816a952ea",
+    "tests/test_provider_quota.py": "8b6d15931b3afd9f81bb76271c98eb5b73dccc03420802da2a8c803a94616bfb",
+    "tests/test_processing.py": "150fdde4b35d63c2da80eb531c8c5e970848a7d886499098161045b72aa39ca4",
+    "tests/test_provider_admission_contract.py": "25a1cfe7f1d2a15db6bfd162442201a03076d04f3b7bb0135aa2eed8f5002d88"
+  },
+  "protected_unchanged_sha256": {
+    "app/services/answer_contract.py": "b180a1785cece05a383f6212a7f4ac9dac674773d67540e1d76232d6244f2fb0",
+    "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+    "app/services/fact_support.py": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+    "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+    "app/services/retrieval_candidates.py": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+    "evaluation/answer-generation-current.responses.json": "2e473052cead3c9e463fbb80ff3c973963497885ab5a4892a33f47353c381937",
+    "evaluation/answer-generation-assessment-current.json": "546b031518b718d90d6e1125df6f141e3b52ed7066ea5303ef62637244b169b5",
+    "evaluation/answer-generation-preflight.json": "0148be28e3d2f74ef42c89c0c9c84ad7a0f7488f0ba233dac9a944c03721f2a8"
+  },
+  "heldout": {
+    "path": "evaluation/quality-source-fidelity-heldout-v1.json",
+    "sha256": "5cc52efccd65f20cdaf383d718e0261f1415e282b27b6fbdbb384eb645e5a7be",
+    "cases": 8,
+    "status": "Frozen before prompt edits; no generation or scoring performed; still reserved"
+  },
+  "changes": [
+    "Explicit generic source-only examples/no plausible extra facts; preserve qualifiers,negation,conditions,optionality and direction.",
+    "Cover supported requested parts and material limitations/recovery constraints; report missing details and state facts once.",
+    "Citations beside claims; canonical refusal only when none of the requested parts can be answered. No keyword semantic veto or extra model call.",
+    "Count actual system+user prompt text with instance dispatch; include Gemini newline separator on both Gemini routes. Provider framing/tokenization still differs from text length.",
+    "Optional --cases for offline quality evaluation; validate required case/claim fields,types,positive integer pages and unique claim IDs before capture/scoring. Preserve defaults,source validation and existing review files."
+  ],
+  "verification": {
+    "backend": {
+      "baseline": {
+        "tests": 749,
+        "seconds": 4.089
+      },
+      "focused": {
+        "tests": 16,
+        "seconds": 0.566
+      },
+      "final": {
+        "tests": 765,
+        "seconds": 2.941
+      }
+    },
+    "new_test_methods": 16,
+    "provider_accounting_routes": 5,
+    "provider_context_text_replays": 33,
+    "exact_provider_text_counts": 33,
+    "mocked_gemini_wire_payload": "passed; actual generate() mock transport text includes separator",
+    "frontend_tests": 9,
+    "build": "TypeScript/Vite passed during this increment; Vite4.85s. Frontend source unchanged after backend review corrections.",
+    "syntax_and_diff": "passed",
+    "historical_live_capture_preserved": true,
+    "new_hosted_requests": 0,
+    "human_reviewed_answers": 0,
+    "quality_of_replayed_saved_outputs": {
+      "responses": 12,
+      "mechanical_contracts": 12,
+      "valid_citation_labels": 17,
+      "invalid_indices": 0,
+      "wrong_explicit_pages": 0,
+      "literal_source_passages": 21,
+      "note": "Original saved outputs only;not produced by the updated prompt."
+    }
+  },
+  "accounting": {
+    "scope": "Offline provider-assembly accounting replay on eleven known contexts;not generation/semantic/usage measurement",
+    "provider_context_checks": 33,
+    "exact_new_counts": 33,
+    "contexts": 11,
+    "old_groq_counted_total": 8583,
+    "old_groq_assembled_total": 22063,
+    "new_groq_assembled_total": 33690,
+    "old_system_characters": 1052,
+    "new_system_characters": 2109,
+    "rows": [
+      {
+        "id": "qa01",
+        "provider": "groq",
+        "old_counted_characters": 477,
+        "old_assembled_characters": 1644,
+        "new_counted_characters": 2701,
+        "new_assembled_characters": 2701
+      },
+      {
+        "id": "qa01",
+        "provider": "cerebras",
+        "old_counted_characters": 477,
+        "old_assembled_characters": 1644,
+        "new_counted_characters": 2701,
+        "new_assembled_characters": 2701
+      },
+      {
+        "id": "qa01",
+        "provider": "gemini",
+        "old_counted_characters": 477,
+        "old_assembled_characters": 1646,
+        "new_counted_characters": 2703,
+        "new_assembled_characters": 2703
+      },
+      {
+        "id": "qa02",
+        "provider": "groq",
+        "old_counted_characters": 467,
+        "old_assembled_characters": 1634,
+        "new_counted_characters": 2691,
+        "new_assembled_characters": 2691
+      },
+      {
+        "id": "qa02",
+        "provider": "cerebras",
+        "old_counted_characters": 467,
+        "old_assembled_characters": 1634,
+        "new_counted_characters": 2691,
+        "new_assembled_characters": 2691
+      },
+      {
+        "id": "qa02",
+        "provider": "gemini",
+        "old_counted_characters": 467,
+        "old_assembled_characters": 1636,
+        "new_counted_characters": 2693,
+        "new_assembled_characters": 2693
+      },
+      {
+        "id": "qa03",
+        "provider": "groq",
+        "old_counted_characters": 1322,
+        "old_assembled_characters": 2613,
+        "new_counted_characters": 3670,
+        "new_assembled_characters": 3670
+      },
+      {
+        "id": "qa03",
+        "provider": "cerebras",
+        "old_counted_characters": 1322,
+        "old_assembled_characters": 2613,
+        "new_counted_characters": 3670,
+        "new_assembled_characters": 3670
+      },
+      {
+        "id": "qa03",
+        "provider": "gemini",
+        "old_counted_characters": 1322,
+        "old_assembled_characters": 2615,
+        "new_counted_characters": 3672,
+        "new_assembled_characters": 3672
+      },
+      {
+        "id": "qa04",
+        "provider": "groq",
+        "old_counted_characters": 896,
+        "old_assembled_characters": 2129,
+        "new_counted_characters": 3186,
+        "new_assembled_characters": 3186
+      },
+      {
+        "id": "qa04",
+        "provider": "cerebras",
+        "old_counted_characters": 896,
+        "old_assembled_characters": 2129,
+        "new_counted_characters": 3186,
+        "new_assembled_characters": 3186
+      },
+      {
+        "id": "qa04",
+        "provider": "gemini",
+        "old_counted_characters": 896,
+        "old_assembled_characters": 2131,
+        "new_counted_characters": 3188,
+        "new_assembled_characters": 3188
+      },
+      {
+        "id": "qa05",
+        "provider": "groq",
+        "old_counted_characters": 898,
+        "old_assembled_characters": 2129,
+        "new_counted_characters": 3186,
+        "new_assembled_characters": 3186
+      },
+      {
+        "id": "qa05",
+        "provider": "cerebras",
+        "old_counted_characters": 898,
+        "old_assembled_characters": 2129,
+        "new_counted_characters": 3186,
+        "new_assembled_characters": 3186
+      },
+      {
+        "id": "qa05",
+        "provider": "gemini",
+        "old_counted_characters": 898,
+        "old_assembled_characters": 2131,
+        "new_counted_characters": 3188,
+        "new_assembled_characters": 3188
+      },
+      {
+        "id": "qa06",
+        "provider": "groq",
+        "old_counted_characters": 902,
+        "old_assembled_characters": 2133,
+        "new_counted_characters": 3190,
+        "new_assembled_characters": 3190
+      },
+      {
+        "id": "qa06",
+        "provider": "cerebras",
+        "old_counted_characters": 902,
+        "old_assembled_characters": 2133,
+        "new_counted_characters": 3190,
+        "new_assembled_characters": 3190
+      },
+      {
+        "id": "qa06",
+        "provider": "gemini",
+        "old_counted_characters": 902,
+        "old_assembled_characters": 2135,
+        "new_counted_characters": 3192,
+        "new_assembled_characters": 3192
+      },
+      {
+        "id": "qa07",
+        "provider": "groq",
+        "old_counted_characters": 857,
+        "old_assembled_characters": 2088,
+        "new_counted_characters": 3145,
+        "new_assembled_characters": 3145
+      },
+      {
+        "id": "qa07",
+        "provider": "cerebras",
+        "old_counted_characters": 857,
+        "old_assembled_characters": 2088,
+        "new_counted_characters": 3145,
+        "new_assembled_characters": 3145
+      },
+      {
+        "id": "qa07",
+        "provider": "gemini",
+        "old_counted_characters": 857,
+        "old_assembled_characters": 2090,
+        "new_counted_characters": 3147,
+        "new_assembled_characters": 3147
+      },
+      {
+        "id": "qa08",
+        "provider": "groq",
+        "old_counted_characters": 844,
+        "old_assembled_characters": 2074,
+        "new_counted_characters": 3131,
+        "new_assembled_characters": 3131
+      },
+      {
+        "id": "qa08",
+        "provider": "cerebras",
+        "old_counted_characters": 844,
+        "old_assembled_characters": 2074,
+        "new_counted_characters": 3131,
+        "new_assembled_characters": 3131
+      },
+      {
+        "id": "qa08",
+        "provider": "gemini",
+        "old_counted_characters": 844,
+        "old_assembled_characters": 2076,
+        "new_counted_characters": 3133,
+        "new_assembled_characters": 3133
+      },
+      {
+        "id": "qa09",
+        "provider": "groq",
+        "old_counted_characters": 663,
+        "old_assembled_characters": 1896,
+        "new_counted_characters": 2953,
+        "new_assembled_characters": 2953
+      },
+      {
+        "id": "qa09",
+        "provider": "cerebras",
+        "old_counted_characters": 663,
+        "old_assembled_characters": 1896,
+        "new_counted_characters": 2953,
+        "new_assembled_characters": 2953
+      },
+      {
+        "id": "qa09",
+        "provider": "gemini",
+        "old_counted_characters": 663,
+        "old_assembled_characters": 1898,
+        "new_counted_characters": 2955,
+        "new_assembled_characters": 2955
+      },
+      {
+        "id": "qa10",
+        "provider": "groq",
+        "old_counted_characters": 621,
+        "old_assembled_characters": 1854,
+        "new_counted_characters": 2911,
+        "new_assembled_characters": 2911
+      },
+      {
+        "id": "qa10",
+        "provider": "cerebras",
+        "old_counted_characters": 621,
+        "old_assembled_characters": 1854,
+        "new_counted_characters": 2911,
+        "new_assembled_characters": 2911
+      },
+      {
+        "id": "qa10",
+        "provider": "gemini",
+        "old_counted_characters": 621,
+        "old_assembled_characters": 1856,
+        "new_counted_characters": 2913,
+        "new_assembled_characters": 2913
+      },
+      {
+        "id": "qa11",
+        "provider": "groq",
+        "old_counted_characters": 636,
+        "old_assembled_characters": 1869,
+        "new_counted_characters": 2926,
+        "new_assembled_characters": 2926
+      },
+      {
+        "id": "qa11",
+        "provider": "cerebras",
+        "old_counted_characters": 636,
+        "old_assembled_characters": 1869,
+        "new_counted_characters": 2926,
+        "new_assembled_characters": 2926
+      },
+      {
+        "id": "qa11",
+        "provider": "gemini",
+        "old_counted_characters": 636,
+        "old_assembled_characters": 1871,
+        "new_counted_characters": 2928,
+        "new_assembled_characters": 2928
+      }
+    ]
+  },
+  "review": {
+    "fresh_reviews": 1,
+    "important_findings": [
+      "Gemini combined text included two previously uncounted separator characters.",
+      "Malformed custom cases and duplicate claim IDs could be accepted and inflate completeness."
+    ],
+    "minor_findings": [
+      "Instance-only prompt overrides did not match classmethod accounting.",
+      "The refusal condition was ambiguous for partial answers."
+    ],
+    "correction": "One correction pass fixed both important and both minor findings;16 focused methods and765 total pass;no second review. The Gemini mock needed a base URL before its wire-payload assertion could run.",
+    "approval_interruption": "First mutation attempt was not executed because automatic approval review hit a usage limit. After user requested continue,the same approved-scope patch succeeded;no bypass was used."
+  },
+  "artifact_sha256": {
+    "cg-source-fidelity-before.json": "ce4f8649c32d2f31e10bdecbf2338ace2eb1678d7711db72733d6e0d98302a25",
+    "cg-source-fidelity-data-freeze.json": "1dcae15a1c3d66c7a89fb88efed3896da4420a9ff4f516bce4b3d9e5e1b69c73",
+    "cg-source-fidelity-final-accounting.json": "6d047fe57faf163ed65c2a1a675efd34cc6bf5b477a84d5588859ad169db6f33",
+    "cg-source-fidelity-final-captured-audit.json": "69358f6ed33f7866b58e13ba5acb0e5ed89c645cd1c73d92f162548b31a72875",
+    "cg-source-fidelity-final-tests.log": "62fbeae892b102d6c2d47c162063bc27121796aa3e25ed99f85063952a060884",
+    "cg-source-fidelity-review-green.log": "4397e935ce640a03223539d5f62bcef70b7ff3fa941abecf3f3c3aa74391782d",
+    "cg-source-fidelity-frontend.log": "c30f5301c78dae021a9d39fadeda8a38d00eef66c105309bfbe5c745bc3db0be",
+    "cg-source-fidelity-build.log": "e82b360d46414c061bb2011fa8402f733fca10e4b236bfee54cccd05f7ee218d"
+  },
+  "commands": [
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -p test_source_faithful_synthesis.py",
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests",
+    "npm run test:frontend",
+    "npm run build",
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python scripts/evaluate_quality.py --responses evaluation/answer-generation-current.responses.json --output /private/tmp/cg-source-fidelity-final-captured-audit"
+  ],
+  "limits": [
+    "Prompt rules are instructions,not proof that models follow them. No regenerated candidate answer,semantic improvement,or hallucination rate was measured.",
+    "The earlier11-request approval is fully consumed. Candidate/fresh heldout model captures need a new manifest and explicit quota approval. The old preflight is bound to the old prompt and must not be reused.",
+    "Eight fresh questions are assistant-authored review checklists,not independently human-labelled gold. They remain ungenerated/unscored.",
+    "Stronger guidance increases system text from1052 to2109 characters; eleven known Groq contexts increase from22063 to33690 assembled characters. Live quality,latency and cost tradeoffs are unmeasured.",
+    "Text-length accounting is not exact provider tokenization,billing,protocol framing or a new completion cap. The provider routes and existing reservation/output-allowance policy are unchanged.",
+    "Known q13/as01 retrieval misses and broader semantic entailment remain separate. No evidence threshold/fact/source/auth/READY/worker/deletion/store lifecycle change.",
+    "No additional hosted inference,new dependency,environment/secret change,production document mutation,commit,push or deployment.",
+    "Individual focused unittest runs report an existing unused global Neo4j-driver ResourceWarning plus PyMuPDF SWIG deprecation warnings. Full suite exits successfully;no application resource lifecycle was changed."
+  ]
+}

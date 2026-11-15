@@ -1,0 +1,598 @@
+{
+  "name": "Authored mechanical answer contract v1",
+  "note": "Deterministic authored outputs, not real model generations or semantic human review. Heldout authored before implementation; run only after final reviewed-rule freeze.",
+  "cases": [
+    {
+      "id": "ad01",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1, p. 2]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": true
+    },
+    {
+      "id": "ad02",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 9]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad03",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1, p. 7]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad04",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar.",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad05",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 0]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad06",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source -1]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad07",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1abc]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad08",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad09",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "What is the pressure limit? [Source 1]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad10",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "[Source 1]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad11",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "I could not find enough reliable course content to answer this confidently.",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": true
+    },
+    {
+      "id": "ad12",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "Authorize each operation. [Source 3]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": true
+    },
+    {
+      "id": "ad13",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "Authorize each operation. [Source 3, p. 1]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ad14",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1]\nInspection is every 60 days. [Source 2]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": true
+    },
+    {
+      "id": "ad15",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1]",
+      "sources": [],
+      "expected_valid": false
+    },
+    {
+      "id": "ad16",
+      "split": "development",
+      "question": "What is the pressure limit?",
+      "answer": "   ",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ah01",
+      "split": "held_out",
+      "question": "How often should I inspect?",
+      "answer": "Inspect every 60 days. [source 2, p. 7]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": true
+    },
+    {
+      "id": "ah02",
+      "split": "held_out",
+      "question": "How often should I inspect?",
+      "answer": "Inspect every 60 days. [Source 2, p. 2]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ah03",
+      "split": "held_out",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1] [Source 4]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ah04",
+      "split": "held_out",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1, pp. 2]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ah05",
+      "split": "held_out",
+      "question": "What is the pressure limit?",
+      "answer": "**What is the pressure limit?** [Source 1, p. 2]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ah06",
+      "split": "held_out",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1]\n[Source 2",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ah07",
+      "split": "held_out",
+      "question": "How do I protect PDFs?",
+      "answer": "Authorize each document operation. [Source 3]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": true
+    },
+    {
+      "id": "ah08",
+      "split": "held_out",
+      "question": "What is the pressure limit?",
+      "answer": "I could not find enough reliable course content to answer this confidently.",
+      "sources": [],
+      "expected_valid": true
+    },
+    {
+      "id": "ah09",
+      "split": "held_out",
+      "question": "What is the pressure limit?",
+      "answer": "The limit is 11 bar. [Source 1, p. 0]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    },
+    {
+      "id": "ah10",
+      "split": "held_out",
+      "question": "What is the pressure limit?",
+      "answer": "- [Source 1]\n- [Source 2]",
+      "sources": [
+        {
+          "document_name": "operations.pdf",
+          "page_number": 2,
+          "supporting_passage": "The pressure limit is 11 bar."
+        },
+        {
+          "document_name": "operations.pdf",
+          "page_number": 7,
+          "supporting_passage": "Inspect every 60 days."
+        },
+        {
+          "document_name": "security.pdf",
+          "page_number": null,
+          "supporting_passage": "Authorize each document operation."
+        }
+      ],
+      "expected_valid": false
+    }
+  ]
+}

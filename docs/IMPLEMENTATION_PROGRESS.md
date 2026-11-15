@@ -1,5 +1,115 @@
 # ConceptGraph implementation and verification ledger
 
+15 November source-faithful synthesis correction complete locally: explicit
+generic generation rules address unsourced examples, qualifier loss, missing
+material details and repetition. They preserve partial answers and the canonical
+refusal. There is no new semantic veto, provider judge, retry, architecture change
+or evidence-threshold adjustment. Exact provider prompt-text accounting now
+includes system/user metadata, bounded graph text and both Gemini separators;
+instance overrides match actual adapter dispatch.
+
+The offline quality CLI accepts `--cases` and validates required fields/types,
+positive integer pages and unique expected-claim IDs before capture or scoring.
+It preserves the default dataset, source checks and existing human-review files.
+One fresh review found Gemini's uncounted two-character join and malformed-case
+acceptance, plus instance-dispatch/refusal-wording issues. A single correction
+pass fixed all four; no second review. The first patch was prevented by an
+approval-service usage limit; after the user's continuation request, the normal
+approval path succeeded without a bypass. A mock HTTP base URL was corrected.
+
+Verification: 749 baseline→765 final backend tests, 16 new focused methods,
+33/33 known context/provider text-assembly checks and mocked Gemini wire-payload
+agreement. Nine frontend tests/TS+Vite build passed in this increment; frontend
+source unchanged after backend review corrections. Offline replay of the old
+saved outputs still yields 12 valid contracts, 17 valid labels and 21 literal
+passages, with zero human reviews. These are unchanged historical model outputs,
+not new-prompt generations. Protected evidence/fact/rerank source hashes and old
+capture/report hashes match. Eight fresh quality questions remain frozen/unrun.
+
+The stronger prompt increases system text 1,052→2,109 characters and the known
+11 Groq contexts 22,063→33,690 assembled characters; previous app counter was only
+8,583 on that old text. Budgeting now counts actual text, not exact vendor tokens
+or billing. No extra hosted inference, production data/env/credential mutation,
+new dependency, commit/push/deploy or gate activation. Candidate semantic quality
+and cost/latency tradeoffs remain unmeasured. [Report](../evaluation/source-faithful-synthesis-current.md).
+Next: a new separately budgeted capture on the reserved questions plus real
+hash-bound human claim/citation/completeness review; q13/as01 retrieval is separate.
+
+15 November approved real-generation evaluation: user explicitly authorized the
+bounded 11-request Groq test after the offline preflight. Mocked HTTP verified the
+output/attempt cap, zero SDK retry on 429, usage capture and durable failure state.
+The actual runner used the frozen authored manifest and existing admission hook;
+local shared DB limits were configured disabled and were not changed. Distinct
+cases were paced 20 seconds apart; attempt records persisted before SDK calls.
+
+All 11 Groq requests completed with normal stop, no retry/failover, zero hosted
+embedding/rerank calls, largest reported completion 289/1,200 tokens. Provider
+usage: 5,201 input, 2,138 output, 7,339 total. One additional no-source refusal is
+local/not_attempted. Offline audit of all 12 responses: 12 valid mechanical
+contracts, 17 valid labels, zero bad indices/pages and 21 literal passages. The
+single-run SDK p50/p95 is 0.691/1.218 seconds, excluding pacing/admission/retrieval;
+this is not application/production capacity latency.
+
+Assistant-only analysis flags unsupported examples, lost course/workflow
+qualifiers, missing explicit cleanup idempotency and readiness/quota conflation;
+qa04/qa05 are repetitive. Human reviews remain zero and semantic accuracy/
+completeness metrics remain null. No prompt/runtime tuning or extra provider call
+followed capture. The known authored oracle set is diagnostic, not fresh heldout;
+q13 retrieval is not fixed by its synthesis-only answer. [Raw responses](../evaluation/answer-generation-current.responses.json),
+[assessment and limits](../evaluation/answer-generation-assessment-current.md).
+
+The approved budget is fully used; further live tests need separate authorization.
+All Step 4/preflight code hashes remain unchanged. No production documents,
+ingestion/graph/store data, environment/credentials, commit/push or deployment
+were changed. Next correction can be implemented offline against these known
+failures, with a new frozen quality holdout before a separately budgeted comparison.
+
+15 November generation-evaluation preflight: prepared the exact proposed current
+local prompt/request payloads for the existing 12 authored quality cases. There
+are 11 potential hosted Groq requests plus one local no-source refusal. All 21
+source excerpts are literal and respect five-source/900-character bounds; oracle
+context deliberately bypasses retrieval to isolate synthesis. Expected-claim
+checklists remain outside model payloads. No private document or secret is in the
+pack. Proposed budget is 11 total requests, 1,200 completion tokens each, zero
+retries/failover and stop on provider/quota failure. Estimated input is 5,521 tokens
+from 22,063 prompt characters; not exact token accounting or a price estimate.
+
+Preparation made zero provider calls, created zero generated answers/human
+reviews, and left frozen Step 4 runtime/test hashes unchanged. Existing captures
+remain fallback output, not model-generation evidence. A bounded hosted quota
+approval was requested because the earlier user choice was offline checks only;
+execution is pending. No network execution code, provider activation, environment,
+production mutation, commit, push or deployment was added. [Exact preflight](../evaluation/answer-generation-preflight.md).
+
+15 November answer-contract checkpoint: **Step 4 mechanical safeguards implemented
+and verified locally** on `codex/answer-citation-contract`, above release `8de7beb`.
+All five provider call sites validate source indices, explicit pages and usable
+answer text through the existing invalid-answer/failover paths. Uncited answers,
+question echoes with citations, citation-only output and malformed references are
+rejected. Canonical refusal is allowed; its correctness remains unmeasured.
+
+New authored development format cases retain 4/4 valid outputs and improve invalid
+rejection 1/12→12/12; fresh frozen heldout retains 3/3 and improves 0/7→7/7. Heldout
+is now consumed; no tuning followed its first measurement. Fallback retains all
+five bounded accepted excerpts instead of two and preserves a tested late fact.
+It quotes Markdown/entities literally and discloses partial/shortened excerpts.
+Prompt requests direct answers, cited details and explicit missing information;
+actual model adherence and semantic completeness remain pending.
+
+749 backend tests, nine frontend tests, TS/Vite build and seven actual installed
+ReactMarkdown/GFM renderer checks pass. Existing deterministic quality capture:
+12 responses, 21 valid references, 21 literal source passages, zero provider calls
+and zero human reviews. One fresh review found two Important rendering defects;
+three RED subcases, one correction pass, no second review. Evidence gate, fact
+policy, rerank and query endpoint bytes match the deployed baseline. No schema,
+auth/READY/store/worker/deletion changes. Invalid answers can use the existing
+budgeted backup; there is no new judge/repair/retry stage. No commit, push, deploy,
+hosted inference, production data, credentials or feature activation this turn.
+Next is separately budgeted generation capture and actual human claim-support/
+completeness review; broader fact entailment and q13/as01 remain unfinished.
+[Report](../evaluation/answer-contract-current.md),
+[plan](superpowers/plans/2026-11-15-answer-contract.md).
+
 14 November fact-availability checkpoint: **Step 3 explicit equipment fact guard
 implemented and verified locally**, on `codex/fact-availability` above deployed
 baseline `d871ad1`. Recognized named-equipment manufacturer/voltage/serial requests

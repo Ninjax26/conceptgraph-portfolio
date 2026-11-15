@@ -1,0 +1,1009 @@
+{
+  "date": "2026-11-15",
+  "status": "Scoped Step4 mechanical safeguards implemented and verified locally; generation semantic quality pending",
+  "baseline_revision": "8de7bebaebd1cecef48b2a3789cb98b3dde11f60",
+  "freeze": {
+    "status": "Reviewed rule frozen before first heldout run; no tuning after measurement",
+    "data_freeze": {
+      "path": "evaluation/answer-contract-cases-v1.json",
+      "sha256": "8e965dfffb57e372d1d88762ec4c7c30d76a2f6e2511f5fdff9ac6f52ca57d24",
+      "development_cases": 16,
+      "heldout_cases": 10
+    },
+    "source_sha256": {
+      "app/services/answer_contract.py": "b180a1785cece05a383f6212a7f4ac9dac674773d67540e1d76232d6244f2fb0",
+      "app/services/synthesis_service.py": "bdc8da2fa9a1caefbbb6c94fecbbcd4fb4e8e353f94a55a2f033b323b5cf7c8d",
+      "scripts/quality_metrics.py": "b1176a8b85abd29075721e818d279c5526f646f31fad86173aa76c68f8921bea",
+      "scripts/evaluate_answer_contract.py": "ab4582eebc7ed7f5ed87c95910baa3c45214f51952ede0f1a9e7863782a71d91",
+      "tests/test_answer_contract.py": "b780ae756b4172ce333d510cb04399861ab2c0ada2eb38681c7f78ec0a6209f7",
+      "tests/test_provider_quota.py": "dbe508c6dd904f313a892cf63ac8ad745515631d5cdb72609e79c9c7f2457cc1",
+      "tests/test_processing.py": "af162d3b2572a1e42b978bc50512c7184bd815611bd685e4d1fbd2f65fe457e2",
+      "tests/test_provider_admission_contract.py": "074c3efc5041e25032ef989d0f8242810801e1bffa04badd05574cdbbcd01186"
+    }
+  },
+  "development": {
+    "split": "development",
+    "baseline_revision": "8de7bebaebd1cecef48b2a3789cb98b3dde11f60",
+    "dataset_sha256": "8e965dfffb57e372d1d88762ec4c7c30d76a2f6e2511f5fdff9ac6f52ca57d24",
+    "baseline_synthesis_sha256": "ffc968e5aad8bdfb76f23a61ef1361ea70a959abaabb4ff69d76b07cb36cd9ee",
+    "source_sha256": {
+      "app/services/answer_contract.py": "b180a1785cece05a383f6212a7f4ac9dac674773d67540e1d76232d6244f2fb0",
+      "app/services/synthesis_service.py": "bdc8da2fa9a1caefbbb6c94fecbbcd4fb4e8e353f94a55a2f033b323b5cf7c8d",
+      "scripts/quality_metrics.py": "b1176a8b85abd29075721e818d279c5526f646f31fad86173aa76c68f8921bea",
+      "scripts/evaluate_answer_contract.py": "ab4582eebc7ed7f5ed87c95910baa3c45214f51952ede0f1a9e7863782a71d91"
+    },
+    "before": {
+      "valid_count": 4,
+      "valid_accepted": 4,
+      "invalid_count": 12,
+      "invalid_rejected": 1,
+      "cases": [
+        {
+          "id": "ad01",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad02",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad03",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad04",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad05",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad06",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad07",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad08",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad09",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad10",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad11",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad12",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad13",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad14",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad15",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad16",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an empty answer."
+        }
+      ]
+    },
+    "after": {
+      "valid_count": 4,
+      "valid_accepted": 4,
+      "invalid_count": 12,
+      "invalid_rejected": 12,
+      "cases": [
+        {
+          "id": "ad01",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad02",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad03",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad04",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an answer without source citations."
+        },
+        {
+          "id": "ad05",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad06",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad07",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad08",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad09",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned only the question with citations."
+        },
+        {
+          "id": "ad10",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned only citations."
+        },
+        {
+          "id": "ad11",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad12",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad13",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad14",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ad15",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ad16",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an empty answer."
+        }
+      ]
+    },
+    "fallback_before": {
+      "accepted_source_count": 5,
+      "excerpts_retained": 2,
+      "source_indices": [
+        1,
+        2
+      ],
+      "valid_references": 2,
+      "late_fact_retained": false,
+      "fallback_characters": 193,
+      "tail_passage_characters": 857
+    },
+    "fallback_after": {
+      "accepted_source_count": 5,
+      "excerpts_retained": 5,
+      "source_indices": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "valid_references": 5,
+      "late_fact_retained": true,
+      "fallback_characters": 424,
+      "tail_passage_characters": 857
+    },
+    "scope": "Authored outputs and deterministic fallback, not real LLM generations or human semantic review.",
+    "semantic_accuracy": null,
+    "human_reviewed_answers": 0,
+    "limits": [
+      "Valid labels do not prove claim support or completeness.",
+      "Canonical refusal is structurally allowed; semantic refusal correctness is unmeasured.",
+      "Existing provider backup may be used on newly detected invalid answers; no new retry or judge request is added."
+    ]
+  },
+  "heldout": {
+    "split": "held_out",
+    "baseline_revision": "8de7bebaebd1cecef48b2a3789cb98b3dde11f60",
+    "dataset_sha256": "8e965dfffb57e372d1d88762ec4c7c30d76a2f6e2511f5fdff9ac6f52ca57d24",
+    "baseline_synthesis_sha256": "ffc968e5aad8bdfb76f23a61ef1361ea70a959abaabb4ff69d76b07cb36cd9ee",
+    "source_sha256": {
+      "app/services/answer_contract.py": "b180a1785cece05a383f6212a7f4ac9dac674773d67540e1d76232d6244f2fb0",
+      "app/services/synthesis_service.py": "bdc8da2fa9a1caefbbb6c94fecbbcd4fb4e8e353f94a55a2f033b323b5cf7c8d",
+      "scripts/quality_metrics.py": "b1176a8b85abd29075721e818d279c5526f646f31fad86173aa76c68f8921bea",
+      "scripts/evaluate_answer_contract.py": "ab4582eebc7ed7f5ed87c95910baa3c45214f51952ede0f1a9e7863782a71d91"
+    },
+    "before": {
+      "valid_count": 3,
+      "valid_accepted": 3,
+      "invalid_count": 7,
+      "invalid_rejected": 0,
+      "cases": [
+        {
+          "id": "ah01",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah02",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah03",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah04",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah05",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah06",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah07",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah08",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah09",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah10",
+          "expected_valid": false,
+          "accepted": true,
+          "reason": null
+        }
+      ]
+    },
+    "after": {
+      "valid_count": 3,
+      "valid_accepted": 3,
+      "invalid_count": 7,
+      "invalid_rejected": 7,
+      "cases": [
+        {
+          "id": "ah01",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah02",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ah03",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ah04",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ah05",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned only the question with citations."
+        },
+        {
+          "id": "ah06",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ah07",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah08",
+          "expected_valid": true,
+          "accepted": true,
+          "reason": null
+        },
+        {
+          "id": "ah09",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned an invalid source or page citation."
+        },
+        {
+          "id": "ah10",
+          "expected_valid": false,
+          "accepted": false,
+          "reason": "The provider returned only citations."
+        }
+      ]
+    },
+    "fallback_before": {
+      "accepted_source_count": 5,
+      "excerpts_retained": 2,
+      "source_indices": [
+        1,
+        2
+      ],
+      "valid_references": 2,
+      "late_fact_retained": false,
+      "fallback_characters": 193,
+      "tail_passage_characters": 857
+    },
+    "fallback_after": {
+      "accepted_source_count": 5,
+      "excerpts_retained": 5,
+      "source_indices": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "valid_references": 5,
+      "late_fact_retained": true,
+      "fallback_characters": 424,
+      "tail_passage_characters": 857
+    },
+    "scope": "Authored outputs and deterministic fallback, not real LLM generations or human semantic review.",
+    "semantic_accuracy": null,
+    "human_reviewed_answers": 0,
+    "limits": [
+      "Valid labels do not prove claim support or completeness.",
+      "Canonical refusal is structurally allowed; semantic refusal correctness is unmeasured.",
+      "Existing provider backup may be used on newly detected invalid answers; no new retry or judge request is added."
+    ]
+  },
+  "fallback_quality": {
+    "output_kind": "deterministic_evidence_fallback_not_llm",
+    "provider_calls": 0,
+    "summary": {
+      "captured_answers": 12,
+      "expected_cases": 12,
+      "reviewed_answers": 0,
+      "citation_references": 21,
+      "invalid_citation_references": 0,
+      "wrong_cited_pages": 0,
+      "source_passages": 21,
+      "literal_source_passages": 21,
+      "human_reviewed_claims": 0,
+      "human_supported_claims": 0,
+      "human_correctly_cited_claims": 0,
+      "graph_nodes": 61,
+      "graph_edges": 44,
+      "known_reference_edges": 6,
+      "known_reference_edges_found": 6,
+      "unreviewed_graph_edges": 44,
+      "human_reviewed_graph_edges": 0,
+      "human_correct_graph_edges": 0,
+      "groundedness": null,
+      "citation_correctness": null,
+      "mean_answer_completeness": null,
+      "reviewed_supported_answers": 0,
+      "reviewed_unsupported_answers": 0,
+      "correct_reviewed_refusals": null
+    },
+    "structurally_valid_answers": 12,
+    "answers": [
+      {
+        "id": "qa01",
+        "answer_present": true,
+        "content_sha256": "083980d60749376f79a78ec29fbb7314d36759c2302e101349055c84b3550bbe",
+        "review_context_sha256": "0227c4c605eecd9a0a581c6e6a5cffb05509c38c0d193f1c5f4fd8f5f8db194e",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 1]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 1,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 1,
+        "literal_source_count": 1,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa02",
+        "answer_present": true,
+        "content_sha256": "6a1d6e713b44d4eae98daa7a1e23289817ec990bfee6c39c27d63ccc37d3991b",
+        "review_context_sha256": "234a3fbb8b89500319fda564d7c3c99dd23af22f58f22cd407c2263e6cbdf617",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 2]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 1,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 1,
+        "literal_source_count": 1,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa03",
+        "answer_present": true,
+        "content_sha256": "a3bf4b6ca1d2c94b9621a2ea4f536c4c6b48f49a390cd3c242f931676b13cad3",
+        "review_context_sha256": "b6962b44a230c5dc2e081ffd22b98bc3237955f182ab8f83f36a5ea62ae9123d",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 1]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 2]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 3, p. 3]",
+            "index": 3,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 3,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 3,
+        "literal_source_count": 3,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa04",
+        "answer_present": true,
+        "content_sha256": "8e5a64e8ab862d608c58f64cc1c6250d90018884eaedc1bc0fae4fda11bbf545",
+        "review_context_sha256": "1e253b158022de89e6b4ceb0b604c00c7e6d56b85062df5851a08a814ddec7d2",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 1]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 2]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa05",
+        "answer_present": true,
+        "content_sha256": "07a6f0435aecc4b6a8c041899651dc51cfb8677c0784dfa4c65b129e191959c5",
+        "review_context_sha256": "86daf5940d05afa32027096f11d6603f1956497f5ac41760831f16336eb09830",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 3]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 5]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa06",
+        "answer_present": true,
+        "content_sha256": "104f045a7e1875faf671194b11941bbce6aeb686bde874d6897cc13c0eed26c9",
+        "review_context_sha256": "5425fe958d5b40f0f5db96db72e3f11cefa333ce64fe06d0a15fcd0a738d5ed0",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 2]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 3]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa07",
+        "answer_present": true,
+        "content_sha256": "faac3715e0465da96a6b291771744f04473c94a3db29b2b601986891718ea049",
+        "review_context_sha256": "8a23d76dd562e2a31fdcf346c4d479392c502fd1bd81dd8fc2dc18161a4ac06a",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 1]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 4]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa08",
+        "answer_present": true,
+        "content_sha256": "3316f7315dd834b1b810b3f462e0801e3c1b47b3bafe70961fb8d5914730b7f4",
+        "review_context_sha256": "74e85339a5e16be7f47b42036f8b80545e4d865184a78f9e72d09a38de6a9f8d",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 6]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 6]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa09",
+        "answer_present": true,
+        "content_sha256": "6153540a64a768c6fce72f42809fd44bc318879ea1c1cc4162f211d2b0025605",
+        "review_context_sha256": "59034341ff3cbd8206146dec16455e493e07f1a5222eb4099baf3b34498539b6",
+        "expected_refusal": false,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 1]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 2]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa10",
+        "answer_present": true,
+        "content_sha256": "6153540a64a768c6fce72f42809fd44bc318879ea1c1cc4162f211d2b0025605",
+        "review_context_sha256": "ccad6be4b697177231c9aea0b859fc0a9352e3cc64e0658c12a869998063de1f",
+        "expected_refusal": true,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 1]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 2]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa11",
+        "answer_present": true,
+        "content_sha256": "a0124a6d787e8fccb81906766d3b1ac5ec825c96408900f6be1d323a880eeccd",
+        "review_context_sha256": "67610ea742aaddf2d31986124c864a2f2803257860d3abb9f61aa31ae8393a5f",
+        "expected_refusal": true,
+        "canonical_refusal": false,
+        "answer_contract_valid": true,
+        "citation_references": [
+          {
+            "label": "[Source 1, p. 1]",
+            "index": 1,
+            "index_valid": true,
+            "page_valid": true
+          },
+          {
+            "label": "[Source 2, p. 2]",
+            "index": 2,
+            "index_valid": true,
+            "page_valid": true
+          }
+        ],
+        "citation_count": 2,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 2,
+        "literal_source_count": 2,
+        "cited_sources_literal": true,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      },
+      {
+        "id": "qa12",
+        "answer_present": true,
+        "content_sha256": "a65c759fb8e85e2ae0e07a4e89b6ca58a91e85a0e86c974115cbcdfa268f32a3",
+        "review_context_sha256": "decd0f2d5173eae98ca7b52432883d61e3ad87f475410e7cbe42cb86fd9fc9bc",
+        "expected_refusal": true,
+        "canonical_refusal": true,
+        "answer_contract_valid": true,
+        "citation_references": [],
+        "citation_count": 0,
+        "invalid_citation_count": 0,
+        "wrong_cited_page_count": 0,
+        "source_count": 0,
+        "literal_source_count": 0,
+        "cited_sources_literal": null,
+        "review_status": "pending",
+        "claim_count": null,
+        "supported_claims": null,
+        "correctly_cited_claims": null,
+        "groundedness": null,
+        "citation_correctness": null,
+        "answer_completeness": null,
+        "refusal_correct": null
+      }
+    ],
+    "source_hashes": {
+      "dataset_sha256": "a8b81079bf249493c41841aeb9d002dd45e0906a04c3327201d27daa51eb573b",
+      "reference_sha256": "a11f6cf50380f4a9121681bd9f377a0729d7cc7ac18d16567908a3b093d253f4",
+      "graph_snapshot_sha256": "e148b9cc612aecc5adda9ec296a0c889a42e0c33cff53f738c1204102b7dca79",
+      "evaluator_sha256": {
+        "quality_metrics.py": "b1176a8b85abd29075721e818d279c5526f646f31fad86173aa76c68f8921bea",
+        "evaluate_quality.py": "dadaf6c22378df056399d74571c1debd82ce219a52e58751685ff8bc08d6f02e"
+      },
+      "corpus_sha256": {
+        "web-foundations.pdf": "3fb927b78ebd993594a34c8e6441e15e81d76596a38010f35bbc690e6242779f",
+        "identity-security.pdf": "48efccdeb4e74361abe4b3c2d7129fb3c0a41b6639c75a9fb0bc25aa4314224e",
+        "data-reliability.pdf": "371a60d7a21fef52b378b348aea14cb713fcc80ad7e5967c9554b09b1c7308c6",
+        "equipment-PMP-101.pdf": "373659e66eea90821be6e17da675115f6d0b03caddce6f3c445108efbb03131e",
+        "equipment-PMP-102.pdf": "45af7928fb307c0971a71062143755b5773c40fa9da8ecd0c9317453786ca093",
+        "equipment-PMP-103.pdf": "bdf4f1ecfe7e70da759f5f38029351dd9c7b93337859ea741ab3d100b370449b",
+        "equipment-PMP-104.pdf": "6d6fba1eb0b17fb8939b2a07214aea61259b066298b85e22fbdede237a8e9c2e",
+        "equipment-PMP-105.pdf": "fe57ea889a566ef85769ae654c6262b2747e6d29f771890bfa65ab15a9f950bf",
+        "equipment-PMP-106.pdf": "c1ed7b982e7ea58febc59e3c50d934effaa5d02c4dcae7a3a071c26246598c4b"
+      }
+    }
+  },
+  "markdown_renderer": {
+    "checks_passed": 7,
+    "definitions": [
+      {
+        "answer": "[Source 1]: https://example.com",
+        "rejected": true,
+        "html": ""
+      },
+      {
+        "answer": "The limit is 11 bar.\n\n[Source 1]: https://example.com",
+        "rejected": true,
+        "html": "<p>The limit is 11 bar.</p>"
+      }
+    ],
+    "before": "<p>AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages:</p>\n<ul>\n<li>The limit is <del>11 bar</del> 9 bar; [Source 99] is printed literally. [Source 1, p. 2]</li>\n</ul>",
+    "after": "<p>AI synthesis is temporarily unavailable, so here are the most relevant retrieved course passages. These are excerpts, not a generated answer; they may not cover every requested detail.</p>\n<ul>\n<li>The limit is ~~11 bar~~ 9 bar; &amp;#91;Source 99&amp;#93; is printed literally. [Source 1, p. 2]</li>\n</ul>",
+    "scope": "Actual installed ReactMarkdown + remarkGfm + ReactDOM server renderer; no browser/provider calls"
+  },
+  "verification": {
+    "backend_before": 726,
+    "backend_after": 749,
+    "backend_seconds": 4.213,
+    "new_test_methods": 23,
+    "frontend_tests": 9,
+    "typescript_vite_build": "passed; Vite9.66s",
+    "actual_renderer_assertions": 7,
+    "diff_check": "passed",
+    "frozen_hash_integrity": "passed",
+    "upstream_evidence_and_query_sources_unchanged": {
+      "app/services/citation_service.py": "94e327a95cbbb5828e00b6752a9284c84d356882a4d05d1d1631a506d5abb363",
+      "app/services/rerank_service.py": "9184959e43473d0812290b9751818d8e5d08e4d37a3c4b0e9fbf2f42e6777432",
+      "app/services/fact_support.py": "659d2970ff5f671a9343ab787f7312f5de49c2d42a1407a0d9d63be6aeefbc3d",
+      "app/services/retrieval_candidates.py": "4b3133fe6da7cb46e87c3bb77b3b50e37da82e6c8146ba5c20601ce0130fec04",
+      "app/api/endpoints/query.py": "e1271c68087c4687431ab9873876a7250999d8590e95a980ec11eabffa61f4b2"
+    }
+  },
+  "commands": [
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests",
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -p test_answer_contract.py",
+    "npm run test:frontend",
+    "npm run build",
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python scripts/evaluate_answer_contract.py --split development --output /private/tmp/cg-answer-development-final.json",
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python scripts/evaluate_answer_contract.py --split held_out --output /private/tmp/cg-answer-heldout.json",
+    "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python scripts/evaluate_quality.py --fallback --output /private/tmp/cg-answer-quality-final",
+    "Node ReactDOM renderToStaticMarkup(ReactMarkdown with remarkGfm): two definition repros, old strikethrough reproduction and four escaped-fallback rendering assertions. Inputs/HTML saved in markdown_renderer above."
+  ],
+  "raw_artifact_sha256": {
+    "cg-answer-data-freeze.json": "59c01aeeaa90da2b45c7c135f35bbaa4256b62e3b172b6c7204bedbc641ff43d",
+    "cg-answer-rule-freeze.json": "28a8cf0e7aecdf10eb2bb83bba2d7d9dfb1dc9f568eb24c668e1128cfbde58b2",
+    "cg-answer-development-final.json": "8a7506c704fb0458eeabffc4b76e27adcd021d3a7da186298595ecd1809451b0",
+    "cg-answer-heldout.json": "7338db7b3e45fa881bc422f126565486f1228b9fa369cca26f59fa854dd0b9a3",
+    "cg-answer-quality-final.json": "7af97c3bcd40ed43d7ba17b6aef4acdd2adcaef9fc82c046bb1240d542ff062a",
+    "cg-answer-markdown-checks.json": "7f6f69d5d54fc5e3238c286b95fd5731bf4e02c0a08850c7a2b33984815033f8",
+    "cg-answer-final-tests.log": "bb35fa333aabfca3a53ec3337bb6e78dcc973864ca4d06e87e05242157646e9d",
+    "cg-answer-frontend.log": "b0a2ded8ebb96f7472afb7abf9c137394abd69ac8403856d76824285c3f212f3",
+    "cg-answer-build.log": "8a4073e10356cf544e28f6b63bfccc42404f0cf2d56ec586c99b4c864dd9a8a9"
+  },
+  "limits": [
+    "Mechanical format and reference checks only. A valid citation can still fail to support a claim. No live generated answers or human semantic review were performed.",
+    "Direct-answer structure, per-claim citations and missing-detail disclosure are prompt instructions; actual model adherence and semantic completeness remain unmeasured.",
+    "Exact canonical refusals are allowed without citations. Correctness of those refusals is unmeasured; q13/as01 and wider fact-entailment work remain separate.",
+    "This is not a full Markdown/HTML semantic parser. The two reviewed rendering defects are covered; arbitrary hidden or code-context text still needs broader renderer-aware evaluation.",
+    "Fallback displays accepted excerpts, not a generated answer. It is capped at five sources and900 normalized characters per source. Oversized direct inputs are explicitly labelled shortened; normal accepted excerpts already use the900-character bound.",
+    "Invalid outputs can invoke an existing budgeted backup provider. No repair, judge or extra retry stage was added; routing, usage observation, circuit and cancellation behavior are retained.",
+    "The public API, auth, READY scope, evidence/fact thresholds, source order, graph/store/worker/deletion lifecycle and production flags are unchanged. The retrieval benchmark was not rerun; unchanged source bytes are recorded, not claimed as fresh model metrics.",
+    "New authored heldout cases were frozen before implementation and first measured after reviewed-rule freeze. They are now consumed; no source/data tuning followed measurement.",
+    "One fresh review, two Important findings, three failing subcases reproduced, one correction pass, no second review. Six preexisting successful-provider mocks were supplied actual cited source text rather than weakening validation.",
+    "Local and uncommitted. No push, deploy, hosted inference, production test data, environment/secret changes or new dependencies."
+  ]
+}

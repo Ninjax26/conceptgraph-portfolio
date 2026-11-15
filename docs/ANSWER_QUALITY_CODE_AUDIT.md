@@ -1,5 +1,48 @@
 # Answer quality: code audit and execution order
 
+15 November offline correction: generic synthesis rules now explicitly preserve
+source qualifiers and material detail, avoid unprovided examples and repetition,
+and cite claims nearby. Canonical refusal applies only when no requested part is
+supported. No lexical semantic veto or additional generation request is added.
+Actual system/user prompt text is counted for existing admission, including
+Gemini join separators and instance dispatch. The optional offline `--cases`
+path validates case/claim schemas and unique claim IDs so malformed checklists
+cannot silently inflate CLI completeness. Defaults/review preservation are tested.
+765 backend tests pass; old captured answers/evidence/fact/rerank source hashes
+remain preserved. Eight new quality questions are frozen but unrun. Prompt
+adherence, human semantic quality and new token/latency effects are still
+unmeasured; the longer prompt must be compared under a fresh explicit quota budget.
+[Exact results and limits](../evaluation/source-faithful-synthesis-current.md).
+No commit or deployment occurred.
+
+15 November actual-output update: an explicitly approved bounded Groq capture
+now provides 11 model outputs plus one labelled local refusal from oracle source
+context. No prompt/runtime changes were made during capture. All 12 responses
+pass mechanical contracts; 17 source labels and 21 supplied excerpts are valid.
+Assistant analysis still finds unsupported examples and stronger-than-source
+qualifiers, omitted explicit cleanup idempotency and readiness/quota conflation.
+This demonstrates why format validation is not semantic claim support. Human
+semantic metrics remain unmeasured; no generalization/improvement score is claimed.
+[Actual findings and exact usage](../evaluation/answer-generation-assessment-current.md).
+Prioritize source-faithful examples, qualifiers, requested-detail coverage and
+conciseness. Retrieval and q13 remain separate. All 11 approved requests are used;
+further hosted evaluation needs a new explicit budget. No release occurred.
+
+15 November update: Step 4 adds a shared pure answer/reference contract to all
+provider synthesis call sites and the offline auditor. It rejects invalid source
+numbers/pages, missing or unfinished labels, source-definition-only output,
+citation-only text and question echoes plus citations. Canonical refusal remains
+allowed without citations. Invalid output reuses existing provider failover;
+source-safe errors, quota observation, cancellation and store behavior remain.
+Fallback now includes up to five 900-character accepted excerpts with original
+indices, explicit limitations and escaped Markdown/entities. Prompt completeness
+instructions are unmeasured on real generations. Frozen heldout format rejection
+improves 0/7→7/7 with 3/3 valid retained; 749 backend tests pass. There are no new
+semantic human scores, hosted calls, API/schema/auth/store changes or deployment.
+[Results and limits](../evaluation/answer-contract-current.md). Next is separately
+budgeted generation capture and human claim/citation/completeness review. The
+older dated pipeline audit below is historical, including its two-source fallback.
+
 14 November update: the explicit named-equipment manufacturer/voltage/serial
 fact gate now runs on final literal citations before synthesis. Missing facts
 cannot be replaced by topical relevance, brand labels or the wrong voltage role.

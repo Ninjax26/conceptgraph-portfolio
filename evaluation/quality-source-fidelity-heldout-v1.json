@@ -1,0 +1,197 @@
+{
+  "name": "Source-faithful synthesis fresh quality questions v1",
+  "annotation_note": "Assistant-authored new questions and review checklists over the existing authored PDF corpus. Frozen before prompt edits;not independently human annotated and not generated/scored. Review checklist is never provider input. Known diagnostic qa01\u2013qa12 remain development,not heldout.",
+  "cases": [
+    {
+      "id": "sfh01",
+      "split": "held_out",
+      "question": "Does a signed session cookie keep its contents secret or revoke access immediately? Explain its stated limits.",
+      "sources": [
+        [
+          "identity-security.pdf",
+          4
+        ]
+      ],
+      "expected_refusal": false,
+      "expected_claims": [
+        {
+          "id": "integrity",
+          "text": "A signature gives integrity,not secrecy."
+        },
+        {
+          "id": "confidentiality",
+          "text": "Contents must not include secrets needing encryption."
+        },
+        {
+          "id": "revocation",
+          "text": "Instant revocation needs additional state."
+        }
+      ]
+    },
+    {
+      "id": "sfh02",
+      "split": "held_out",
+      "question": "Does applying a request limit establish identity or private document ownership? Distinguish the controls.",
+      "sources": [
+        [
+          "identity-security.pdf",
+          6
+        ]
+      ],
+      "expected_refusal": false,
+      "expected_claims": [
+        {
+          "id": "consumption",
+          "text": "Rate limits bound consumption."
+        },
+        {
+          "id": "identity",
+          "text": "They do not establish identity."
+        },
+        {
+          "id": "ownership",
+          "text": "They do not establish document ownership."
+        }
+      ]
+    },
+    {
+      "id": "sfh03",
+      "split": "held_out",
+      "question": "What does vector similarity establish about an answer,and which scope must still be applied?",
+      "sources": [
+        [
+          "data-reliability.pdf",
+          5
+        ]
+      ],
+      "expected_refusal": false,
+      "expected_claims": [
+        {
+          "id": "support",
+          "text": "Similarity does not prove passage support for an answer."
+        },
+        {
+          "id": "scope",
+          "text": "Filter by allowed upload identifiers."
+        },
+        {
+          "id": "gate",
+          "text": "Reranking/evidence thresholds can reject weak matches."
+        }
+      ]
+    },
+    {
+      "id": "sfh04",
+      "split": "held_out",
+      "question": "In this course,what comes before learning idempotency? Does the passage state that every idempotent implementation must use a SQL transaction?",
+      "sources": [
+        [
+          "data-reliability.pdf",
+          1
+        ],
+        [
+          "data-reliability.pdf",
+          2
+        ]
+      ],
+      "expected_refusal": false,
+      "expected_claims": [
+        {
+          "id": "course",
+          "text": "Transactions precede studying idempotency in this workflow."
+        },
+        {
+          "id": "limit",
+          "text": "The passage gives a study prerequisite,not a universal requirement for every implementation."
+        }
+      ]
+    },
+    {
+      "id": "sfh05",
+      "split": "held_out",
+      "question": "What may an HTTP429 response include,and does this passage guarantee the next attempt will succeed?",
+      "sources": [
+        [
+          "web-foundations.pdf",
+          6
+        ]
+      ],
+      "expected_refusal": false,
+      "expected_claims": [
+        {
+          "id": "retry",
+          "text": "A429 may include Retry-After."
+        },
+        {
+          "id": "limit",
+          "text": "The passage does not guarantee that the next attempt succeeds."
+        }
+      ]
+    },
+    {
+      "id": "sfh06",
+      "split": "held_out",
+      "question": "Which exact cipher-suite identifiers does this TLS page prescribe?",
+      "sources": [
+        [
+          "web-foundations.pdf",
+          2
+        ]
+      ],
+      "expected_refusal": true,
+      "expected_claims": []
+    },
+    {
+      "id": "sfh07",
+      "split": "held_out",
+      "question": "Which request components are listed here,and which specific HTTP header names does the page supply?",
+      "sources": [
+        [
+          "web-foundations.pdf",
+          1
+        ]
+      ],
+      "expected_refusal": false,
+      "expected_claims": [
+        {
+          "id": "parts",
+          "text": "Method,target,headers,and sometimes body are listed."
+        },
+        {
+          "id": "missing",
+          "text": "The page does not supply specific header names;do not invent examples."
+        }
+      ]
+    },
+    {
+      "id": "sfh08",
+      "split": "held_out",
+      "question": "For PMP-106,give its pressure limit and inspection timing,keeping both equipment-specific.",
+      "sources": [
+        [
+          "equipment-PMP-106.pdf",
+          1
+        ],
+        [
+          "equipment-PMP-106.pdf",
+          2
+        ]
+      ],
+      "expected_refusal": false,
+      "expected_claims": [
+        {
+          "id": "pressure",
+          "text": "The approved pressure is8.0 bar."
+        },
+        {
+          "id": "interval",
+          "text": "The interval is7 days."
+        },
+        {
+          "id": "scope",
+          "text": "Use these limits for PMP-106,not a neighbouring identifier."
+        }
+      ]
+    }
+  ]
+}
