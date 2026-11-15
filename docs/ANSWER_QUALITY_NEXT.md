@@ -1,5 +1,23 @@
 # Next: recover useful evidence before changing answer generation
 
+**15 November: approved current-prompt capture completed.** Exactly 19 Groq
+requests (11 known +8 fresh), zero retries/fallbacks, 1,200 output-token cap per
+request. Actual usage: 12,156 input +4,520 completion =16,676 tokens. All calls
+ended normally, but three raw answers fail citation format (`qa06`, `sfh07`,
+`sfh08`): 16/19 hosted contracts pass, 17/20 including one local refusal. Known
+missing-fact refusals remain 2/2; fresh unsupported case refuses 1/1. Known answers
+are shorter (6,379→3,879 characters) but use more tokens (7,339→9,475). Assistant
+observations show unresolved qualifier/readiness errors; human metrics remain
+null. [Actual assessment](../evaluation/answer-comparison-assessment-current.md).
+
+The current capture uses provider-default temperature versus historical zero;
+no controlled causal quality gain is claimed. The fresh set and all 19 requests
+are now consumed. Next: offline citation compatibility regressions and actual
+claim-support review, with new heldout data before future tuning measurements.
+No runtime/prompt changes or production mutations were made. Earlier preflight
+and pending statuses below retain their historical scope.
+
+
 **15 November: current-prompt comparison preparation.** Released runtime baseline
 is `d5626c2`. Added `scripts/prepare_answer_comparison.py`: a network-free builder
 with exact known-context preservation, literal source bounds, current request

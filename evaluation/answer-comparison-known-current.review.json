@@ -1,0 +1,1668 @@
+{
+  "instructions": "Read every answer/claim and its cited source. Fill answers and graph_edges; do not set all_claims_reviewed until every factual claim is assessed. Rerun with --reviews pointing to this file. Pending or stale reviews do not receive semantic scores.",
+  "answers": [
+    {
+      "id": "qa01",
+      "content_sha256": "d59bbe446a5dbfabb138e35abb4411c105152fe06acd8bd9d15faa70c0532c83",
+      "reviewer": "",
+      "review_context_sha256": "0227c4c605eecd9a0a581c6e6a5cffb05509c38c0d193f1c5f4fd8f5f8db194e",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa02",
+      "content_sha256": "1796657e9e596783d31a1def54b140c034e03294bf6d5fe9c79fe4af846d5ecd",
+      "reviewer": "",
+      "review_context_sha256": "234a3fbb8b89500319fda564d7c3c99dd23af22f58f22cd407c2263e6cbdf617",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa03",
+      "content_sha256": "3f262fcf6f7ea6e9eac6ff17f6deea30e2ac42dbc82a0feffef9d106d245655b",
+      "reviewer": "",
+      "review_context_sha256": "b6962b44a230c5dc2e081ffd22b98bc3237955f182ab8f83f36a5ea62ae9123d",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa04",
+      "content_sha256": "5946be17deea2753083e5d52dce118837f0c227428b4a7757e5e33f3441a0bec",
+      "reviewer": "",
+      "review_context_sha256": "1e253b158022de89e6b4ceb0b604c00c7e6d56b85062df5851a08a814ddec7d2",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa05",
+      "content_sha256": "71a2cba0fa510b933d5807aca532059b066bdc3432c4e2a9da861490232f4922",
+      "reviewer": "",
+      "review_context_sha256": "86daf5940d05afa32027096f11d6603f1956497f5ac41760831f16336eb09830",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa06",
+      "content_sha256": "bdfe851bfcbb3eb0003359bc21c505f976e490b7f653f376f0d8f2d25bc75659",
+      "reviewer": "",
+      "review_context_sha256": "5425fe958d5b40f0f5db96db72e3f11cefa333ce64fe06d0a15fcd0a738d5ed0",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa07",
+      "content_sha256": "7c172827e2122d5f94ba7d5838f0af854efe67ca18140ff729a0cb4bcc78a8e4",
+      "reviewer": "",
+      "review_context_sha256": "8a23d76dd562e2a31fdcf346c4d479392c502fd1bd81dd8fc2dc18161a4ac06a",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa08",
+      "content_sha256": "4f42b57dcf550c9be3fd562a2eaa3cbc48efe1c2429cb812925d723b2fe1f7c5",
+      "reviewer": "",
+      "review_context_sha256": "74e85339a5e16be7f47b42036f8b80545e4d865184a78f9e72d09a38de6a9f8d",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa09",
+      "content_sha256": "ebf4c228ec798d59fa6c81888b84ea36213689a3d06d16b1aa26247654e20a8e",
+      "reviewer": "",
+      "review_context_sha256": "59034341ff3cbd8206146dec16455e493e07f1a5222eb4099baf3b34498539b6",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa10",
+      "content_sha256": "f8b8dbec7f2884dc81bc8d43c0c3dfb3b116c65e7aa3ce4e54b472afa03d04b3",
+      "reviewer": "",
+      "review_context_sha256": "ccad6be4b697177231c9aea0b859fc0a9352e3cc64e0658c12a869998063de1f",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa11",
+      "content_sha256": "a17b4acd9ffa4d177a46a733f95c48f6e9118c8f5694eb880ea6b3ec14592ac5",
+      "reviewer": "",
+      "review_context_sha256": "67610ea742aaddf2d31986124c864a2f2803257860d3abb9f61aa31ae8393a5f",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    },
+    {
+      "id": "qa12",
+      "content_sha256": "a65c759fb8e85e2ae0e07a4e89b6ca58a91e85a0e86c974115cbcdfa268f32a3",
+      "reviewer": "",
+      "review_context_sha256": "decd0f2d5173eae98ca7b52432883d61e3ad87f475410e7cbe42cb86fd9fc9bc",
+      "all_claims_reviewed": false,
+      "claims": [],
+      "expected_claims_covered": [],
+      "refusal_correct": null
+    }
+  ],
+  "answer_context": [
+    {
+      "id": "qa01",
+      "question": "What fields make up an HTTP request and response?",
+      "response": {
+        "answer": "HTTP request fields: method, target, headers, and optionally a body.  \nHTTP response fields: status code, headers, and optionally a body.\u202f[Source\u00a01]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 1,
+            "supporting_passage": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "request",
+          "text": "A request contains method, target, headers and sometimes a body."
+        },
+        {
+          "id": "response",
+          "text": "A response contains a status code, headers and optionally a body."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa01",
+        "content_sha256": "d59bbe446a5dbfabb138e35abb4411c105152fe06acd8bd9d15faa70c0532c83",
+        "reviewer": "",
+        "review_context_sha256": "0227c4c605eecd9a0a581c6e6a5cffb05509c38c0d193f1c5f4fd8f5f8db194e",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa02",
+      "question": "What does a browser check in a TLS certificate?",
+      "response": {
+        "answer": "A browser verifies that the TLS certificate **(1)** matches the hostname the user is trying to reach, and **(2)** chains back to a certificate authority that is trusted by the browser. [Source 1]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 2,
+            "supporting_passage": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "hostname",
+          "text": "The certificate matches the requested hostname."
+        },
+        {
+          "id": "authority",
+          "text": "The certificate chains to a trusted authority."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa02",
+        "content_sha256": "1796657e9e596783d31a1def54b140c034e03294bf6d5fe9c79fe4af846d5ecd",
+        "reviewer": "",
+        "review_context_sha256": "234a3fbb8b89500319fda564d7c3c99dd23af22f58f22cd407c2263e6cbdf617",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa03",
+      "question": "What should I learn before HTTPS, including the foundational prerequisite?",
+      "response": {
+        "answer": "To understand HTTPS you should first learn **HTTP**, then learn **TLS**.  \n- HTTP is the foundational prerequisite that is required two steps before HTTPS.  \n- TLS is the next prerequisite that HTTPS builds on.  \n\nThus the learning sequence is: **HTTP \u2192 TLS \u2192 HTTPS**.  \n[Source\u202f1, p.\u202f1] [Source\u202f2, p.\u202f2] [Source\u202f3, p.\u202f3]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 1,
+            "supporting_passage": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 2,
+            "supporting_passage": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+          },
+          {
+            "source_id": "source-3",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 3,
+            "supporting_passage": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "direct",
+          "text": "TLS is the direct prerequisite for HTTPS."
+        },
+        {
+          "id": "foundation",
+          "text": "HTTP comes before TLS and is a foundational prerequisite for HTTPS."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa03",
+        "content_sha256": "3f262fcf6f7ea6e9eac6ff17f6deea30e2ac42dbc82a0feffef9d106d245655b",
+        "reviewer": "",
+        "review_context_sha256": "b6962b44a230c5dc2e081ffd22b98bc3237955f182ab8f83f36a5ea62ae9123d",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa04",
+      "question": "How are authentication and authorization different?",
+      "response": {
+        "answer": "Authentication verifies who the caller is by checking credentials or an existing session, while authorization determines whether that verified identity is allowed to perform a particular action on a resource. Authentication must succeed before authorization can be evaluated, and authorization is the gate that controls access to documents such as PDFs. A successful login alone does not grant permission to every PDF in an application. [Source\u202f1] [Source\u202f2]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 1,
+            "supporting_passage": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 2,
+            "supporting_passage": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "identity",
+          "text": "Authentication establishes the caller's identity."
+        },
+        {
+          "id": "permission",
+          "text": "Authorization checks whether that caller may act on a resource."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa04",
+        "content_sha256": "5946be17deea2753083e5d52dce118837f0c227428b4a7757e5e33f3441a0bec",
+        "reviewer": "",
+        "review_context_sha256": "1e253b158022de89e6b4ceb0b604c00c7e6d56b85062df5851a08a814ddec7d2",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa05",
+      "question": "Does HTTPS prove a website is honest or prevent phishing?",
+      "response": {
+        "answer": "HTTPS does not prove that a website is honest, nor does it prevent phishing. The encryption and integrity guarantees of TLS only protect the communication channel; they do not verify the identity or intentions of the site\u2019s operator or guard against deceptive content. [[Source 1]] [[Source 2]]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 3,
+            "supporting_passage": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 5,
+            "supporting_passage": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "transport",
+          "text": "HTTPS protects traffic in transit."
+        },
+        {
+          "id": "phishing",
+          "text": "A phishing site can use HTTPS; encryption does not prove honesty."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa05",
+        "content_sha256": "71a2cba0fa510b933d5807aca532059b066bdc3432c4e2a9da861490232f4922",
+        "reviewer": "",
+        "review_context_sha256": "86daf5940d05afa32027096f11d6603f1956497f5ac41760831f16336eb09830",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa06",
+      "question": "Why do ingestion retries need idempotency?",
+      "response": {
+        "answer": "Ingestion retries need idempotency so that if a transient failure occurs, the system can safely repeat the ingestion operation without creating duplicate data or unintended side\u2011effects. Idempotency guarantees that performing the operation multiple times has the same intended effect as performing it once, usually through deterministic chunk identifiers and upsert logic. Without it, a retry could add duplicate vectors or otherwise corrupt the state. Idempotency is a prerequisite for safe retries, and both depend on transactional guarantees to ensure partial successes are handled correctly.\u3010Source 1\u3011\u3010Source 2\u3011",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 2,
+            "supporting_passage": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 3,
+            "supporting_passage": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "earlier_write",
+          "text": "A write may already have succeeded before a failure was observed."
+        },
+        {
+          "id": "duplicates",
+          "text": "Deterministic identifiers and upserts help prevent duplicated effects."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa06",
+        "content_sha256": "bdfe851bfcbb3eb0003359bc21c505f976e490b7f653f376f0d8f2d25bc75659",
+        "reviewer": "",
+        "review_context_sha256": "5425fe958d5b40f0f5db96db72e3f11cefa333ce64fe06d0a15fcd0a738d5ed0",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa07",
+      "question": "Why cannot a PostgreSQL rollback remove partial Qdrant writes?",
+      "response": {
+        "answer": "Because a PostgreSQL transaction only protects changes made inside PostgreSQL itself, it does not extend to writes that are sent to an external vector store such as Qdrant. When a workflow writes vectors to Qdrant, those writes occur outside the database transaction, so a rollback in PostgreSQL cannot undo them. Instead, the system must perform a compensating cleanup\u2014deleting the Qdrant points by the exact upload identifier\u2014while preserving authoritative metadata until cleanup can be retried, ensuring idempotency and safe retries. [Source\u202f1] [Source\u202f2]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 1,
+            "supporting_passage": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 4,
+            "supporting_passage": "Compensating cleanup removes partial derived artifacts after a workflow fails across services. A PostgreSQL rollback cannot erase points already written to Qdrant. Delete by the exact upload identifier and preserve authoritative metadata until cleanup can be retried. Cleanup is not a distributed atomic transaction: it can also fail, so record the failure and keep operations idempotent."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "external",
+          "text": "The SQL transaction cannot automatically roll back external vector writes."
+        },
+        {
+          "id": "cleanup",
+          "text": "Compensating cleanup deletes exact-upload artifacts and must itself be retryable/idempotent."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa07",
+        "content_sha256": "7c172827e2122d5f94ba7d5838f0af854efe67ca18140ff729a0cb4bcc78a8e4",
+        "reviewer": "",
+        "review_context_sha256": "8a23d76dd562e2a31fdcf346c4d479392c502fd1bd81dd8fc2dc18161a4ac06a",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa08",
+      "question": "How are service readiness and HTTP 429 different?",
+      "response": {
+        "answer": "Service readiness is a system\u2011level status that tells operators whether the service\u2019s internal dependencies (such as databases or quota checks) are functioning and the service is ready to receive traffic. A readiness failure is an infrastructure or configuration issue that usually requires operator intervention.  \nHTTP\u202f429, on the other hand, is a response code returned by the service to a client that has exceeded a rate limit; it is a runtime indication of too many requests in the current window and can include a\u202fRetry\u2011After header. It is a client\u2011side signal that the request should be retried later rather than a sign that the service is misconfigured or down.  \n\nThus, readiness reflects the service\u2019s overall health and ability to accept traffic, whereas HTTP\u202f429 reflects a temporary, client\u2011initiated rate\u2011limiting condition.  \n[Source\u00a01]\u202f[Source\u00a02]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 6,
+            "supporting_passage": "Readiness decides whether a service can accept useful traffic. Required dependencies such as the authoritative database must work. An optional concept graph may be reported as degraded while vector-based answers continue. A healthy process does not prove that an external AI provider has quota. Readiness and rate-limit failures require different operator responses."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 6,
+            "supporting_passage": "An HTTP 401 response means authentication is required or the supplied credentials are not accepted. An HTTP 403 response means the request is forbidden; it can occur even when identity is known. HTTP 429 indicates too many requests and can include a Retry-After header. HTTP 503 indicates that a service is temporarily unavailable. Clients should distinguish these cases rather than report every failure as an invalid password."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "readiness",
+          "text": "Readiness checks whether useful traffic can be served with required dependencies."
+        },
+        {
+          "id": "rate",
+          "text": "HTTP 429 means too many requests and may include Retry-After."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa08",
+        "content_sha256": "4f42b57dcf550c9be3fd562a2eaa3cbc48efe1c2429cb812925d723b2fe1f7c5",
+        "reviewer": "",
+        "review_context_sha256": "74e85339a5e16be7f47b42036f8b80545e4d865184a78f9e72d09a38de6a9f8d",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa09",
+      "question": "What are PMP-104's approved pressure limit and inspection interval?",
+      "response": {
+        "answer": "PMP\u2011104 has an approved maximum operating pressure of **11.0\u202fbar** and must be inspected every **60\u202fdays**.  \n\n- **Pressure limit:** 11.0\u202fbar \u2013 stop operation if exceeded.\u202f[Source\u202f1]  \n- **Inspection interval:** 60\u202fdays \u2013 inspect pump housing, seals, and connections.\u202f[Source\u202f2]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 1,
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 2,
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [
+        {
+          "id": "pressure",
+          "text": "The approved maximum pressure is 11.0 bar."
+        },
+        {
+          "id": "interval",
+          "text": "The required inspection interval is 60 days."
+        }
+      ],
+      "expected_refusal": false,
+      "review": {
+        "id": "qa09",
+        "content_sha256": "ebf4c228ec798d59fa6c81888b84ea36213689a3d06d16b1aa26247654e20a8e",
+        "reviewer": "",
+        "review_context_sha256": "59034341ff3cbd8206146dec16455e493e07f1a5222eb4099baf3b34498539b6",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa10",
+      "question": "Who manufactured PMP-104?",
+      "response": {
+        "answer": "I could not find enough reliable course content to answer this confidently.",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 1,
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 2,
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [],
+      "expected_refusal": true,
+      "review": {
+        "id": "qa10",
+        "content_sha256": "f8b8dbec7f2884dc81bc8d43c0c3dfb3b116c65e7aa3ce4e54b472afa03d04b3",
+        "reviewer": "",
+        "review_context_sha256": "ccad6be4b697177231c9aea0b859fc0a9352e3cc64e0658c12a869998063de1f",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa11",
+      "question": "What is PMP-105's factory serial number?",
+      "response": {
+        "answer": "I could not find enough reliable course content to answer this confidently.",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-equipment-PMP-105.pdf",
+            "document_name": "equipment-PMP-105.pdf",
+            "page_number": 1,
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-105. The approved maximum operating pressure is 16.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-equipment-PMP-105.pdf",
+            "document_name": "equipment-PMP-105.pdf",
+            "page_number": 2,
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-105. The required inspection interval is 90 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [],
+      "expected_refusal": true,
+      "review": {
+        "id": "qa11",
+        "content_sha256": "a17b4acd9ffa4d177a46a733f95c48f6e9118c8f5694eb880ea6b3ec14592ac5",
+        "reviewer": "",
+        "review_context_sha256": "67610ea742aaddf2d31986124c864a2f2803257860d3abb9f61aa31ae8393a5f",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    },
+    {
+      "id": "qa12",
+      "question": "How many moons does Jupiter currently have?",
+      "response": {
+        "answer": "I could not find enough reliable course content to answer this confidently.",
+        "sources": [],
+        "generation_metadata": {
+          "provider_used": "not_attempted",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "expected_claims": [],
+      "expected_refusal": true,
+      "review": {
+        "id": "qa12",
+        "content_sha256": "a65c759fb8e85e2ae0e07a4e89b6ca58a91e85a0e86c974115cbcdfa268f32a3",
+        "reviewer": "",
+        "review_context_sha256": "decd0f2d5173eae98ca7b52432883d61e3ad87f475410e7cbe42cb86fd9fc9bc",
+        "all_claims_reviewed": false,
+        "claims": [],
+        "expected_claims_covered": [],
+        "refusal_correct": null
+      }
+    }
+  ],
+  "graph_edges": [
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 0,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "HTTP Request",
+      "target": "HTTP",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+        },
+        {
+          "page_number": 2,
+          "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+        },
+        {
+          "page_number": 3,
+          "text": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 1,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "HTTP Response",
+      "target": "HTTP",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+        },
+        {
+          "page_number": 2,
+          "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+        },
+        {
+          "page_number": 3,
+          "text": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 2,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "HTTP",
+      "target": "TLS",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+        },
+        {
+          "page_number": 2,
+          "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+        },
+        {
+          "page_number": 3,
+          "text": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 3,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "TLS",
+      "target": "HTTPS",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+        },
+        {
+          "page_number": 2,
+          "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+        },
+        {
+          "page_number": 3,
+          "text": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 4,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "Certificate",
+      "target": "TLS",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+        },
+        {
+          "page_number": 2,
+          "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+        },
+        {
+          "page_number": 3,
+          "text": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 5,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "HTTP",
+      "target": "HTTPS",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+        },
+        {
+          "page_number": 2,
+          "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+        },
+        {
+          "page_number": 3,
+          "text": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 6,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "DNS Lookup",
+      "target": "DNS",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "DNS resolves domain names to records such as IP addresses. A resolver can reuse a cached answer until its time to live expires. A DNS lookup does not prove that an application is healthy. After locating a server, the browser still needs a successful connection and an HTTP response. DNS caching and HTTP caching operate at different layers: one reuses name resolution results, the other reuses application responses."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 7,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "DNS Caching",
+      "target": "DNS",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "DNS resolves domain names to records such as IP addresses. A resolver can reuse a cached answer until its time to live expires. A DNS lookup does not prove that an application is healthy. After locating a server, the browser still needs a successful connection and an HTTP response. DNS caching and HTTP caching operate at different layers: one reuses name resolution results, the other reuses application responses."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 8,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "DNS Caching",
+      "target": "HTTP Caching",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "DNS resolves domain names to records such as IP addresses. A resolver can reuse a cached answer until its time to live expires. A DNS lookup does not prove that an application is healthy. After locating a server, the browser still needs a successful connection and an HTTP response. DNS caching and HTTP caching operate at different layers: one reuses name resolution results, the other reuses application responses."
+        },
+        {
+          "page_number": 5,
+          "text": "HTTP caching reuses a stored response when its freshness rules permit. Cache-Control can specify private responses or prohibit storage with no-store. An ETag is a validator that can support conditional requests and avoid downloading an unchanged representation. Never assume a shared cache may safely store a personalized response. This response cache differs from a database index, which accelerates locating rows without storing an HTTP response."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 9,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "Cache-Control",
+      "target": "HTTP Caching",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "DNS resolves domain names to records such as IP addresses. A resolver can reuse a cached answer until its time to live expires. A DNS lookup does not prove that an application is healthy. After locating a server, the browser still needs a successful connection and an HTTP response. DNS caching and HTTP caching operate at different layers: one reuses name resolution results, the other reuses application responses."
+        },
+        {
+          "page_number": 5,
+          "text": "HTTP caching reuses a stored response when its freshness rules permit. Cache-Control can specify private responses or prohibit storage with no-store. An ETag is a validator that can support conditional requests and avoid downloading an unchanged representation. Never assume a shared cache may safely store a personalized response. This response cache differs from a database index, which accelerates locating rows without storing an HTTP response."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 10,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "ETag",
+      "target": "Conditional Requests",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 5,
+          "text": "HTTP caching reuses a stored response when its freshness rules permit. Cache-Control can specify private responses or prohibit storage with no-store. An ETag is a validator that can support conditional requests and avoid downloading an unchanged representation. Never assume a shared cache may safely store a personalized response. This response cache differs from a database index, which accelerates locating rows without storing an HTTP response."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 11,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "Shared Cache",
+      "target": "HTTP Caching",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "DNS resolves domain names to records such as IP addresses. A resolver can reuse a cached answer until its time to live expires. A DNS lookup does not prove that an application is healthy. After locating a server, the browser still needs a successful connection and an HTTP response. DNS caching and HTTP caching operate at different layers: one reuses name resolution results, the other reuses application responses."
+        },
+        {
+          "page_number": 5,
+          "text": "HTTP caching reuses a stored response when its freshness rules permit. Cache-Control can specify private responses or prohibit storage with no-store. An ETag is a validator that can support conditional requests and avoid downloading an unchanged representation. Never assume a shared cache may safely store a personalized response. This response cache differs from a database index, which accelerates locating rows without storing an HTTP response."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 12,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "Database Index",
+      "target": "HTTP Caching",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "DNS resolves domain names to records such as IP addresses. A resolver can reuse a cached answer until its time to live expires. A DNS lookup does not prove that an application is healthy. After locating a server, the browser still needs a successful connection and an HTTP response. DNS caching and HTTP caching operate at different layers: one reuses name resolution results, the other reuses application responses."
+        },
+        {
+          "page_number": 5,
+          "text": "HTTP caching reuses a stored response when its freshness rules permit. Cache-Control can specify private responses or prohibit storage with no-store. An ETag is a validator that can support conditional requests and avoid downloading an unchanged representation. Never assume a shared cache may safely store a personalized response. This response cache differs from a database index, which accelerates locating rows without storing an HTTP response."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 13,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "Authentication",
+      "target": "HTTP 401",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 6,
+          "text": "An HTTP 401 response means authentication is required or the supplied credentials are not accepted. An HTTP 403 response means the request is forbidden; it can occur even when identity is known. HTTP 429 indicates too many requests and can include a Retry-After header. HTTP 503 indicates that a service is temporarily unavailable. Clients should distinguish these cases rather than report every failure as an invalid password."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "web-foundations.pdf",
+      "edge_index": 14,
+      "snapshot_sha256": "5a697484ab7586d1a42e76afa99c6b64da8d68783bb10f8f8371bf93ce608cae",
+      "source": "HTTP",
+      "target": "HTTPS",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+        },
+        {
+          "page_number": 2,
+          "text": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+        },
+        {
+          "page_number": 3,
+          "text": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 0,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Authentication",
+      "target": "Authorization",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+        },
+        {
+          "page_number": 2,
+          "text": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+        },
+        {
+          "page_number": 3,
+          "text": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 1,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Authorization",
+      "target": "Document Access Control",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+        },
+        {
+          "page_number": 2,
+          "text": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+        },
+        {
+          "page_number": 3,
+          "text": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 2,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Document Access Control",
+      "target": "Vector Searches",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+        },
+        {
+          "page_number": 2,
+          "text": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+        },
+        {
+          "page_number": 3,
+          "text": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 3,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Document Access Control",
+      "target": "Graph Traversals",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+        },
+        {
+          "page_number": 2,
+          "text": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+        },
+        {
+          "page_number": 3,
+          "text": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 4,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "HttpOnly",
+      "target": "Signed Session Cookie",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "A signed session cookie lets a server detect tampering and verify an expiry time. HttpOnly prevents page JavaScript from reading the cookie; Secure restricts transmission to HTTPS. A signature provides integrity, not secrecy, so session contents must not include secrets that require encryption. A stateless signed cookie does not by itself create per-user document ownership or provide instant revocation without additional state."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 5,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Secure",
+      "target": "Signed Session Cookie",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "A signed session cookie lets a server detect tampering and verify an expiry time. HttpOnly prevents page JavaScript from reading the cookie; Secure restricts transmission to HTTPS. A signature provides integrity, not secrecy, so session contents must not include secrets that require encryption. A stateless signed cookie does not by itself create per-user document ownership or provide instant revocation without additional state."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 6,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Signature",
+      "target": "Signed Session Cookie",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "A signed session cookie lets a server detect tampering and verify an expiry time. HttpOnly prevents page JavaScript from reading the cookie; Secure restricts transmission to HTTPS. A signature provides integrity, not secrecy, so session contents must not include secrets that require encryption. A stateless signed cookie does not by itself create per-user document ownership or provide instant revocation without additional state."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 7,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Stateless Signed Cookie",
+      "target": "Signed Session Cookie",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "A signed session cookie lets a server detect tampering and verify an expiry time. HttpOnly prevents page JavaScript from reading the cookie; Secure restricts transmission to HTTPS. A signature provides integrity, not secrecy, so session contents must not include secrets that require encryption. A stateless signed cookie does not by itself create per-user document ownership or provide instant revocation without additional state."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 8,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Deceptive Messages",
+      "target": "Phishing",
+      "relation_type": "PART_OF",
+      "candidate_pages": [
+        {
+          "page_number": 5,
+          "text": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 9,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Phishing",
+      "target": "Credential Disclosure",
+      "relation_type": "CAUSES",
+      "candidate_pages": [
+        {
+          "page_number": 5,
+          "text": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 10,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "HTTPS",
+      "target": "Transport Protection",
+      "relation_type": "EXPLAINS",
+      "candidate_pages": [
+        {
+          "page_number": 3,
+          "text": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks."
+        },
+        {
+          "page_number": 5,
+          "text": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 11,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "HTTPS",
+      "target": "Phishing",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 3,
+          "text": "Document access control enforces ownership or sharing rules on every operation involving a document. Its direct prerequisite is authorization; authentication is the foundational prerequisite before authorization. Protect vector searches and graph traversals with the same document scope used for PDF previews. Guessing an upload identifier must never grant access. HTTPS protects transport, but it cannot replace these resource permission checks."
+        },
+        {
+          "page_number": 5,
+          "text": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 12,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Rate Limits",
+      "target": "Expensive AI Operations",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 6,
+          "text": "Rate limits bound the number of requests a caller may make in a time window. Expensive AI operations can have a smaller budget than read-only metadata requests. HTTP 429 can tell a client to slow down. Rate limits control consumption but do not establish identity or document ownership. A shared reviewer code often maps all reviewers to one shared request budget and shared workspace."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 13,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Rate Limits",
+      "target": "HTTP 429",
+      "relation_type": "CAUSES",
+      "candidate_pages": [
+        {
+          "page_number": 6,
+          "text": "Rate limits bound the number of requests a caller may make in a time window. Expensive AI operations can have a smaller budget than read-only metadata requests. HTTP 429 can tell a client to slow down. Rate limits control consumption but do not establish identity or document ownership. A shared reviewer code often maps all reviewers to one shared request budget and shared workspace."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "identity-security.pdf",
+      "edge_index": 14,
+      "snapshot_sha256": "fc5550064bc44488479d3983201fe64dec2511e7c98119b8b8001410a9a37ddf",
+      "source": "Shared Reviewer Code",
+      "target": "Rate Limits",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 6,
+          "text": "Rate limits bound the number of requests a caller may make in a time window. Expensive AI operations can have a smaller budget than read-only metadata requests. HTTP 429 can tell a client to slow down. Rate limits control consumption but do not establish identity or document ownership. A shared reviewer code often maps all reviewers to one shared request budget and shared workspace."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 0,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Database Transaction",
+      "target": "Idempotency",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+        },
+        {
+          "page_number": 2,
+          "text": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+        },
+        {
+          "page_number": 3,
+          "text": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 1,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Idempotency",
+      "target": "Safe Retries",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+        },
+        {
+          "page_number": 2,
+          "text": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+        },
+        {
+          "page_number": 3,
+          "text": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 2,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Deterministic Chunk Identifiers",
+      "target": "Idempotency",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+        },
+        {
+          "page_number": 2,
+          "text": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+        },
+        {
+          "page_number": 3,
+          "text": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 3,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Upserts",
+      "target": "Idempotency",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+        },
+        {
+          "page_number": 2,
+          "text": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+        },
+        {
+          "page_number": 3,
+          "text": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 4,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Transactions",
+      "target": "Idempotency",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+        },
+        {
+          "page_number": 2,
+          "text": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+        },
+        {
+          "page_number": 3,
+          "text": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 5,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Deterministic Identifiers",
+      "target": "Safe Retries",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 1,
+          "text": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+        },
+        {
+          "page_number": 2,
+          "text": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+        },
+        {
+          "page_number": 3,
+          "text": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 6,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Compensating Cleanup",
+      "target": "Partial Derived Artifacts",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "Compensating cleanup removes partial derived artifacts after a workflow fails across services. A PostgreSQL rollback cannot erase points already written to Qdrant. Delete by the exact upload identifier and preserve authoritative metadata until cleanup can be retried. Cleanup is not a distributed atomic transaction: it can also fail, so record the failure and keep operations idempotent."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 7,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Workflow Failure",
+      "target": "Partial Derived Artifacts",
+      "relation_type": "CAUSES",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "Compensating cleanup removes partial derived artifacts after a workflow fails across services. A PostgreSQL rollback cannot erase points already written to Qdrant. Delete by the exact upload identifier and preserve authoritative metadata until cleanup can be retried. Cleanup is not a distributed atomic transaction: it can also fail, so record the failure and keep operations idempotent."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 8,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Compensating Cleanup",
+      "target": "Idempotent Operations",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 4,
+          "text": "Compensating cleanup removes partial derived artifacts after a workflow fails across services. A PostgreSQL rollback cannot erase points already written to Qdrant. Delete by the exact upload identifier and preserve authoritative metadata until cleanup can be retried. Cleanup is not a distributed atomic transaction: it can also fail, so record the failure and keep operations idempotent."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 9,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Numeric Embeddings",
+      "target": "Vector Search",
+      "relation_type": "APPLIES_TO",
+      "candidate_pages": [
+        {
+          "page_number": 5,
+          "text": "Vector search compares numeric embeddings to locate passages with similar meaning. Filter by the allowed upload identifiers before returning results. A similarity score does not prove that a passage supports the answer. Reranking can compare the question and each candidate more carefully; an evidence threshold can reject weak matches. Vector search complements a concept graph, which stores explicit typed relationships such as prerequisites."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 10,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Vector Search",
+      "target": "Similarity Score",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 5,
+          "text": "Vector search compares numeric embeddings to locate passages with similar meaning. Filter by the allowed upload identifiers before returning results. A similarity score does not prove that a passage supports the answer. Reranking can compare the question and each candidate more carefully; an evidence threshold can reject weak matches. Vector search complements a concept graph, which stores explicit typed relationships such as prerequisites."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 11,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Evidence Threshold",
+      "target": "Reranking",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 5,
+          "text": "Vector search compares numeric embeddings to locate passages with similar meaning. Filter by the allowed upload identifiers before returning results. A similarity score does not prove that a passage supports the answer. Reranking can compare the question and each candidate more carefully; an evidence threshold can reject weak matches. Vector search complements a concept graph, which stores explicit typed relationships such as prerequisites."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 12,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Vector Search",
+      "target": "Concept Graph",
+      "relation_type": "RELATED_TO",
+      "candidate_pages": [
+        {
+          "page_number": 5,
+          "text": "Vector search compares numeric embeddings to locate passages with similar meaning. Filter by the allowed upload identifiers before returning results. A similarity score does not prove that a passage supports the answer. Reranking can compare the question and each candidate more carefully; an evidence threshold can reject weak matches. Vector search complements a concept graph, which stores explicit typed relationships such as prerequisites."
+        },
+        {
+          "page_number": 6,
+          "text": "Readiness decides whether a service can accept useful traffic. Required dependencies such as the authoritative database must work. An optional concept graph may be reported as degraded while vector-based answers continue. A healthy process does not prove that an external AI provider has quota. Readiness and rate-limit failures require different operator responses."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    },
+    {
+      "document_name": "data-reliability.pdf",
+      "edge_index": 13,
+      "snapshot_sha256": "52242dc93d0fc434418f450cda067f1c246629e4b16536f85213010b18f75f64",
+      "source": "Required Dependencies",
+      "target": "Readiness",
+      "relation_type": "PREREQUISITE_OF",
+      "candidate_pages": [
+        {
+          "page_number": 6,
+          "text": "Readiness decides whether a service can accept useful traffic. Required dependencies such as the authoritative database must work. An optional concept graph may be reported as degraded while vector-based answers continue. A healthy process does not prove that an external AI provider has quota. Readiness and rate-limit failures require different operator responses."
+        }
+      ],
+      "supported": null,
+      "direction_correct": null,
+      "supporting_evidence": null,
+      "reviewer": "",
+      "note": "Candidate node pages are not proof of relationship support. Human review pending."
+    }
+  ]
+}

@@ -1,0 +1,531 @@
+{
+  "output_kind": "live_groq_oracle_synthesis_plus_explicit_local_refusal",
+  "provider_requests_attempted": 11,
+  "captures": [
+    {
+      "id": "qa01",
+      "response": {
+        "answer": "HTTP request fields: method, target, headers, and optionally a body.  \nHTTP response fields: status code, headers, and optionally a body. [Source 1]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 1,
+            "supporting_passage": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 1,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:16:02.218494+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 596,
+          "completion_tokens": 189,
+          "total_tokens": 785
+        },
+        "latency_seconds": 0.951,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "999",
+          "x-ratelimit-remaining-tokens": "7199",
+          "x-ratelimit-reset-requests": "1m26.4s",
+          "x-ratelimit-reset-tokens": "6.007s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa02",
+      "response": {
+        "answer": "A browser verifies that the TLS certificate **(1)** matches the hostname the user is trying to reach, and **(2)** chains back to a certificate authority that is trusted by the browser. [Source 1]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 2,
+            "supporting_passage": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 2,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:16:23.173934+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 585,
+          "completion_tokens": 114,
+          "total_tokens": 699
+        },
+        "latency_seconds": 0.516,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "998",
+          "x-ratelimit-remaining-tokens": "7226",
+          "x-ratelimit-reset-requests": "2m52.8s",
+          "x-ratelimit-reset-tokens": "5.805s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa03",
+      "response": {
+        "answer": "To understand HTTPS you should first learn **HTTP**, then learn **TLS**.  \n- HTTP is the foundational prerequisite that is required two steps before HTTPS.  \n- TLS is the next prerequisite that HTTPS builds on.  \n\nThus the learning sequence is: **HTTP → TLS → HTTPS**.  \n[Source 1, p. 1] [Source 2, p. 2] [Source 3, p. 3]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 1,
+            "supporting_passage": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 2,
+            "supporting_passage": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+          },
+          {
+            "source_id": "source-3",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 3,
+            "supporting_passage": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 3,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:16:43.695742+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 777,
+          "completion_tokens": 148,
+          "total_tokens": 925
+        },
+        "latency_seconds": 0.652,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "997",
+          "x-ratelimit-remaining-tokens": "6937",
+          "x-ratelimit-reset-requests": "4m19.2s",
+          "x-ratelimit-reset-tokens": "7.972s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa04",
+      "response": {
+        "answer": "Authentication verifies who the caller is by checking credentials or an existing session, while authorization determines whether that verified identity is allowed to perform a particular action on a resource. Authentication must succeed before authorization can be evaluated, and authorization is the gate that controls access to documents such as PDFs. A successful login alone does not grant permission to every PDF in an application. [Source 1] [Source 2]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 1,
+            "supporting_passage": "Authentication establishes the identity of a caller using credentials or an existing session. Authorization decides whether that identity may perform a specific action on a resource. In this course authentication is a prerequisite for authorization, and authorization is a prerequisite for document access control. A successful login alone does not grant permission to every PDF in an application."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 2,
+            "supporting_passage": "Authorization evaluates whether a caller may perform an action on a resource. For a private PDF, compare the verified caller identity with the document owner or an explicit sharing rule. Authentication is a prerequisite for authorization. Authorization is a prerequisite for document access control. These checks belong on the server and must cover previews, retrieval, downloads, deletion, and graph queries, even if the interface hides buttons."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 4,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:17:04.355961+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 664,
+          "completion_tokens": 368,
+          "total_tokens": 1032
+        },
+        "latency_seconds": 0.873,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "996",
+          "x-ratelimit-remaining-tokens": "7147",
+          "x-ratelimit-reset-requests": "5m45.6s",
+          "x-ratelimit-reset-tokens": "6.397s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa05",
+      "response": {
+        "answer": "HTTPS does not prove that a website is honest, nor does it prevent phishing. The encryption and integrity guarantees of TLS only protect the communication channel; they do not verify the identity or intentions of the site’s operator or guard against deceptive content. [[Source 1]] [[Source 2]]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 3,
+            "supporting_passage": "HTTPS carries HTTP messages over TLS. To understand HTTPS, study TLS first and HTTP before TLS. This makes HTTP a foundational prerequisite two steps before HTTPS. HTTPS protects traffic between browser and server against passive reading and modification in transit. It does not repair application authorization bugs, prevent a malicious server from storing data, or guarantee that a website is honest."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 5,
+            "supporting_passage": "Phishing uses deceptive messages or websites to persuade a person to disclose credentials or perform an unsafe action. A message may manufacture urgency to discourage checking the sender. Verify unexpected requests through a separate trusted channel. HTTPS can encrypt a phishing website's traffic, so a secure connection is not proof that the operator is trustworthy. This lesson distinguishes transport protection from human deception."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 5,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:17:25.234915+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 669,
+          "completion_tokens": 225,
+          "total_tokens": 894
+        },
+        "latency_seconds": 0.577,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "995",
+          "x-ratelimit-remaining-tokens": "6963",
+          "x-ratelimit-reset-requests": "7m12s",
+          "x-ratelimit-reset-tokens": "7.777s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa06",
+      "response": {
+        "answer": "Ingestion retries need idempotency so that if a transient failure occurs, the system can safely repeat the ingestion operation without creating duplicate data or unintended side‑effects. Idempotency guarantees that performing the operation multiple times has the same intended effect as performing it once, usually through deterministic chunk identifiers and upsert logic. Without it, a retry could add duplicate vectors or otherwise corrupt the state. Idempotency is a prerequisite for safe retries, and both depend on transactional guarantees to ensure partial successes are handled correctly.【Source 1】【Source 2】",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 2,
+            "supporting_passage": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 3,
+            "supporting_passage": "Safe retries repeat a transiently failed operation under a bounded attempt budget. Their direct prerequisite is idempotency, whose prerequisite is transactions. Use a delay or backoff when a provider is busy and stop retrying permanent input errors. If an earlier write may already have succeeded, deterministic identifiers help make the next attempt safe. Blindly repeating a non-idempotent action can duplicate data or effects."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 6,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:17:45.816898+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 686,
+          "completion_tokens": 204,
+          "total_tokens": 890
+        },
+        "latency_seconds": 0.704,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "994",
+          "x-ratelimit-remaining-tokens": "6957",
+          "x-ratelimit-reset-requests": "8m38.4s",
+          "x-ratelimit-reset-tokens": "7.822s"
+        },
+        "answer_contract_error": "The provider returned an answer without source citations."
+      }
+    },
+    {
+      "id": "qa07",
+      "response": {
+        "answer": "Because a PostgreSQL transaction only protects changes made inside PostgreSQL itself, it does not extend to writes that are sent to an external vector store such as Qdrant. When a workflow writes vectors to Qdrant, those writes occur outside the database transaction, so a rollback in PostgreSQL cannot undo them. Instead, the system must perform a compensating cleanup—deleting the Qdrant points by the exact upload identifier—while preserving authoritative metadata until cleanup can be retried, ensuring idempotency and safe retries. [Source 1] [Source 2]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 1,
+            "supporting_passage": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 4,
+            "supporting_passage": "Compensating cleanup removes partial derived artifacts after a workflow fails across services. A PostgreSQL rollback cannot erase points already written to Qdrant. Delete by the exact upload identifier and preserve authoritative metadata until cleanup can be retried. Cleanup is not a distributed atomic transaction: it can also fail, so record the failure and keep operations idempotent."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 7,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:18:06.527247+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 675,
+          "completion_tokens": 322,
+          "total_tokens": 997
+        },
+        "latency_seconds": 0.522,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "993",
+          "x-ratelimit-remaining-tokens": "7177",
+          "x-ratelimit-reset-requests": "10m4.8s",
+          "x-ratelimit-reset-tokens": "6.172s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa08",
+      "response": {
+        "answer": "Service readiness is a system‑level status that tells operators whether the service’s internal dependencies (such as databases or quota checks) are functioning and the service is ready to receive traffic. A readiness failure is an infrastructure or configuration issue that usually requires operator intervention.  \nHTTP 429, on the other hand, is a response code returned by the service to a client that has exceeded a rate limit; it is a runtime indication of too many requests in the current window and can include a Retry‑After header. It is a client‑side signal that the request should be retried later rather than a sign that the service is misconfigured or down.  \n\nThus, readiness reflects the service’s overall health and ability to accept traffic, whereas HTTP 429 reflects a temporary, client‑initiated rate‑limiting condition.  \n[Source 1] [Source 2]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 6,
+            "supporting_passage": "Readiness decides whether a service can accept useful traffic. Required dependencies such as the authoritative database must work. An optional concept graph may be reported as degraded while vector-based answers continue. A healthy process does not prove that an external AI provider has quota. Readiness and rate-limit failures require different operator responses."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 6,
+            "supporting_passage": "An HTTP 401 response means authentication is required or the supplied credentials are not accepted. An HTTP 403 response means the request is forbidden; it can occur even when identity is known. HTTP 429 indicates too many requests and can include a Retry-After header. HTTP 503 indicates that a service is temporarily unavailable. Clients should distinguish these cases rather than report every failure as an invalid password."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 8,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:18:27.055549+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 670,
+          "completion_tokens": 327,
+          "total_tokens": 997
+        },
+        "latency_seconds": 0.794,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "992",
+          "x-ratelimit-remaining-tokens": "6962",
+          "x-ratelimit-reset-requests": "11m31.2s",
+          "x-ratelimit-reset-tokens": "7.785s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa09",
+      "response": {
+        "answer": "PMP‑104 has an approved maximum operating pressure of **11.0 bar** and must be inspected every **60 days**.  \n\n- **Pressure limit:** 11.0 bar – stop operation if exceeded. [Source 1]  \n- **Inspection interval:** 60 days – inspect pump housing, seals, and connections. [Source 2]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 1,
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 2,
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 9,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:18:47.857579+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 645,
+          "completion_tokens": 143,
+          "total_tokens": 788
+        },
+        "latency_seconds": 0.671,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "991",
+          "x-ratelimit-remaining-tokens": "6987",
+          "x-ratelimit-reset-requests": "12m57.599s",
+          "x-ratelimit-reset-tokens": "7.597s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa10",
+      "response": {
+        "answer": "I could not find enough reliable course content to answer this confidently.",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 1,
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-104. The approved maximum operating pressure is 11.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-equipment-PMP-104.pdf",
+            "document_name": "equipment-PMP-104.pdf",
+            "page_number": 2,
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-104. The required inspection interval is 60 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 10,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:19:08.534373+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 638,
+          "completion_tokens": 121,
+          "total_tokens": 759
+        },
+        "latency_seconds": 0.49,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "990",
+          "x-ratelimit-remaining-tokens": "7158",
+          "x-ratelimit-reset-requests": "14m24s",
+          "x-ratelimit-reset-tokens": "6.314s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa11",
+      "response": {
+        "answer": "I could not find enough reliable course content to answer this confidently.",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-equipment-PMP-105.pdf",
+            "document_name": "equipment-PMP-105.pdf",
+            "page_number": 1,
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-105. The approved maximum operating pressure is 16.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-equipment-PMP-105.pdf",
+            "document_name": "equipment-PMP-105.pdf",
+            "page_number": 2,
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-105. The required inspection interval is 90 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "known_comparison",
+        "attempt": 11,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:19:29.030512+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 642,
+          "completion_tokens": 67,
+          "total_tokens": 709
+        },
+        "latency_seconds": 0.497,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "989",
+          "x-ratelimit-remaining-tokens": "7154",
+          "x-ratelimit-reset-requests": "15m50.4s",
+          "x-ratelimit-reset-tokens": "6.345s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "qa12",
+      "response": {
+        "answer": "I could not find enough reliable course content to answer this confidently.",
+        "sources": [],
+        "generation_metadata": {
+          "provider_used": "not_attempted",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "status": "local_no_source_refusal_no_hosted_call"
+      }
+    }
+  ]
+}

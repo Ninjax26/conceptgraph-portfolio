@@ -1,0 +1,340 @@
+{
+  "output_kind": "live_groq_oracle_synthesis_fresh_candidate",
+  "provider_requests_attempted": 8,
+  "captures": [
+    {
+      "id": "sfh01",
+      "response": {
+        "answer": "A signed session cookie only guarantees **integrity**, not secrecy, and it cannot revoke a user’s access instantly on its own.  \n- The signature lets the server detect tampering and enforce an expiry, but it does **not** encrypt the cookie’s contents; therefore any secret data must be stored elsewhere or encrypted separately.  \n- Because the cookie is stateless, the server has no built‑in way to invalidate it immediately; revocation would require additional server‑side state or a different mechanism.  \n\n[Source 1]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 4,
+            "supporting_passage": "A signed session cookie lets a server detect tampering and verify an expiry time. HttpOnly prevents page JavaScript from reading the cookie; Secure restricts transmission to HTTPS. A signature provides integrity, not secrecy, so session contents must not include secrets that require encryption. A stateless signed cookie does not by itself create per-user document ownership or provide instant revocation without additional state."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 12,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:19:49.533783+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 595,
+          "completion_tokens": 441,
+          "total_tokens": 1036
+        },
+        "latency_seconds": 1.209,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "988",
+          "x-ratelimit-remaining-tokens": "7083",
+          "x-ratelimit-reset-requests": "17m16.8s",
+          "x-ratelimit-reset-tokens": "6.877s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "sfh02",
+      "response": {
+        "answer": "No—rate‑limiting a client’s requests does not create or confirm an identity or grant ownership of private documents. Rate limits are a consumption‑control mechanism; they restrict how many requests can be made in a given period and can be applied to all users sharing a common budget or workspace, but they do not tie a request to a specific user or document ownership. In contrast, identity and ownership controls involve authentication, authorization, or ownership metadata that explicitly identify a user or entity and grant or revoke access to a particular document. \n\n[Source 1]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-identity-security.pdf",
+            "document_name": "identity-security.pdf",
+            "page_number": 6,
+            "supporting_passage": "Rate limits bound the number of requests a caller may make in a time window. Expensive AI operations can have a smaller budget than read-only metadata requests. HTTP 429 can tell a client to slow down. Rate limits control consumption but do not establish identity or document ownership. A shared reviewer code often maps all reviewers to one shared request budget and shared workspace."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 13,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:20:10.751014+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 590,
+          "completion_tokens": 288,
+          "total_tokens": 878
+        },
+        "latency_seconds": 0.524,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "987",
+          "x-ratelimit-remaining-tokens": "7042",
+          "x-ratelimit-reset-requests": "18m43.2s",
+          "x-ratelimit-reset-tokens": "7.185s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "sfh03",
+      "response": {
+        "answer": "Vector similarity only shows that a passage is semantically close to the question; it does not prove that the passage actually supports the answer. Therefore the same answer still requires further vetting—filtering the results by the allowed upload identifiers, reranking the candidates against the question, applying an evidence‑threshold to discard weak matches, and using the concept graph for explicit, typed relationships such as prerequisites. [Source 1]",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 5,
+            "supporting_passage": "Vector search compares numeric embeddings to locate passages with similar meaning. Filter by the allowed upload identifiers before returning results. A similarity score does not prove that a passage supports the answer. Reranking can compare the question and each candidate more carefully; an evidence threshold can reject weak matches. Vector search complements a concept graph, which stores explicit typed relationships such as prerequisites."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 14,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:20:31.282396+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 590,
+          "completion_tokens": 451,
+          "total_tokens": 1041
+        },
+        "latency_seconds": 0.854,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "986",
+          "x-ratelimit-remaining-tokens": "6969",
+          "x-ratelimit-reset-requests": "20m9.6s",
+          "x-ratelimit-reset-tokens": "7.732s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "sfh04",
+      "response": {
+        "answer": "In this course the first prerequisite for learning idempotency is a solid understanding of **database transactions**. Both excerpts state that “transactions are a prerequisite for idempotency” [Source 1] and that “transactions are a prerequisite for studying idempotency in this workflow” [Source 2].\n\nThe passage does **not** claim that every idempotent implementation must use a SQL transaction. It only indicates that transactions provide the foundation for studying idempotency, and it notes that a SQL transaction does not automatically roll back writes to external systems such as vector databases or object stores [Source 1].",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 1,
+            "supporting_passage": "A database transaction groups related changes into a unit that commits or rolls back. For a document workflow, authoritative metadata can record which processing stage completed. A SQL transaction does not automatically roll back writes made to an external vector database or object store. In this course transactions are a prerequisite for idempotency, and idempotency is a prerequisite for safe retries."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-data-reliability.pdf",
+            "document_name": "data-reliability.pdf",
+            "page_number": 2,
+            "supporting_passage": "Idempotency means repeating an operation has the same intended effect as performing it once. Deterministic chunk identifiers and upserts can prevent a repeated ingestion attempt from creating duplicate vectors. Transactions are a prerequisite for studying idempotency in this workflow, and idempotency is a prerequisite for safe retries. Idempotency does not mean every attempt succeeds; the operation must still report failures."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 15,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:20:52.143183+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 697,
+          "completion_tokens": 345,
+          "total_tokens": 1042
+        },
+        "latency_seconds": 0.634,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "985",
+          "x-ratelimit-remaining-tokens": "6852",
+          "x-ratelimit-reset-requests": "21m36s",
+          "x-ratelimit-reset-tokens": "8.61s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "sfh05",
+      "response": {
+        "answer": "An HTTP 429 response can include a **Retry-After** header that tells the client how long to wait before retrying [Source 1].  \nThe passage does **not** guarantee that a subsequent attempt will succeed; it only indicates that the client should wait before retrying [Source 1].",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 6,
+            "supporting_passage": "An HTTP 401 response means authentication is required or the supplied credentials are not accepted. An HTTP 403 response means the request is forbidden; it can occur even when identity is known. HTTP 429 indicates too many requests and can include a Retry-After header. HTTP 503 indicates that a service is temporarily unavailable. Clients should distinguish these cases rather than report every failure as an invalid password."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 16,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:21:12.785515+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 598,
+          "completion_tokens": 160,
+          "total_tokens": 758
+        },
+        "latency_seconds": 0.366,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "984",
+          "x-ratelimit-remaining-tokens": "6951",
+          "x-ratelimit-reset-requests": "23m2.4s",
+          "x-ratelimit-reset-tokens": "7.867s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "sfh06",
+      "response": {
+        "answer": "I could not find enough reliable course content to answer this confidently.",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 2,
+            "supporting_passage": "TLS protects data in transit using encryption and integrity checks. A certificate helps the client authenticate the server during the handshake. A browser checks that the certificate matches the requested hostname and chains to a trusted authority. TLS does not decide whether a signed-in user can read a particular document. HTTP is a prerequisite for studying TLS in this web course; TLS is a prerequisite for HTTPS."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 17,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:22:01.536716+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 586,
+          "completion_tokens": 231,
+          "total_tokens": 817
+        },
+        "latency_seconds": 0.726,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "983",
+          "x-ratelimit-remaining-tokens": "7046",
+          "x-ratelimit-reset-requests": "24m28.8s",
+          "x-ratelimit-reset-tokens": "7.154s"
+        },
+        "answer_contract_error": null
+      }
+    },
+    {
+      "id": "sfh07",
+      "response": {
+        "answer": "The page lists the following components that make up an HTTP request: method, target, headers, and, when present, a body【Source 1】. It does not provide any specific HTTP header names.",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-web-foundations.pdf",
+            "document_name": "web-foundations.pdf",
+            "page_number": 1,
+            "supporting_passage": "HTTP defines requests and responses between a client and a server. A request contains a method, target, headers, and sometimes a body. A response contains a status code, headers, and optionally a body. HTTP itself does not encrypt the message. In this course, HTTP is a prerequisite for understanding TLS in web communication, and TLS is a prerequisite for understanding HTTPS. Learn this sequence: HTTP, then TLS, then HTTPS."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 18,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:22:22.274037+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 603,
+          "completion_tokens": 136,
+          "total_tokens": 739
+        },
+        "latency_seconds": 0.561,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "982",
+          "x-ratelimit-remaining-tokens": "6946",
+          "x-ratelimit-reset-requests": "25m55.199s",
+          "x-ratelimit-reset-tokens": "7.905s"
+        },
+        "answer_contract_error": "The provider returned an answer without source citations."
+      }
+    },
+    {
+      "id": "sfh08",
+      "response": {
+        "answer": "The approved maximum operating pressure for PMP‑106 is **8.0 bar**【Source 1】, and the required inspection interval for this equipment is **7 days**【Source 2】.",
+        "sources": [
+          {
+            "source_id": "source-1",
+            "document_id": "quality-equipment-PMP-106.pdf",
+            "document_name": "equipment-PMP-106.pdf",
+            "page_number": 1,
+            "supporting_passage": "OPERATING SPECIFICATION Equipment identifier PMP-106. The approved maximum operating pressure is 8.0 bar. Record pressure in bar. Stop operation if the measured pressure exceeds this limit. Use the specification for this exact equipment identifier; limits for other equipment do not apply."
+          },
+          {
+            "source_id": "source-2",
+            "document_id": "quality-equipment-PMP-106.pdf",
+            "document_name": "equipment-PMP-106.pdf",
+            "page_number": 2,
+            "supporting_passage": "INSPECTION PROCEDURE Equipment identifier PMP-106. The required inspection interval is 7 days. Inspect the pump housing, seals and connections. Record the date, observations and equipment identifier. Use the inspection interval for this exact equipment; another identifier can have a different interval."
+          }
+        ],
+        "generation_metadata": {
+          "provider_used": "groq",
+          "failover_used": false,
+          "failover_reason": null
+        }
+      },
+      "capture_metadata": {
+        "group": "fresh_candidate_only",
+        "attempt": 19,
+        "status": "completed",
+        "started_utc": "2026-11-15T10:22:42.843763+00:00",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 650,
+          "completion_tokens": 240,
+          "total_tokens": 890
+        },
+        "latency_seconds": 0.697,
+        "rate_limit_headers": {
+          "x-ratelimit-remaining-requests": "981",
+          "x-ratelimit-remaining-tokens": "6899",
+          "x-ratelimit-reset-requests": "27m21.6s",
+          "x-ratelimit-reset-tokens": "8.257s"
+        },
+        "answer_contract_error": "The provider returned an answer without source citations."
+      }
+    }
+  ]
+}
