@@ -4,11 +4,29 @@ from typing import Any
 
 
 REFUSAL_TEXT = "I could not find enough reliable course content to answer this confidently."
-_REFERENCE = re.compile(r"\[\s*Source\b[^\]\n]*(?:\]|(?=\n|$))", re.I)
+_REFERENCE = re.compile(r"\[\s*Source\b[^\]\n]*(?:\]|(?=\n|$))|【\s*Source\b[^】\n]*(?:】|(?=\n|$))", re.I)
 _LABEL = re.compile(r"\[Source\s+([0-9]{1,9})(?:,\s*p\.\s*([0-9]{1,9}))?\]", re.I)
+
+_TYPOGRAPHIC_LABEL = re.compile(r"【Source[^】\n]*】", re.I)
+
+
+def normalize_citation_labels(answer: str) -> str:
+    """Canonicalize complete typographic labels, preserving prose and escapes."""
+    def replace(token):
+        prefix = answer[:token.start()]
+        if (len(prefix) - len(prefix.rstrip('\\'))) % 2:
+            return token.group()
+        label = '[' + token.group()[1:-1] + ']'
+        match = _LABEL.fullmatch(label)
+        if match is None:
+            return token.group()
+        page = f", p. {match[2]}" if match[2] else ""
+        return f"[Source {match[1]}{page}]"
+    return _TYPOGRAPHIC_LABEL.sub(replace, answer)
 
 
 def citation_references(answer: str, sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    answer = normalize_citation_labels(answer)
     refs = []
     for token in _REFERENCE.finditer(answer):
         # Escaped labels in quoted evidence are literal source text. An even
@@ -43,6 +61,7 @@ def answer_contract_error(answer: str, question: str, sources: list[dict[str, An
         return None
     if " ".join(answer.split()).casefold() == REFUSAL_TEXT.casefold():
         return None
+    answer = normalize_citation_labels(answer)
     refs = citation_references(answer, sources)
     if not refs:
         return "The provider returned an answer without source citations."

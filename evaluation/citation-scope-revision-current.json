@@ -1,0 +1,210 @@
+{
+  "scope": "Offline compatibility replay of consumed outputs, not regenerated answers or semantic accuracy.",
+  "baseline_revision": "17e9171",
+  "captured_answers": 20,
+  "provider_calls": 0,
+  "human_reviews": 0,
+  "semantic_accuracy": null,
+  "before_valid": 17,
+  "after_valid": 20,
+  "hosted_before_valid": 16,
+  "hosted_after_valid": 19,
+  "prompt_character_counts": {
+    "known_comparison": {
+      "before": 33690,
+      "after": 39553,
+      "difference": 5863
+    },
+    "fresh_candidate_only": {
+      "before": 22703,
+      "after": 26598,
+      "difference": 3895
+    }
+  },
+  "cases": [
+    {
+      "id": "qa01",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 2
+    },
+    {
+      "id": "qa02",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "qa03",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 4
+    },
+    {
+      "id": "qa04",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 2
+    },
+    {
+      "id": "qa05",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "qa06",
+      "hosted": true,
+      "before_error": "The provider returned an answer without source citations.",
+      "after_error": null,
+      "normalization_changes_label_text": true,
+      "literal_highlight_count": 2
+    },
+    {
+      "id": "qa07",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 3
+    },
+    {
+      "id": "qa08",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "qa09",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "qa10",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "qa11",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "qa12",
+      "hosted": false,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 0
+    },
+    {
+      "id": "sfh01",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "sfh02",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "sfh03",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "sfh04",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 4
+    },
+    {
+      "id": "sfh05",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 0
+    },
+    {
+      "id": "sfh06",
+      "hosted": true,
+      "before_error": null,
+      "after_error": null,
+      "normalization_changes_label_text": false,
+      "literal_highlight_count": 1
+    },
+    {
+      "id": "sfh07",
+      "hosted": true,
+      "before_error": "The provider returned an answer without source citations.",
+      "after_error": null,
+      "normalization_changes_label_text": true,
+      "literal_highlight_count": 2
+    },
+    {
+      "id": "sfh08",
+      "hosted": true,
+      "before_error": "The provider returned an answer without source citations.",
+      "after_error": null,
+      "normalization_changes_label_text": true,
+      "literal_highlight_count": 1
+    }
+  ],
+  "source_sha256": {
+    "app/services/answer_contract.py": "945b269b4ab14140ecd8cb3a9d96d1c8e7910f6e9bdabd04c6ec3ccdfd0c5bb1",
+    "app/services/synthesis_service.py": "8c4b00f24aab90c563f705cbc9daf641c6102a43a00e483b92767c44f683a203",
+    "tests/test_citation_scope_revision.py": "3e8f5b9ce8398f780a0b932e6afb5e85b9b69be21a841dee95124924ff16c5f5"
+  },
+  "limits": [
+    "Three label-format failures are mechanically recovered; qa06 unsupported assertions are still semantically wrong.",
+    "All earlier raw captures/reports/datasets are unchanged; heldout is consumed.",
+    "Literal conditions are lexical bounded hints, not full condition extraction or entailment.",
+    "Prompt guidance impact, new token/latency costs and model adherence unmeasured.",
+    "No hosted request, judge, repair call, environment edit or production mutation."
+  ],
+  "verification": {
+    "backend_tests": 781,
+    "focused_new_methods": 11,
+    "frontend_tests": 9,
+    "typescript_vite_build": "passed_before_final_python_only_fragment_fix",
+    "actual_markdown_renderer_assertions": 4,
+    "new_hosted_requests": 0,
+    "human_reviews": 0,
+    "fresh_reviews": 1,
+    "review_findings_fixed": 1
+  },
+  "review_correction": "P2: retrieval already bounds excerpts; unterminated final fragments omitted from condition highlights. Regression through build_sources failed then passed. One fix pass, no second review."
+}

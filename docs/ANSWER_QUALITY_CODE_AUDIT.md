@@ -1,5 +1,27 @@
 # Answer quality: code audit and execution order
 
+**16 November: citation compatibility and source-condition improvements.** Exact
+complete `【Source N】` labels now become standard citations before validation;
+wrong indices/pages, malformed labels and empty cited passages still fail. A
+valid normalized primary answer avoids an unnecessary backup call. Fallback
+excerpts keep typographic source text literal in the installed Markdown renderer.
+
+The prompt now highlights bounded, literal scope/negation/condition sentences
+and asks the model to check each dependency or guarantee. A reviewed clipping
+fix excludes unterminated fragments even after retrieval has shortened a source.
+All 781 backend tests pass, including 11 new methods. Nine frontend tests, the
+production build and four renderer checks also passed during this increment.
+The consumed-output format replay improves 17/20→20/20, not semantic accuracy.
+The known qa06 semantic failure is not repaired by formatting normalization.
+[Report and prompt-size tradeoff](../evaluation/citation-scope-revision-current.md).
+
+No new hosted call or human review was made. Highlighting is lexical guidance;
+model adherence and claim support remain unmeasured. Full original evidence is
+still supplied, including complete sentences without terminal punctuation that
+may not receive highlights. Both prior quota allowances are exhausted. Current
+changes are prepared for a local commit; deployment is a separate action.
+
+
 15 November offline correction: generic synthesis rules now explicitly preserve
 source qualifiers and material detail, avoid unprovided examples and repetition,
 and cite claims nearby. Canonical refusal applies only when no requested part is
