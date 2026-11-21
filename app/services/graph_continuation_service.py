@@ -22,6 +22,7 @@ from app.core.processing import MAX_GRAPH_PROCESSING_ATTEMPTS
 from app.models.document_upload import DocumentUpload, GraphContinuationJob, GraphExtractionCheckpoint, GraphPublicationCleanupReceipt, GraphPublicationDraft, GraphPublicationIntent, GraphPublicationReceipt
 from app.services.graph_retry_policy import retry_not_before, retry_wait_seconds
 from app.services.graph_result_metadata import graph_result_metadata
+from app.services.graph_batch_cache import save_cache_entry
 from app.services.ingestion_service import GraphProjectionMarker, GraphSectionBatch, IngestionService
 from app.services.graph_publication_candidate import (
     GraphPublicationCandidate, prepare_graph_publication, restore_graph_publication,
@@ -970,5 +971,7 @@ class GraphContinuationService:
             session.add(checkpoint)
         else:
             checkpoint.extraction_json = checked.model_dump(mode="json")
+        if batch.cache_entry is not None:
+            await save_cache_entry(session, record, batch.cache_entry)
         await session.commit()
         return True

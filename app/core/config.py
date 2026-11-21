@@ -243,6 +243,7 @@ class Settings(BaseSettings):
     graph_snapshot_max_bytes: int = Field(default=0, ge=0, alias="GRAPH_SNAPSHOT_MAX_BYTES")
     graph_draft_max_jobs: int = Field(default=0, ge=0, alias="GRAPH_DRAFT_MAX_JOBS")
     graph_draft_max_bytes: int = Field(default=0, ge=0, alias="GRAPH_DRAFT_MAX_BYTES")
+    graph_batch_cache_enabled: bool = Field(default=False, alias="GRAPH_BATCH_CACHE_ENABLED")
     graph_batch_size: int = Field(
         default=4,
         ge=2,

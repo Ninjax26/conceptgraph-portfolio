@@ -96,8 +96,10 @@ def _is_protected(request: Request) -> bool:
 
 def _is_expensive(request: Request) -> bool:
     path = request.url.path.rstrip("/")
+    if path.startswith("/api/v1/ingest/uploads/") and "/extraction/" in path:
+        return request.method in {"GET", "POST"}
     return request.method == "POST" and (
-        path in EXPENSIVE_PATHS or path.endswith("/retry")
+        path in EXPENSIVE_PATHS or path.endswith(("/retry", "/revisions/compare"))
     )
 
 

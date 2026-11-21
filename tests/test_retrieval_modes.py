@@ -170,7 +170,8 @@ class EvaluationIntegrityTests(unittest.TestCase):
     def test_traversal_aggregates_before_concatenating_paths(self):
         for hops in (1, 2):
             cypher = RetrievalService._fallback_cypher("HTTPS", max_hops=hops).cypher
-            self.assertIn("WITH concept, prerequisite_paths,", cypher)
+            self.assertLess(cypher.index("LIMIT 5"), cypher.index("MATCH prerequisite_path"))
+            self.assertIn("AS traversal_limited", cypher)
             self.assertIn("adjacent_nodes +", cypher)
             self.assertNotIn("collect(DISTINCT adjacent) +", cypher)
 

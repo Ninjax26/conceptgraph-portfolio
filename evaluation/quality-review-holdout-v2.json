@@ -1,0 +1,9 @@
+{
+  "name": "Public course pages — prospective review v2",
+  "cases": [
+    {"id":"r2-01","question":"Our DNS resolver has a cached address. What can it reuse, and what would a browser still need to confirm the application responds?","sources":[["web-foundations.pdf",4]],"expected_refusal":false,"expected_claims":[{"id":"ttl","text":"The resolver may reuse the resolution until its TTL expires."},{"id":"response","text":"A successful connection and HTTP response are still needed."}]},
+    {"id":"r2-02","question":"An engineer suggests putting a confidential value in a signed session cookie. Which protection does signing give that value, and which protection would still be needed?","sources":[["identity-security.pdf",4]],"expected_refusal":false,"expected_claims":[{"id":"integrity","text":"Signing lets the server detect tampering."},{"id":"secrecy","text":"Signing does not encrypt contents or keep a secret confidential."}]},
+    {"id":"r2-03","question":"A passage from another upload scores highly for my question. Which checks decide whether it may be returned and whether it provides enough evidence?","sources":[["data-reliability.pdf",5]],"expected_refusal":false,"expected_claims":[{"id":"allowed","text":"Filter by the allowed upload identifiers before returning results."},{"id":"support","text":"Similarity alone cannot establish claim support. Reranking evaluates candidates and an evidence threshold can reject weak matches."}]},
+    {"id":"r2-04","question":"How many bytes does the course prescribe for the ETag on a personalized response?","sources":[["web-foundations.pdf",5]],"expected_refusal":true,"expected_claims":[]}
+  ]
+}

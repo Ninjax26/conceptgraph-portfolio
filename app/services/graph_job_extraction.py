@@ -3,6 +3,8 @@
 import asyncio
 from contextlib import suppress
 
+from app.core.config import settings
+from app.services.graph_batch_cache import GraphBatchCache
 from app.core.blocking import run_async_safely
 from app.services.graph_continuation_service import GraphContinuationService, GraphJobClaim
 from app.services.ingestion_service import IngestionService
@@ -54,7 +56,9 @@ class GraphJobExtraction:
         # Renew before any provider work, not just at the first timer tick.
         await renew()
         extraction = asyncio.create_task(self.ingestion.extract_graph_from_chunks(
-            inputs.chunks, completed_batches=inputs.checkpoints, on_batch_completed=save))
+            inputs.chunks, completed_batches=inputs.checkpoints, on_batch_completed=save,
+            **({"batch_cache": GraphBatchCache(self.sessions, claim.upload_id)}
+               if settings.graph_batch_cache_enabled else {})))
         heartbeat = asyncio.create_task(maintain_lease())
         async def drain(tasks):
             for task in tasks:

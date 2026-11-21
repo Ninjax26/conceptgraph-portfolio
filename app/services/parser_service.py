@@ -1,4 +1,6 @@
+from bisect import bisect_right
 import csv
+import json
 from collections import Counter, deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
@@ -13,6 +15,7 @@ import unicodedata
 import pymupdf as fitz
 
 from app.core.config import settings
+from app.services.document_layout import ordered_lines
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +32,7 @@ class LayoutLine:
     bold: bool
     bbox: tuple[float, float, float, float]
     page_height: float
+    kind: str = "text"
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +48,8 @@ class ExtractedPage:
     text_quality_score: float | None = None
     extraction_warnings: tuple[str, ...] = ()
     ocr_attempts: int = 0
+    review_text: str = ""
+    ocr_lines: tuple[LayoutLine, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +58,7 @@ class OCRResult:
     confidence: float | None
     attempts: int = 1
     warnings: tuple[str, ...] = ()
+    lines: tuple[LayoutLine, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +116,7 @@ class ParserService:
         self.ocr_mixed_pages_enabled = ocr_mixed_pages_enabled
         self.ocr_retry_enabled = ocr_retry_enabled
 
-    def extract_pages_from_bytes(self, content: bytes) -> list[ExtractedPage]:
+    def extract_pages_from_bytes(self, content: bytes, *, corrections: dict[int, str] | None = None) -> list[ExtractedPage]:
         pages: list[ExtractedPage] = []
         ocr_attempts = 0
         with fitz.open(stream=content, filetype="pdf") as document:
@@ -120,9 +127,7 @@ class ParserService:
                     flags=fitz.TEXTFLAGS_TEXT,
                     sort=True,
                 )
-                layout_lines = tuple(
-                    self._layout_lines_from_dict(layout, page.rect.height)
-                )
+                layout_lines = ordered_lines(page, self._layout_lines_from_dict(layout, page.cropbox.height))
                 native_text = self._clean_text(
                     "\n".join(line.text for line in layout_lines)
                 )
@@ -138,6 +143,9 @@ class ParserService:
             )
 
             for page_index, native_text, layout_lines in native_pages:
+                if corrections and page_index in corrections:
+                    pages.append(ExtractedPage(page_index, corrections[page_index], extraction_method="reviewer_corrected"))
+                    continue
                 page = document[page_index - 1]
                 quality = self._text_quality(native_text)
                 native_character_count = quality.readable_characters
@@ -181,6 +189,7 @@ class ParserService:
                                 page_number=page_index,
                                 text=result.text,
                                 extraction_method="ocr",
+                                ocr_lines=result.lines,
                                 ocr_confidence=result.confidence,
                                 text_quality_score=self._text_quality(result.text).score,
                                 extraction_warnings=tuple(dict.fromkeys(result.warnings)),
@@ -206,6 +215,8 @@ class ParserService:
                             body_font_size=body_font_size,
                             repeated_margin_lines=repeated_margin_lines,
                             supplemental_ocr_text=supplemental,
+                            ocr_lines=result.lines if result else (),
+                            review_text=result.text if result and not supplemental and result.text != native_text else "",
                             text_quality_score=self._text_quality(combined).score,
                             extraction_warnings=tuple(dict.fromkeys(warnings)),
                             ocr_attempts=(result.attempts if result else 1) if needs_ocr or image_region is not None else 0,
@@ -218,6 +229,8 @@ class ParserService:
                         extraction_warnings=tuple(dict.fromkeys([*warnings, "ocr_no_reliable_text"])),
                         ocr_attempts=result.attempts if result else 1,
                         text_quality_score=0.0,
+                        review_text=result.text if result else "",
+                        ocr_lines=result.lines if result else (),
                     ))
         return pages
 
@@ -244,6 +257,8 @@ class ParserService:
                     if page.layout_lines
                     else self._split_sections(text)
                 )
+                if extraction_method == "reviewer_corrected":
+                    sections = [DetectedSection("", text, "reviewer_corrected")]
                 if page.supplemental_ocr_text and page.layout_lines:
                     sections.extend(self._split_sections(page.supplemental_ocr_text))
             else:
@@ -251,9 +266,35 @@ class ParserService:
                 extraction_method = "native_text"
                 ocr_confidence = None
                 sections = self._split_sections(text)
+            source_lines = ()
+            if isinstance(page, ExtractedPage):
+                source_lines = page.layout_lines
+                if extraction_method in {"ocr", "native_text+ocr"}:
+                    source_lines += page.ocr_lines
+            # Lookup by text and forward order so repeated labels on the same
+            # page bind to the correct occurrence.
+            locations = {}
+            for order, line in enumerate(source_lines, 1):
+                locations.setdefault(line.text, []).append(order)
+            previous_order = 0
             chunk_index = 0
             for section in sections:
-                for chunk_text in self._iter_text_chunks(section.text):
+                line_ends, orders, offset = [], [], 0
+                for line_text in section.text.splitlines():
+                    offset += len(line_text) + 1
+                    candidates = locations.get(line_text, ())
+                    index = bisect_right(candidates, previous_order)
+                    order = candidates[index] if index < len(candidates) else None
+                    if order:
+                        previous_order = order
+                    line_ends.append(offset)
+                    orders.append(order)
+                for start, stop in self._iter_chunk_ranges(section.text):
+                    chunk_text = section.text[start:stop]
+                    first = bisect_right(line_ends, start)
+                    last = bisect_right(line_ends, stop - 1)
+                    boxes = [[order, *[round(v, 2) for v in source_lines[order - 1].bbox]]
+                             for order in orders[first:last + 1] if order]
                     if max_chunks is not None and len(chunks) >= max_chunks:
                         from app.services.resource_budget_service import ResourceBudgetExceeded
                         raise ResourceBudgetExceeded("This PDF exceeds the configured per-document chunk budget. Split it into smaller PDFs.", retryable=False)
@@ -265,6 +306,7 @@ class ParserService:
                             metadata={
                                 "chunk_id": chunk_id,
                                 "chunk_index": chunk_index,
+                                **({"source_lines_pdf_points": json.dumps(boxes, separators=(",", ":"))} if boxes else {}),
                                 "document_id": document_id,
                                 "upload_id": upload_id,
                                 "document_name": document_name,
@@ -417,7 +459,7 @@ class ParserService:
                 previous=previous,
                 following=following,
             )
-            if score >= 4:
+            if score >= 4 and line.kind != "table_row":
                 if body:
                     sections.append(
                         DetectedSection(
@@ -583,6 +625,7 @@ class ParserService:
     def _ocr_page(self, page: fitz.Page, *, clip: fitz.Rect | None = None) -> OCRResult:
         deadline = time.monotonic() + self.ocr_page_timeout_seconds
         pixmap, dpi = self._render_ocr_page(page, dpi=self.ocr_dpi, clip=clip)
+        selected_dpi = self.ocr_dpi
         result = self._run_tesseract(pixmap, dpi=dpi, psm=1, timeout=max(0.001, deadline - time.monotonic()))
         attempts = 1
         warnings: list[str] = ["ocr_resolution_capped"] if dpi < self.ocr_dpi else []
@@ -598,13 +641,25 @@ class ParserService:
                     alternate = self._run_tesseract(retry_image, dpi=retry_dpi, psm=6, timeout=remaining)
                     if self._ocr_rank(alternate) > self._ocr_rank(result):
                         result = alternate
+                        pixmap = retry_image
+                        selected_dpi = min(300, self.ocr_dpi + 100)
                 except RuntimeError:
                     warnings.append("ocr_retry_failed")
         if result.confidence is not None and result.confidence < self.ocr_min_confidence:
             warnings.append("ocr_confidence_low")
         if self._text_quality(result.text).score < self.MIN_TEXT_QUALITY:
             warnings.append("ocr_text_quality_low")
-        return replace(result, attempts=attempts, warnings=tuple(dict.fromkeys(warnings)))
+        # TSV boxes are in pixels relative to the rendered (possibly clipped)
+        # image. Map its pixel origin back to unrotated PDF page coordinates.
+        rendered = page.rect if clip is None else clip & page.rect
+        scale = min(selected_dpi / 72,
+                    0.98 * math.sqrt(self.ocr_max_render_pixels / rendered.get_area()), 6000 / max(rendered.width, rendered.height))
+        positioned = []
+        for line in result.lines:
+            box = fitz.Rect(line.bbox) + (pixmap.x, pixmap.y, pixmap.x, pixmap.y)
+            box = box * fitz.Matrix(1 / scale, 1 / scale) * page.derotation_matrix
+            positioned.append(replace(line, bbox=tuple(box), page_height=page.cropbox.height))
+        return replace(result, lines=tuple(positioned), attempts=attempts, warnings=tuple(dict.fromkeys(warnings)))
 
     def _ocr_rank(self, result: OCRResult) -> tuple[bool, float, float, int]:
         quality = self._text_quality(result.text)
@@ -649,6 +704,7 @@ class ParserService:
     @staticmethod
     def _parse_tesseract_tsv(value: str) -> OCRResult:
         lines: dict[tuple[str, str, str], list[str]] = {}
+        boxes = {}
         confidences: list[tuple[float, int]] = []
         for row in csv.DictReader(StringIO(value), delimiter="\t"):
             word = ParserService._clean_text(row.get("text") or "")
@@ -666,6 +722,13 @@ class ParserService:
                 row.get("line_num", ""),
             )
             lines.setdefault(line_key, []).append(word)
+            try:
+                left, top, width, height = (int(row[k]) for k in ("left", "top", "width", "height"))
+                if width > 0 and height > 0:
+                    box = fitz.Rect(left, top, left + width, top + height)
+                    boxes[line_key] = boxes[line_key] | box if line_key in boxes else box
+            except (KeyError, TypeError, ValueError):
+                pass
             weight = max(1, ParserService._meaningful_character_count(word))
             confidences.append((confidence, weight))
 
@@ -680,7 +743,9 @@ class ParserService:
             if total_weight
             else None
         )
-        return OCRResult(text=text, confidence=average)
+        positioned = tuple(LayoutLine(" ".join(words), 0, False, tuple(boxes[key]), 0, "ocr")
+                           for key, words in lines.items() if key in boxes)
+        return OCRResult(text=text, confidence=average, lines=positioned)
 
     @staticmethod
     def _clean_text(value: str) -> str:
@@ -751,15 +816,19 @@ class ParserService:
         return list(self._iter_text_chunks(text))
 
     def _iter_text_chunks(self, text: str):
+        for start, stop in self._iter_chunk_ranges(text):
+            yield text[start:stop]
+
+    def _iter_chunk_ranges(self, text: str):
         words = deque()
         new_words = 0
         for match in re.finditer(r"\S+", text):
             words.append(match)
             new_words += 1
             if len(words) == self.chunk_size:
-                yield text[words[0].start():words[-1].end()].strip()
+                yield words[0].start(), words[-1].end()
                 for _ in range(self.chunk_size - self.chunk_overlap):
                     words.popleft()
                 new_words = 0
         if words and new_words:
-            yield text[words[0].start():words[-1].end()].strip()
+            yield words[0].start(), words[-1].end()

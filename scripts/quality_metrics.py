@@ -45,7 +45,7 @@ def audit_answer(case, response, pages, review=None):
               "cited_sources_literal": all(ref["index_valid"] and literal[ref["index"] - 1] for ref in refs) if refs else None,
               "review_status": "pending", "claim_count": None, "supported_claims": None,
               "correctly_cited_claims": None, "groundedness": None, "citation_correctness": None,
-              "answer_completeness": None, "refusal_correct": None}
+              "answer_correct": None, "answer_completeness": None, "refusal_correct": None}
     if review is None:
         return result
     if review.get("all_claims_reviewed") is not True and not str(review.get("reviewer") or "").strip():
@@ -56,6 +56,7 @@ def audit_answer(case, response, pages, review=None):
     cited = {ref["index"] for ref in refs if ref["index_valid"] and ref["page_valid"]}
     valid = (bool(str(review.get("reviewer") or "").strip()) and review.get("content_sha256") == result["content_sha256"]
              and review.get("review_context_sha256") == result["review_context_sha256"]
+             and (review.get("answer_correct") is None or type(review["answer_correct"]) is bool)
              and review.get("all_claims_reviewed") is True and isinstance(claims, list)
              and isinstance(covered, list) and all(isinstance(key, str) and key in known for key in covered)
              and type(review.get("refusal_correct")) is bool)
@@ -73,7 +74,7 @@ def audit_answer(case, response, pages, review=None):
     count = len(claims)
     supported = sum(claim["supported"] for claim in claims)
     correct = sum(claim["citations_correct"] for claim in claims)
-    return dict(result, review_status="reviewed", claim_count=count, supported_claims=supported,
+    return dict(result, review_status="reviewed", answer_correct=review.get("answer_correct"), claim_count=count, supported_claims=supported,
                 correctly_cited_claims=correct, groundedness=supported / count if count else None,
                 citation_correctness=correct / count if count else None,
                 answer_completeness=len(set(covered)) / len(known) if known else None,

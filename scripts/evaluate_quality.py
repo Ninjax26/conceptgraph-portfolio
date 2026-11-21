@@ -128,7 +128,7 @@ def run(args):
                           "review": {"id": case["id"], "content_sha256": content_hash(response), "reviewer": "",
                                      "review_context_sha256": review_context_hash(case, response, pages),
                                      "all_claims_reviewed": False, "claims": [], "expected_claims_covered": [],
-                                     "refusal_correct": None}})
+                                     "answer_correct": None, "refusal_correct": None}})
     snapshot = json.loads(args.graph_snapshot.read_text())
     graphs, edge_queue = [], []
     for filename, record in snapshot.items():
@@ -174,12 +174,15 @@ def run(args):
     claim_count = summary["human_reviewed_claims"]
     complete = [answer["answer_completeness"] for answer in reviewed if answer["answer_completeness"] is not None]
     refusals = [answer["refusal_correct"] for answer in reviewed if answer["refusal_correct"] is not None]
-    summary.update(groundedness=summary["human_supported_claims"] / claim_count if claim_count else None,
+    correctness = [a["answer_correct"] for a in reviewed if a["answer_correct"] is not None]
+    summary.update(human_correctness_reviews=len(correctness),
+                   human_answer_accuracy=sum(correctness) / len(correctness) if correctness else None,
+                   groundedness=summary["human_supported_claims"] / claim_count if claim_count else None,
                    citation_correctness=summary["human_correctly_cited_claims"] / claim_count if claim_count else None,
                    mean_answer_completeness=sum(complete) / len(complete) if complete else None,
                    reviewed_supported_answers=len(complete), reviewed_unsupported_answers=len(refusals),
                    correct_reviewed_refusals=sum(refusals) if refusals else None)
-    fully_reviewed = (len(reviewed) == len(cases) and len(answers) == len(cases)
+    fully_reviewed = (len(correctness) == len(cases) and len(reviewed) == len(cases) and len(answers) == len(cases)
                       and bool(valid_graphs) and len(valid_graphs) == len(snapshot)
                       and all(graph["human_reviewed_edges"] == graph["edges"] for graph in valid_graphs))
     report = {"generated_at": datetime.now(timezone.utc).isoformat(),
@@ -218,6 +221,7 @@ def run(args):
              f"| Hash-bound human answer reviews | {len(reviewed)}/{len(answers)} |",
              f"| Known prerequisite links found | {summary['known_reference_edges_found']}/{summary['known_reference_edges']} |",
              f"| Graph edges pending semantic review | {summary['unreviewed_graph_edges']}/{summary['graph_edges']} |",
+             f"| Answer correctness ({len(correctness)} human ratings) | {metric(summary['human_answer_accuracy'])} |",
              f"| Groundedness (reviewed claims only) | {metric(summary['groundedness'])} |",
              f"| Citation correctness (reviewed claims only) | {metric(summary['citation_correctness'])} |",
              f"| Mean completeness ({len(complete)} reviewed supported answers) | {metric(summary['mean_answer_completeness'])} |",

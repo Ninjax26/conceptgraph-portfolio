@@ -53,6 +53,7 @@ from app.schemas.extraction import (
     normalize_concept_name,
 )
 from app.services.cerebras_service import cerebras_service
+from app.services.graph_batch_cache import CacheEntry, GraphBatchCache
 from app.services.gemini_service import gemini_service
 from app.services.parser_service import DocumentChunk
 from app.services.provider_failover import provider_circuit_breaker
@@ -72,6 +73,7 @@ class GraphSectionBatch:
     section_label: str
     chunks: tuple[DocumentChunk, ...]
     kind: str = "section"
+    cache_entry: CacheEntry | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +173,7 @@ class IngestionService:
         chunks: Sequence[DocumentChunk],
         *,
         completed_batches: Mapping[str, GraphExtractionResponse] | None = None,
+        batch_cache: GraphBatchCache | None = None,
         on_batch_completed: Callable[
             [GraphSectionBatch, GraphExtractionResponse], Awaitable[None]
         ]
@@ -245,7 +248,10 @@ class IngestionService:
                 for chunk in batch.chunks
             )
             try:
-                extraction = await self.extract_graph_from_text(context)
+                if batch_cache is None:
+                    extraction = await self.extract_graph_from_text(context)
+                else:
+                    extraction, batch = await batch_cache.extract(self, batch, context)
                 enriched = self._attach_provenance(extraction, batch.chunks)
                 if extraction.nodes and not enriched.nodes:
                     raise GraphStructureError("No extracted concepts cite the supplied source.", reason=GraphFailureReason.UNKNOWN_SOURCE)
@@ -368,7 +374,10 @@ class IngestionService:
                 )
                 if linked is None:
                     try:
-                        extraction = await self.extract_graph_from_text(context)
+                        if batch_cache is None:
+                            extraction = await self.extract_graph_from_text(context)
+                        else:
+                            extraction, global_batch = await batch_cache.extract(self, global_batch, context)
                         linked = self._attach_provenance(
                             extraction, global_batch.chunks
                         )
@@ -1127,6 +1136,8 @@ class IngestionService:
             fields.append("execution_token")
         for field in fields:
             if field in payload_schema:
+                if payload_schema[field].data_type != PayloadSchemaType.KEYWORD:
+                    raise RuntimeError(f"Qdrant filter field {field} requires a keyword index.")
                 continue
             try:
                 self.vector_client.create_payload_index(
@@ -1573,6 +1584,8 @@ class IngestionService:
             ],
             "recovery_context": recovery_context,
         }
+        if settings.graph_batch_cache_enabled:
+            contract["source_label_contract"] = "request-local-v1"
         encoded = json.dumps(contract, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         return f"{kind}:{hashlib.sha256(encoded.encode('utf-8')).hexdigest()}"
 

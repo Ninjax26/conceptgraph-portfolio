@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import contextlib
 import logging
 import time
@@ -18,6 +19,7 @@ from app.core.processing import ProcessingStage, classify_failure
 from app.models.document_upload import DocumentUpload
 from app.schemas.extraction import GraphExtractionResponse
 from app.services.ingestion_service import GraphSectionBatch, IngestionService
+from app.services.graph_batch_cache import GraphBatchCache
 from app.services.graph_result_metadata import graph_result_metadata
 from app.services.parser_service import ExtractedPage, ParserService
 from app.services.storage_service import storage_service
@@ -110,9 +112,15 @@ class DocumentProcessingService:
             pdf_content = await run_blocking_safely(
                 storage_service.get_bytes, record.storage_key
             )
+            reviewed = {}
+            load_reviews = getattr(self.upload_service, "reviewed_page_texts", None)
+            if self.config.graph_projection_fencing_enabled and load_reviews and isinstance(getattr(record, "content_hash", None), str):
+                source_digest = hashlib.sha256(pdf_content).hexdigest()
+                reviewed = await self._run_with_session(lambda session: load_reviews(session, upload_id, source_digest))
             pages = await run_blocking_safely(
                 self.parser_service.extract_pages_from_bytes,
                 pdf_content,
+                **({"corrections": reviewed} if reviewed else {}),
             )
             extraction_summary = self._page_extraction_summary(pages)
             stage_seconds["text_extraction"] = round(time.perf_counter() - stage_started, 4)
@@ -220,6 +228,7 @@ class DocumentProcessingService:
                         section_key=batch.section_key,
                         section_label=batch.section_label,
                         extraction_json=extraction.model_dump(mode="json"),
+                        **({"cache_entry": batch.cache_entry} if batch.cache_entry is not None else {}),
                     )
                 )
                 if not saved:
@@ -227,10 +236,13 @@ class DocumentProcessingService:
                         f"Processing attempt {task_id} is no longer current for {upload_id}."
                     )
 
+            batch_cache = (GraphBatchCache(AsyncSessionLocal, upload_id)
+                           if self.config.graph_batch_cache_enabled else None)
             graph = await self.ingestion_service.extract_graph_from_chunks(
                 chunks,
                 completed_batches=completed_batches,
                 on_batch_completed=save_checkpoint,
+                **({"batch_cache": batch_cache} if batch_cache is not None else {}),
             )
             await self._ensure_current(superseded, upload_id, task_id)
             if self.config.graph_projection_fencing_enabled:
@@ -271,6 +283,7 @@ class DocumentProcessingService:
                 "stage_seconds": stage_seconds,
                 "source_bytes": len(pdf_content),
                 "page_count": len(pages),
+                **({"graph_batch_cache_hits": batch_cache.hits} if batch_cache is not None else {}),
                 "graph_provider_calls": (provider_call_counts.get() or {}).get("graph_extraction", 0),
                 "queue_wait_seconds": max(0, (record.started_at - record.last_attempted_at).total_seconds())
                 if getattr(record, "started_at", None) is not None and getattr(record, "last_attempted_at", None) is not None else None,
@@ -477,6 +490,7 @@ class DocumentProcessingService:
         warning_pages = 0
         ocr_attempts = 0
         unreadable_pages = 0
+        reviewed_pages = 0
         warning_page_numbers: list[int] = []
         confidences: list[float] = []
         for page in pages:
@@ -492,6 +506,8 @@ class DocumentProcessingService:
                     ocr_pages += 1
                 if page.ocr_confidence is not None:
                     confidences.append(page.ocr_confidence)
+            elif isinstance(page, ExtractedPage) and page.extraction_method == "reviewer_corrected":
+                reviewed_pages += 1
             elif isinstance(page, ExtractedPage) and page.extraction_method == "unreadable":
                 unreadable_pages += 1
             else:
@@ -499,6 +515,7 @@ class DocumentProcessingService:
         return {
             "pages_extracted": len(pages),
             "native_text_pages": native_pages,
+            "reviewer_corrected_pages": reviewed_pages,
             "ocr_pages": ocr_pages,
             "hybrid_text_ocr_pages": hybrid_pages,
             "extraction_warning_pages": warning_pages,

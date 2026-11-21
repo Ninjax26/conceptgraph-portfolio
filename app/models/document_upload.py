@@ -112,6 +112,16 @@ class GraphExtractionCheckpoint(Base):
     )
 
 
+class GraphBatchCacheRow(Base):
+    """Validated request-local graph. Ownership follows the source upload."""
+    __tablename__ = "graph_batch_cache"
+    upload_id: Mapped[str] = mapped_column(String(64), ForeignKey("document_uploads.upload_id", ondelete="CASCADE"), primary_key=True)
+    cache_key: Mapped[str] = mapped_column(String(80), primary_key=True, index=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    digest: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
 class WorkerPresence(Base):
     __tablename__ = "worker_presence"
 
@@ -249,3 +259,14 @@ class ProviderBudget(Base):
     day_requests: Mapped[int] = mapped_column(Integer, nullable=False)
     minute_estimated_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     day_estimated_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+
+
+class PageTextCorrection(Base):
+    """A review of one immutable source page, retained across processing attempts."""
+
+    __tablename__ = "page_text_corrections"
+    upload_id: Mapped[str] = mapped_column(String(64), ForeignKey("document_uploads.upload_id", ondelete="CASCADE"), primary_key=True)
+    page_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    corrected_text: Mapped[str] = mapped_column(Text, nullable=False)

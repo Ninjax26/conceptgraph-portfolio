@@ -52,6 +52,16 @@ class QualityMetricTests(unittest.TestCase):
         self.assertEqual(result["citation_correctness"], 1.)
         self.assertEqual(result["answer_completeness"], .5)
 
+    def test_correctness_requires_an_explicit_boolean_from_the_reviewer(self):
+        for value in (True, False, None):
+            with self.subTest(value=value):
+                reviewed = audit_answer(self.case, self.response, self.pages,
+                                        dict(self.review(), answer_correct=value))
+                self.assertIs(reviewed["answer_correct"], value)
+        invalid = audit_answer(self.case, self.response, self.pages,
+                               dict(self.review(), answer_correct="yes"))
+        self.assertEqual(invalid["review_status"], "invalid_or_stale")
+
     def test_reviews_become_stale_when_answer_or_sources_change(self):
         for response in (dict(self.response, answer="Changed. [Source 1]"),
                          dict(self.response, sources=[dict(self.response["sources"][0], supporting_passage="Inspect every 60 days.")])):

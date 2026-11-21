@@ -14,6 +14,8 @@ import {
   UploadCloud,
 } from "lucide-react";
 
+import RevisionComparison from "../components/RevisionComparison";
+import ExtractionReview from "../components/ExtractionReview";
 import PdfPreviewModal from "../components/PdfPreviewModal";
 import UploadModal from "../components/UploadModal";
 import { buildGraphElements } from "../lib/graphElements";
@@ -624,7 +626,7 @@ export default function Dashboard(): JSX.Element {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grounded answer</p>
               {response?.answer ? (
                 <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${confidenceClass(response.confidence.level)}`}>
-                  {response.confidence.level} confidence · {Math.round(response.confidence.score * 100)}%
+                  Evidence score · {Math.round(response.confidence.score * 100)}/100 · {response.confidence.level}
                 </span>
               ) : null}
             </div>
@@ -681,7 +683,7 @@ export default function Dashboard(): JSX.Element {
               <p className="my-0 text-slate-500">
                 {response
                   ? "The AI provider returned no answer text. You can inspect the retrieved evidence below and try the question again."
-                  : "Ask a course question to see a formatted answer, confidence score, and page-level evidence here."}
+                  : "Ask a course question to see a formatted answer, evidence score, and page-level evidence here."}
               </p>
             )}
           </article>
@@ -725,6 +727,7 @@ export default function Dashboard(): JSX.Element {
         </div>
 
 
+        {courseId && <RevisionComparison key={courseId} courseId={courseId} />}
         <details className="group border-b border-slate-200 bg-slate-50/40">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 transition hover:bg-slate-50">
             <span className="inline-flex items-center gap-2">
@@ -837,6 +840,7 @@ export default function Dashboard(): JSX.Element {
                       ) : null}
                     </div>
                   </div>
+                  {(job.status === "ready" || job.status === "failed") && <ExtractionReview uploadId={job.upload_id} onQueued={() => void refreshUploads()} />}
                   {job.error_message || job.status_poll_error ? (
                     <p className="mt-2 text-xs text-red-600">
                       {friendlyUploadError(job.error_message ?? job.status_poll_error)}

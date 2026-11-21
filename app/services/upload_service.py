@@ -15,12 +15,15 @@ from app.core.processing import (
     MAX_PROCESSING_ATTEMPTS,
     ProcessingStage,
 )
+from app.services.graph_batch_cache import CacheEntry, save_cache_entry
 from app.models.document_upload import (
     Course,
     DocumentUpload,
     GraphExtractionCheckpoint,
     ProcessingAttempt,
+    PageTextCorrection,
 )
+from app.services.extraction_review import Correction, CorrectionConflict
 from app.services.graph_retry_policy import GraphRetryNotDue, retry_not_before, retry_wait_seconds
 
 if TYPE_CHECKING:
@@ -104,6 +107,7 @@ class UploadService:
         section_key: str,
         section_label: str,
         extraction_json: dict[str, Any],
+        cache_entry: CacheEntry | None = None,
     ) -> bool:
         record = await self._get_current_upload(
             session,
@@ -134,6 +138,8 @@ class UploadService:
             checkpoint.section_key = section_key
             checkpoint.section_label = section_label
             checkpoint.extraction_json = extraction_json
+        if cache_entry is not None:
+            await save_cache_entry(session, record, cache_entry)
         await session.commit()
         return True
 
@@ -439,18 +445,30 @@ class UploadService:
         await session.refresh(record)
         return record
 
+    async def reviewed_page_texts(self, session, upload_id, source_sha256):
+        rows = (await session.execute(select(PageTextCorrection).where(
+            PageTextCorrection.upload_id == upload_id,
+            PageTextCorrection.source_sha256 == source_sha256,
+        ))).scalars()
+        return {row.page_number: row.corrected_text for row in rows}
+
     async def retry_upload(
         self,
         session: AsyncSession,
         upload_id: str,
         task_id: str,
+        *,
+        correction: Correction | None = None,
+        publish_correction: bool = True,
     ) -> DocumentUpload | None:
         from app.services.resource_budget_service import ResourceBudgetExceeded, resource_budget_service
-        await resource_budget_service.lock(session)
-        usage = await resource_budget_service.usage(session)
-        if usage.pending >= resource_budget_service.config.max_pending_documents:
-            await session.rollback()
-            raise ResourceBudgetExceeded("The pending processing budget is full. Wait for existing jobs to finish.")
+        draft_only = correction is not None and not publish_correction
+        if not draft_only:
+            await resource_budget_service.lock(session)
+            usage = await resource_budget_service.usage(session)
+            if usage.pending >= resource_budget_service.config.max_pending_documents:
+                await session.rollback()
+                raise ResourceBudgetExceeded("The pending processing budget is full. Wait for existing jobs to finish.")
         result = await session.execute(
             select(DocumentUpload)
             .where(DocumentUpload.upload_id == upload_id)
@@ -458,7 +476,24 @@ class UploadService:
             .execution_options(populate_existing=True)
         )
         record = result.scalar_one_or_none()
-        if record is None or not self.can_reprocess(record):
+        if correction is not None:
+            if (record is None or self.is_deleting(record) or record.task_id != correction.task_id
+                    or record.stage not in self.DELETABLE_STAGES or record.content_hash != correction.source_sha256
+                    or (not draft_only and record.attempt_count >= MAX_GRAPH_PROCESSING_ATTEMPTS)):
+                raise CorrectionConflict("The upload changed or reached its processing limit. Reload the review.")
+            row = await session.get(PageTextCorrection, (upload_id, correction.page_number))
+            revision = row.revision if row else 0
+            if correction.revision != revision:
+                raise CorrectionConflict("Another reviewer saved a correction. Reload this page.")
+            if row is None:
+                row = PageTextCorrection(upload_id=upload_id, page_number=correction.page_number,
+                                         source_sha256=correction.source_sha256)
+                session.add(row)
+            row.revision, row.corrected_text = revision + 1, correction.text
+            if draft_only:
+                await session.commit()
+                return record
+        elif record is None or not self.can_reprocess(record):
             return None
         if isinstance(record.result_json, dict) and "graph_retry_not_before" in record.result_json:
             # Recheck while holding the same document/resource locks that guard

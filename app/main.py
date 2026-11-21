@@ -6,6 +6,8 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.endpoints.extraction_review import router as extraction_review_router
+from app.api.endpoints.revisions import router as revisions_router
 from app.api.endpoints.auth import router as auth_router
 from app.api.endpoints.ingest import router as ingest_router
 from app.api.endpoints.query import router as query_router
@@ -70,6 +72,8 @@ app.include_router(auth_router)
 app.include_router(query_router)
 app.include_router(public_demo_router)
 app.include_router(ingest_router)
+app.include_router(revisions_router)
+app.include_router(extraction_review_router)
 
 
 @app.get("/api/v1/health", tags=["system"])

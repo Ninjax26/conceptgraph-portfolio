@@ -388,7 +388,7 @@ class RetrievalService:
             two_hop_prerequisite_names=sorted(two_hop_names),
             cypher=cypher,
             metadata={
-                "display_budget_applied": display_limited,
+                "display_budget_applied": display_limited or any(r.get("traversal_limited") for r in records),
                 "display_node_limit": settings.graph_display_max_nodes,
                 "display_edge_limit": settings.graph_display_max_edges,
                 **totals,
@@ -677,23 +677,24 @@ class RetrievalService:
                      ELSE 0
                    END) AS match_score
             WHERE match_score > 0
-            OPTIONAL MATCH prerequisite_path =
-              (prerequisite:Concept)-[:PREREQUISITE_OF*1..{max_hops}]->(concept)
-            WHERE all(
-              path_node IN nodes(prerequisite_path)
-              WHERE path_node.upload_id IN $document_ids
-                AND (course)-[:CONTAINS]->(path_node)
-            )
-            WITH course, concept, match_score,
-                 collect(DISTINCT prerequisite_path) AS prerequisite_paths
-            OPTIONAL MATCH (concept)-[adjacent_relationship]-(adjacent:Concept)
-            WHERE adjacent IS NULL OR (
-              (course)-[:CONTAINS]->(adjacent)
-              AND adjacent.upload_id IN $document_ids
-            )
-            WITH concept, prerequisite_paths, match_score,
-                 collect(DISTINCT adjacent) AS adjacent_nodes,
-                 collect(DISTINCT adjacent_relationship) AS adjacent_edges
+            ORDER BY match_score DESC, concept.name, concept.id
+            LIMIT 5
+            WITH course, concept, match_score, COLLECT {{
+              MATCH prerequisite_path =
+                (prerequisite:Concept)-[:PREREQUISITE_OF*1..{max_hops}]->(concept)
+              WHERE all(path_node IN nodes(prerequisite_path)
+                WHERE path_node.upload_id IN $document_ids AND (course)-[:CONTAINS]->(path_node))
+              RETURN prerequisite_path LIMIT {settings.graph_display_max_edges + 1}
+            }} AS prerequisite_paths
+            WITH concept, prerequisite_paths, match_score, COLLECT {{
+              MATCH (concept)-[adjacent_relationship]-(adjacent:Concept)
+              WHERE adjacent.upload_id IN $document_ids AND (course)-[:CONTAINS]->(adjacent)
+              RETURN [adjacent, adjacent_relationship] AS pair LIMIT {settings.graph_display_max_edges + 1}
+            }} AS pairs
+            WITH concept, prerequisite_paths[..{settings.graph_display_max_edges}] AS prerequisite_paths, match_score,
+                 size(prerequisite_paths) > {settings.graph_display_max_edges} OR size(pairs) > {settings.graph_display_max_edges} AS traversal_limited,
+                 [pair IN pairs[..{settings.graph_display_max_edges}] | pair[0]] AS adjacent_nodes,
+                 [pair IN pairs[..{settings.graph_display_max_edges}] | pair[1]] AS adjacent_edges
             RETURN concept,
                    adjacent_nodes +
                      reduce(node_acc = [], path IN prerequisite_paths |
@@ -701,7 +702,7 @@ class RetrievalService:
                    adjacent_edges +
                      reduce(edge_acc = [], path IN prerequisite_paths |
                        edge_acc + relationships(path)) AS relationships,
-                   match_score
+                   match_score, traversal_limited
             ORDER BY match_score DESC, concept.name
             LIMIT 5
             """,
@@ -830,13 +831,19 @@ class RetrievalService:
             MATCH (course:Course)-[:CONTAINS]->(concept:Concept)
             WHERE course.id IN $course_ids
               AND concept.upload_id IN $document_ids
-            OPTIONAL MATCH (concept)-[relationship]-(related:Concept)
-            WHERE related IS NULL OR ((course)-[:CONTAINS]->(related) AND related.upload_id IN $document_ids)
-            RETURN concept, collect(DISTINCT related) AS related_concepts,
-                   collect(DISTINCT relationship) AS relationships
-            ORDER BY concept.name
-            LIMIT 50
+            WITH course, concept ORDER BY concept.name, concept.id LIMIT 50
+            WITH concept, COLLECT {
+              MATCH (concept)-[relationship]-(related:Concept)
+              WHERE (course)-[:CONTAINS]->(related) AND related.upload_id IN $document_ids
+              RETURN [related, relationship] AS pair LIMIT $probe_limit
+            } AS pairs
+            RETURN concept, [pair IN pairs[..$edge_limit] | pair[0]] AS related_concepts,
+                   [pair IN pairs[..$edge_limit] | pair[1]] AS relationships,
+                   size(pairs) > $edge_limit AS traversal_limited
+            ORDER BY concept.name, concept.id
             """,
+            probe_limit=settings.graph_display_max_edges + 1,
+            edge_limit=settings.graph_display_max_edges,
             course_ids=course_ids,
             document_ids=document_ids,
         )
