@@ -29,6 +29,16 @@ def supporting_query(question: str) -> str | None:
     if (not text or len(text) > 400 or any(char in text for char in ":;,\n?")
             or re.search(r"\b(?:and|or|not|no|never|without|unless|except|only|if|when|while|although|despite|because|but|rather|than|instead|otherwise|solely|exclusively)\b", text, re.IGNORECASE)):
         return None
+    # Look for the transaction boundary only after the original question
+    # has independently found evidence about the named write.
+    rollback = re.fullmatch(
+        r"Why (?:cannot|can['’]t) ((?:a |the )?"
+        r"(?:database|SQL|PostgreSQL|MySQL|SQLite|SQL Server) rollback) "
+        r"(?:remove|undo|revert) (?:partial )?[\w-]+ writes",
+        text, re.IGNORECASE,
+    )
+    if rollback:
+        return f"Can {rollback[1]} undo writes outside the transaction?"
     learning = re.fullmatch(
         r"What (?:must|should|do) I (?:understand|learn|know|study) "
         r"(?:(directly|immediately) )?before (.+)", text, re.IGNORECASE)

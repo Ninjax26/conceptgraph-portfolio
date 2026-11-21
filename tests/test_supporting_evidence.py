@@ -31,6 +31,12 @@ class SupportingEvidenceTests(unittest.TestCase):
             'What should I learn before idempotency?': 'prerequisites for idempotency',
             'Why does a signed login session still need authorization checks for each document?': 'authorization checks for each document',
             'Why must vector retrieval use the same document scope as access control?': 'vector retrieval',
+            'Why cannot a PostgreSQL rollback remove partial Qdrant writes?': 'Can a PostgreSQL rollback undo writes outside the transaction?',
+            'Why can’t a database rollback undo index writes?': 'Can a database rollback undo writes outside the transaction?',
+            'Why cannot a PostgreSQL rollback remove Qdrant writes after retry?': None,
+            'Why cannot a PostgreSQL rollback remove Qdrant writes and object uploads?': None,
+            'Why cannot a PostgreSQL rollback remove a blob?': None,
+            'Why cannot a firmware rollback undo disk writes?': None,
             'Who manufactured PMP-104?': None,
             'Compare TLS with authorization.': None,
             'What must I learn before HTTPS and SQL?': None,
@@ -70,6 +76,31 @@ class SupportingEvidenceTests(unittest.TestCase):
         self.assertEqual(confidence['score'], original[1]['score'])
         self.assertEqual(confidence['level'], original[1]['level'])
         self.assertEqual([primary, extra], before)
+
+    def test_rollback_context_uses_scored_evidence_and_keeps_the_direct_answer_first(self):
+        from app.services.synthesis_service import SynthesisService
+
+        question = "Why cannot a PostgreSQL rollback remove partial Qdrant writes?"
+        cleanup = "A PostgreSQL rollback cannot erase points already written to Qdrant."
+        scope = "A SQL transaction does not automatically roll back writes made to an external vector database."
+        service = RerankService()
+        service._model = SimpleNamespace(predict=lambda pairs: [
+            (5. if "Qdrant" in passage else -8.) if prompt == question else
+            (4. if "external vector database" in passage else -8.)
+            for prompt, passage in pairs
+        ])
+        ranked = service._rerank_locally(question, [candidate(1, scope), candidate(4, cleanup)])
+        sources, confidence = prepare_evidence(question, ranked)
+        primary_sources, primary_confidence = prepare_evidence(
+            question, [chunk for chunk in ranked if not chunk.get("supporting_evidence")]
+        )
+        self.assertEqual(sources[:1], primary_sources)
+        self.assertEqual(confidence["score"], primary_confidence["score"])
+        self.assertEqual([s["page_number"] for s in sources], [4, 1])
+        prompt = SynthesisService._user_prompt(question, [], sources)
+        self.assertIn(question, prompt)
+        self.assertIn(cleanup, prompt)
+        self.assertIn(scope, prompt)
 
     def test_saturated_primary_citations_and_identifiers_cannot_be_displaced(self):
         primary = [candidate(i, f'PMP-104 reference {i}.') for i in range(1,6)]
